@@ -8,3 +8,7 @@ pillow==11.1.0
 
 paddleocr>=2.7,<3
 qrcode[pil]==8.0
+
+# Database drivers
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
