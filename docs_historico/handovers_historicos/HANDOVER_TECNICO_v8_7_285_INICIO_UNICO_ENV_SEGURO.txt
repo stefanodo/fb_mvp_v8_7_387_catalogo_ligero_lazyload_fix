@@ -1,0 +1,45 @@
+HANDOVER v8_7_285 · INICIO ÚNICO Y .ENV SEGURO
+
+Objetivo:
+- Simplificar el arranque diario del sistema.
+- Evitar que el usuario tenga que abrir muchos .command.
+- Evitar que un .env mal pegado ejecute texto/URLs como comandos de shell.
+
+Cambios:
+1. Nuevo comando principal: ABRIR_SYSTEM_MAC.command.
+   - Doble clic y arranque normal.
+   - Desbloquea permisos.
+   - Cierra puerto 8000 si quedó ocupado.
+   - Instala dependencias si hace falta.
+   - Muestra base activa, IA activa y URL móvil.
+   - Abre Safari.
+
+2. Nuevo comando: MANTENIMIENTO_SYSTEM_MAC.command.
+   Menú único para:
+   - Configurar IA/OpenAI.
+   - Poner stock, pedidos y producciones a cero.
+   - Normalizar catálogo/unidades/precios/preparaciones.
+   - Limpiar pedidos y producciones.
+   - HTTPS temporal opcional.
+
+3. INICIAR_F&B_MVP.command reescrito con carga segura de .env.
+   - Ya no usa `source .env`.
+   - Lee solo líneas KEY=VALUE válidas.
+   - Ignora URLs accidentales, textos pegados y líneas inválidas.
+   - Soluciona error observado: `.env: line 5: https://support.apple.com/... No such file or directory`.
+
+4. DESBLOQUEAR_y_INICIAR.command apunta al inicio robusto.
+
+Reglas:
+- Para uso diario: ABRIR_SYSTEM_MAC.command.
+- Para ajustes puntuales: MANTENIMIENTO_SYSTEM_MAC.command.
+- HTTPS temporal queda opcional; no debe bloquear el sistema.
+
+No tocado:
+- Base de datos.
+- Stock.
+- Pedidos.
+- Producciones.
+- OCR.
+- Voz.
+- Fórmulas.

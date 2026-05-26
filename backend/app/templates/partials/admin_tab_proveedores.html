@@ -1,0 +1,75 @@
+<div class="admin-tab" id="tab-proveedores" style="display:none;">
+    <div class="grid2">
+      <div class="panel panel-accent">
+        <h3>Añadir proveedor</h3>
+        <form method="post" action="/supplier/create_form">
+          <div class="row required"><label>Nombre</label><input name="name" required></div>
+          <div class="row"><label>Teléfono</label><input name="phone"></div>
+          <div class="row"><label>Email</label><input name="email"></div>
+          <details class="supplier-extra"><summary>Datos fiscales / pago futuro</summary>
+            <div class="row"><label>NIF/CIF</label><input name="tax_id"></div>
+            <div class="row"><label>Dirección</label><input name="address"></div>
+            <div class="row"><label>CP / Ciudad</label><input name="postal_code" placeholder="28001"><input name="city" placeholder="Madrid"></div>
+            <div class="row"><label>Registro sanitario</label><input name="health_registry_code"></div>
+            <div class="row"><label>Condiciones pago</label><input name="payment_terms" placeholder="15 días / mensual / fin de mes"></div>
+            <div class="row"><label>Frecuencia</label><select name="payment_frequency"><option value="">Sin definir</option><option>DIARIO</option><option>15_DIAS</option><option>MENSUAL</option><option>PRINCIPIO_MES</option><option>FIN_MES</option></select></div>
+            <div class="row"><label>Regla día / forma</label><input name="payment_day_rule" placeholder="día 5 / viernes / vencimiento"><input name="payment_method" placeholder="transferencia"></div>
+            <div class="row"><label>IBAN proveedor</label><input name="iban" placeholder="Solo preparar; no paga sin humano"></div>
+            <div class="row"><label>Email contabilidad</label><input name="accounting_email"></div>
+          </details>
+          <div class="actions"><button type="submit" class="gold btn-section">Añadir proveedor</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <h3>Proveedores</h3>
+        <div id="suppliersSection"></div>
+        <div class="row admin-search-row"><input id="suppliersFilter" list="suppliersFilterDatalist" placeholder="Buscar proveedor..." autocomplete="off"><datalist id="suppliersFilterDatalist">{% for s in suppliers %}<option value="{{s.name}}"></option>{% endfor %}</datalist><div id="suppliersFilterSuggestions" class="smart-inline-results" style="display:none"></div></div>
+        <div class="tablewrap" style="max-height:460px;">
+          <table class="table" id="suppliersTable">
+            <thead><tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Datos / pago</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {% for s in suppliers %}
+              <tr>
+                <form method="post" action="/supplier/{{s.id}}/update_form" class="inline">
+                  <td><input name="name" value="{{s.name}}" required></td>
+                  <td><input name="phone" value="{{s.phone or ''}}"></td>
+                  <td><input name="email" value="{{s.email or ''}}"></td>
+                  <td>
+                    <details class="supplier-extra compact"><summary>Fiscal/pago</summary>
+                      <input name="tax_id" value="{{s.tax_id or ''}}" placeholder="NIF/CIF">
+                      <input name="address" value="{{s.address or ''}}" placeholder="Dirección">
+                      <input name="postal_code" value="{{s.postal_code or ''}}" placeholder="CP">
+                      <input name="city" value="{{s.city or ''}}" placeholder="Ciudad">
+                      <input name="health_registry_code" value="{{s.health_registry_code or ''}}" placeholder="Registro sanitario">
+                      <input name="payment_terms" value="{{s.payment_terms or ''}}" placeholder="Condiciones pago">
+                      <select name="payment_frequency"><option value="" {% if not s.payment_frequency %}selected{% endif %}>Sin definir</option><option value="DIARIO" {% if s.payment_frequency=='DIARIO' %}selected{% endif %}>Diario</option><option value="15_DIAS" {% if s.payment_frequency=='15_DIAS' %}selected{% endif %}>15 días</option><option value="MENSUAL" {% if s.payment_frequency=='MENSUAL' %}selected{% endif %}>Mensual</option><option value="PRINCIPIO_MES" {% if s.payment_frequency=='PRINCIPIO_MES' %}selected{% endif %}>Principio mes</option><option value="FIN_MES" {% if s.payment_frequency=='FIN_MES' %}selected{% endif %}>Fin mes</option></select>
+                      <input name="payment_day_rule" value="{{s.payment_day_rule or ''}}" placeholder="Regla vencimiento">
+                      <input name="payment_method" value="{{s.payment_method or ''}}" placeholder="Forma pago">
+                      <input name="iban" value="{{s.iban or ''}}" placeholder="IBAN proveedor">
+                      <input name="accounting_email" value="{{s.accounting_email or ''}}" placeholder="Email contabilidad">
+                    </details>
+                  </td>
+                  <td><select name="is_active"><option value="1" {% if s.is_active %}selected{% endif %}>Activo</option><option value="0" {% if not s.is_active %}selected{% endif %}>Inactivo</option></select></td>
+                  <td>
+                    <button class="mini" type="submit">Guardar</button>
+                  </form>
+                  <form method="post" action="/supplier/{{s.id}}/delete_form" class="inline" onsubmit="return confirm('¿Desactivar?');">
+                    <button class="mini btn-danger" type="submit">Desactivar</button>
+                  </form>
+                  </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="panel panel-accent supplier-documents-panel">
+      <h3>📄 Documentos por proveedor · preparación contable</h3>
+      <p class="muted small">Terreno preparado para acumular albaranes/facturas, filtrar por proveedor/día/mes/local y generar paquete PDF para gestoría. Los pagos futuros quedan siempre bloqueados hasta validación humana final.</p>
+      <div class="actions wrap">
+        <a class="btn" href="/?page=albaranes&center_id={{selected_center_id}}">Ver Albaranes</a>
+        <a class="btn" href="/ai-system/ui?center_id={{selected_center_id}}">Subir factura/albarán a revisión IA</a>
+      </div>
+    </div>
+  </div>

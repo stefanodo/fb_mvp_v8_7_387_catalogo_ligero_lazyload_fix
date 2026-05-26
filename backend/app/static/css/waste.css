@@ -1,0 +1,534 @@
+.waste-section,.waste-control-section{padding-bottom:80px}.waste-head{gap:16px;align-items:flex-start}.waste-head-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.waste-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:14px 0}.waste-card,.waste-list-card,.control-card{border:1px solid rgba(80,55,25,.14);border-radius:18px;background:#fff;box-shadow:0 10px 28px rgba(30,25,15,.06);padding:16px}.waste-card h2,.control-card h2{margin:0 0 12px;font-size:1.05rem}.waste-form{display:flex;flex-direction:column;gap:8px}.waste-form label{font-weight:700;font-size:.85rem}.waste-form input,.waste-form select,.waste-form textarea{width:100%;border:1px solid #d8d0c3;border-radius:10px;padding:10px;background:#fff;font-size:.95rem}.two-cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}.three-cols{display:grid;grid-template-columns:1.5fr .75fr .75fr;gap:8px}.compact label{margin-bottom:3px}.waste-reason-pills{display:flex;flex-wrap:wrap;gap:6px}.waste-reason-pills label{border:1px solid #e2d7c8;border-radius:999px;padding:7px 9px;background:#fbf8f2;font-size:.8rem}.inline-actions{display:flex;gap:8px;align-items:center}.small{font-size:.82rem}.alert.warn{border:1px solid #e6c46b;background:#fff8df;border-radius:14px;padding:10px 12px;margin:10px 0}.waste-list{display:flex;flex-direction:column;gap:10px}.waste-row{border:1px solid #e3ddd3;border-radius:15px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:10px;background:#fff}.waste-row.status-review{border-left:5px solid #c88413}.waste-row.status-confirmed{border-left:5px solid #487b3b;background:#fbfff8}.waste-row.status-cancelled{opacity:.65}.waste-title{font-weight:800;font-size:1rem}.waste-meta{color:#746b5f;font-size:.82rem;margin:3px 0 8px}.waste-tags{display:flex;flex-wrap:wrap;gap:6px}.waste-tags span{border:1px solid #e4dac9;border-radius:999px;padding:4px 8px;background:#faf7f1;font-size:.8rem}.money-loss{background:#fff1ee!important;border-color:#efb4aa!important;color:#9b2416!important;font-weight:800}.waste-row-actions{display:flex;flex-direction:column;gap:6px;min-width:145px}.waste-edit{margin-top:8px}.waste-edit summary{cursor:pointer;color:#674d1f;font-weight:700}.waste-form.mini{margin-top:8px;background:#fbfaf7;border-radius:12px;padding:10px}.danger{background:#9b2416!important;color:#fff!important;border-color:#9b2416!important}.filter-row{display:flex;gap:8px;align-items:center}.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}.kpi-card{border:1px solid #e2d8c9;border-radius:16px;background:#fff;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,.04)}.kpi-label{font-size:.78rem;color:#6c6257;text-transform:uppercase;letter-spacing:.04em}.kpi-value{font-size:1.8rem;font-weight:900;margin:5px 0}.kpi-note{font-size:.8rem;color:#746b5f}.loss-main{background:#fff4f1;border-color:#e8afa5}.loss-main .kpi-value{color:#9b2416}.control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}.control-card.full{margin-top:14px}.analytics-list{display:flex;flex-direction:column;gap:8px}.analytics-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-bottom:1px solid #eee6dc;padding:7px 0}.analytics-row strong{color:#9b2416}.analytics-row small{color:#746b5f}.insight-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.insight-grid div{border:1px solid #eee5d8;border-radius:14px;background:#fbf8f2;padding:12px}.insight-grid p{margin:6px 0 0;color:#6f655b;font-size:.9rem}.mini-table{display:flex;flex-direction:column;gap:0;overflow:auto}.mini-head,.mini-row{display:grid;grid-template-columns:1.1fr .8fr 1.4fr 1fr .9fr .6fr;gap:8px;min-width:820px;padding:8px;border-bottom:1px solid #eee}.mini-head{font-weight:800;background:#faf7f1;border-radius:10px 10px 0 0}.mini-row strong{color:#9b2416}.empty{color:#70675d;background:#fbf8f2;border-radius:12px;padding:12px;text-align:center}@media(max-width:900px){.waste-grid,.control-grid,.kpi-grid,.insight-grid{grid-template-columns:1fr}.waste-row{grid-template-columns:1fr}.waste-row-actions{flex-direction:row;flex-wrap:wrap}.two-cols,.three-cols{grid-template-columns:1fr}.waste-head-actions{justify-content:flex-start}.kpi-value{font-size:1.5rem}.waste-card,.waste-list-card,.control-card{padding:12px;border-radius:14px}}
+
+/* v8_7_265 · Mermas como asistente operativo */
+.waste-assistant-shell{border:1px solid rgba(210,172,91,.45);border-radius:24px;background:linear-gradient(135deg,#fffaf0,#ffffff);padding:18px;margin:14px 0 18px;box-shadow:0 16px 42px rgba(50,35,10,.08)}
+.waste-assistant-hero{display:grid;grid-template-columns:1fr minmax(220px,300px);gap:16px;align-items:center;margin-bottom:14px}.waste-kicker{display:inline-flex;background:#211915;color:#f2c45b;border-radius:999px;padding:5px 10px;font-size:.75rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.waste-hero-text h2{font-size:1.8rem;margin:8px 0}.waste-hero-text p{margin:0;color:#5d544b}.waste-quick-money{border:1px solid #f0c4b9;background:#fff1ee;border-radius:18px;padding:16px;text-align:right}.waste-quick-money span{display:block;color:#744034;font-size:.82rem;text-transform:uppercase;font-weight:800}.waste-quick-money strong{display:block;color:#9b2416;font-size:2rem;font-weight:950}.waste-quick-money small{color:#6b6259}.waste-action-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:12px 0}.waste-action-card{border:1px solid #e7dac4;background:#fff;border-radius:20px;padding:18px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:7px;min-height:145px;box-shadow:0 10px 24px rgba(30,20,8,.05);transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}.waste-action-card:hover,.waste-action-card.active{transform:translateY(-1px);border-color:#b68a2a;box-shadow:0 14px 32px rgba(60,39,8,.12)}.waste-action-card.primary{background:#1c1712;color:#fff;border-color:#b68a2a}.waste-action-card span{font-size:2.2rem}.waste-action-card strong{font-size:1.05rem}.waste-action-card em{font-style:normal;color:#7a7064;font-size:.9rem}.waste-action-card.primary em{color:#d9cbb8}.waste-panel{display:none}.waste-panel.active{display:block}.assistant-card{max-width:860px;margin:0 auto}.big-voice{font-size:1rem;padding:12px 16px!important;border-radius:14px!important}.waste-form input[type=file]{padding:12px;background:#fbf8f2;border-style:dashed}.waste-list-card{margin-top:16px}
+@media(max-width:900px){.waste-assistant-shell{padding:12px;border-radius:18px}.waste-assistant-hero{grid-template-columns:1fr}.waste-quick-money{text-align:left}.waste-action-grid{grid-template-columns:1fr}.waste-action-card{min-height:auto;padding:16px;display:grid;grid-template-columns:auto 1fr;align-items:center}.waste-action-card em{grid-column:2}.waste-hero-text h2{font-size:1.35rem}.waste-quick-money strong{font-size:1.6rem}.assistant-card{border-radius:18px}.inline-actions{flex-direction:column;align-items:stretch}.inline-actions button{width:100%}}
+
+
+/* v8_7_266 · contraste y acciones visibles */
+body[data-page="mermas"] .waste-section,
+body[data-page="mermas_control"] .waste-control-section{color:#1d1a17;}
+body[data-page="mermas"] .waste-card,
+body[data-page="mermas"] .waste-list-card,
+body[data-page="mermas_control"] .control-card{background:#fffdf9;border-color:#d7c8b1;box-shadow:0 14px 32px rgba(35,24,10,.08);}
+body[data-page="mermas"] .waste-card h2,
+body[data-page="mermas"] .waste-title,
+body[data-page="mermas_control"] .control-card h2{color:#191611;}
+body[data-page="mermas"] .waste-form label,
+body[data-page="mermas"] .waste-edit summary{color:#2b241c;}
+body[data-page="mermas"] .waste-form input,
+body[data-page="mermas"] .waste-form select,
+body[data-page="mermas"] .waste-form textarea{color:#1f1a14;background:#fff;border:1px solid #c8b79c;}
+body[data-page="mermas"] .waste-form input::placeholder,
+body[data-page="mermas"] .waste-form textarea::placeholder{color:#766b5d;opacity:1;}
+body[data-page="mermas"] .waste-meta,
+body[data-page="mermas"] .muted,
+body[data-page="mermas_control"] .kpi-note,
+body[data-page="mermas_control"] .analytics-row small{color:#51493f;}
+body[data-page="mermas"] .waste-tags span{background:#f7f1e7;border-color:#d6c5ab;color:#2f2a24;}
+body[data-page="mermas"] .waste-row{background:#fffefb;border-color:#d9ccb8;}
+body[data-page="mermas"] .waste-row-actions{align-self:end;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:8px;min-width:220px;}
+body[data-page="mermas"] .waste-row-actions form{margin:0;}
+body[data-page="mermas"] .waste-row-actions button{min-width:140px;font-weight:800;border-radius:12px;padding:10px 14px;}
+body[data-page="mermas"] .cancel-btn{background:#fff6f0!important;color:#8f2a1c!important;border:1px solid #d99a90!important;}
+body[data-page="mermas"] .cancel-btn:hover{background:#fdebe6!important;}
+body[data-page="mermas"] .status-chip{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:999px;font-weight:800;font-size:.85rem;border:1px solid transparent;}
+body[data-page="mermas"] .status-chip.cancelled{background:#f5f2ee;color:#6b6359;border-color:#d4cdc3;}
+body[data-page="mermas"] .status-chip.confirmed{background:#eef8ea;color:#2d6835;border-color:#9cc49a;}
+body[data-page="mermas"] .waste-voice-support{margin-top:8px;border-radius:12px;padding:10px 12px;font-size:.92rem;font-weight:700;line-height:1.35;border:1px solid #d9c7a3;background:#fff8e8;color:#5e4520;}
+body[data-page="mermas"] .waste-voice-support.ok{border-color:#9cc49a;background:#edf8eb;color:#245a2f;}
+body[data-page="mermas"] .waste-voice-support.warn{border-color:#e0b568;background:#fff6df;color:#6d4a14;}
+body[data-page="mermas"] .waste-action-card em{color:#5b5146;}
+body[data-page="mermas"] .waste-action-card.primary em{color:#efe0c6;}
+body[data-page="mermas"] .waste-assistant-shell{background:linear-gradient(135deg,#fffaf0,#fffefb);}
+@media(max-width:900px){
+  body[data-page="mermas"] .waste-row-actions{justify-content:flex-start;min-width:0;}
+  body[data-page="mermas"] .waste-row-actions button{width:100%;}
+  body[data-page="mermas"] .status-chip{width:100%;}
+}
+
+/* v8_7_326 · Mermas: menos blanco, más sutil y compacto */
+body[data-page="mermas"] .panel,body[data-page="mermas_control"] .panel,body[data-page="mermas"] .waste-panel,body[data-page="mermas_control"] .waste-panel{background:rgba(17,24,39,.88)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.10)!important;}
+body[data-page="mermas"] .card,body[data-page="mermas_control"] .card,body[data-page="mermas"] .waste-card,body[data-page="mermas_control"] .waste-card{background:rgba(255,255,255,.055)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.10)!important;box-shadow:none!important;}
+body[data-page="mermas"] .card,body[data-page="mermas_control"] .card{min-height:72px!important;padding:12px 14px!important;}
+body[data-page="mermas"] .value,body[data-page="mermas_control"] .value{font-size:24px!important;}
+body[data-page="mermas"] .quick-choice,body[data-page="mermas"] .waste-choice{padding:14px!important;min-height:96px!important;background:rgba(255,255,255,.055)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.10)!important;}
+body[data-page="mermas"] input,body[data-page="mermas"] textarea,body[data-page="mermas"] select{background:#0c121d!important;color:#f4f6fb!important;border-color:rgba(255,255,255,.14)!important;}
+
+/* v8_7_328 · Mermas compactas y oscuras */
+.waste-card,.waste-list-card,.control-card{background:linear-gradient(180deg,#141b26,#101722)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.11)!important;box-shadow:none!important;padding:12px!important;}
+.waste-card input,.waste-card select,.waste-card textarea,.control-card input,.control-card select,.control-card textarea{background:#0b111b!important;color:#f2f5f9!important;border-color:rgba(255,255,255,.13)!important;}
+.waste-grid{gap:10px!important}.waste-card h2,.control-card h2{font-size:1rem!important;color:#f4f7fb!important;}
+@media(max-width:760px){.waste-grid{grid-template-columns:1fr 1fr!important}.waste-card,.control-card{border-radius:14px!important;padding:11px!important}.waste-card h2,.control-card h2{font-size:.95rem!important}.two-cols,.three-cols{grid-template-columns:1fr!important}}
+@media(max-width:520px){.waste-grid{grid-template-columns:1fr!important}}
+
+/* v8_7_329 · Mermas: contraste real y tarjetas menos invasivas */
+body[data-page="mermas_control"] .section-head h1,
+body[data-page="mermas_control"] .control-card h2,
+body[data-page="mermas_control"] .control-card.full h2,
+body[data-page="mermas_control"] .mini-head span{
+  color:#f5f7fb!important;text-shadow:0 1px 0 rgba(0,0,0,.28)!important;
+}
+body[data-page="mermas_control"] .section-head .muted{color:#c8d1df!important;}
+body[data-page="mermas_control"] .kpi-card{
+  background:linear-gradient(180deg,rgba(28,36,48,.96),rgba(18,25,36,.96))!important;
+  border:1px solid rgba(255,255,255,.12)!important;color:#edf2f8!important;border-radius:16px!important;padding:14px 16px!important;
+}
+body[data-page="mermas_control"] .kpi-card.loss-main{background:linear-gradient(180deg,rgba(50,32,32,.96),rgba(31,24,28,.96))!important;border-color:rgba(190,78,68,.32)!important;}
+body[data-page="mermas_control"] .kpi-label{color:#d9e0ea!important;font-weight:900!important;letter-spacing:.07em!important;}
+body[data-page="mermas_control"] .kpi-value{color:#f4f7fb!important;font-size:1.55rem!important;}
+body[data-page="mermas_control"] .loss-main .kpi-value{color:#ffb2a8!important;}
+body[data-page="mermas_control"] .kpi-note{color:#b9c4d3!important;}
+body[data-page="mermas_control"] .control-card{
+  background:linear-gradient(180deg,rgba(20,28,40,.94),rgba(14,21,32,.94))!important;
+  border:1px solid rgba(255,255,255,.10)!important;border-radius:16px!important;color:#edf2f8!important;padding:13px!important;
+}
+body[data-page="mermas_control"] .analytics-row{border-bottom-color:rgba(255,255,255,.08)!important;color:#e9eef7!important;}
+body[data-page="mermas_control"] .analytics-row strong{color:#f1d98d!important;}
+body[data-page="mermas_control"] .analytics-row small{color:#b6c1d0!important;}
+body[data-page="mermas_control"] .empty{background:rgba(255,255,255,.055)!important;color:#d5dde8!important;border:1px solid rgba(255,255,255,.08)!important;}
+body[data-page="mermas_control"] .insight-grid div{background:rgba(255,255,255,.045)!important;border-color:rgba(255,255,255,.09)!important;color:#eaf0f8!important;}
+body[data-page="mermas_control"] .insight-grid p{color:#c5cedb!important;}
+body[data-page="mermas_control"] .mini-head{background:rgba(255,255,255,.07)!important;color:#f2f5fa!important;}
+body[data-page="mermas_control"] .mini-row{color:#e9eef7!important;border-bottom-color:rgba(255,255,255,.07)!important;}
+body[data-page="mermas_control"] .date-time-stack{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+body[data-page="mermas_control"] .date-time-stack b,body[data-page="mermas"] .date-chip{background:rgba(214,180,94,.13);border:1px solid rgba(214,180,94,.24);color:#f1d98d;border-radius:999px;padding:3px 8px;font-weight:900;}
+body[data-page="mermas_control"] .date-time-stack small,body[data-page="mermas"] .time-chip{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.10);color:#d9e3f1;border-radius:999px;padding:3px 8px;font-weight:800;}
+body[data-page="mermas"] .waste-meta-clean{display:flex!important;gap:7px!important;align-items:center!important;flex-wrap:wrap!important;color:#d8e0eb!important;}
+body[data-page="mermas"] .waste-row{background:linear-gradient(180deg,rgba(20,28,40,.94),rgba(14,21,32,.94))!important;color:#eef3fb!important;border-color:rgba(255,255,255,.11)!important;}
+body[data-page="mermas"] .waste-title{color:#f4f7fb!important;}
+body[data-page="mermas"] .waste-tags span{background:rgba(255,255,255,.065)!important;color:#e6edf7!important;border-color:rgba(255,255,255,.10)!important;}
+body[data-page="mermas"] .cancel-btn{background:rgba(160,62,50,.16)!important;color:#ffc6bd!important;border:1px solid rgba(190,84,70,.45)!important;}
+@media(max-width:760px){body[data-page="mermas_control"] .kpi-grid{grid-template-columns:1fr 1fr!important;gap:10px!important;}body[data-page="mermas_control"] .kpi-card{padding:12px!important;}body[data-page="mermas_control"] .kpi-value{font-size:1.25rem!important;}body[data-page="mermas_control"] .control-grid{gap:10px!important;}}
+@media(max-width:520px){body[data-page="mermas_control"] .kpi-grid{grid-template-columns:1fr!important;}}
+
+/* v8_7_332 · Mermas: contraste real y registros legibles */
+body[data-page="mermas_control"] .waste-control-section h1,
+body[data-page="mermas_control"] .control-card h2,
+body[data-page="mermas_control"] .control-card h3,
+body[data-page="mermas"] .waste-list-card h2,
+body[data-page="mermas"] .waste-row .waste-title{
+  color:#f4f7fb!important;
+  text-shadow:0 1px 0 rgba(0,0,0,.35)!important;
+  opacity:1!important;
+}
+body[data-page="mermas_control"] .waste-control-section .muted,
+body[data-page="mermas_control"] .control-card p,
+body[data-page="mermas_control"] .analytics-row span,
+body[data-page="mermas_control"] .mini-row span,
+body[data-page="mermas"] .waste-meta,
+body[data-page="mermas"] .waste-row .muted{color:#c9d3e2!important;opacity:1!important;}
+body[data-page="mermas_control"] .kpi-card,
+body[data-page="mermas_control"] .control-card,
+body[data-page="mermas"] .waste-row,
+body[data-page="mermas"] .waste-list-card{
+  background:linear-gradient(180deg,rgba(20,28,41,.94),rgba(13,19,29,.94))!important;
+  border-color:rgba(255,255,255,.12)!important;
+  color:#eef3fb!important;
+}
+body[data-page="mermas_control"] .kpi-card.loss-main{background:linear-gradient(180deg,rgba(65,30,34,.78),rgba(24,22,30,.94))!important;border-color:rgba(235,125,125,.22)!important;}
+body[data-page="mermas_control"] .kpi-label{color:#d9e1ec!important;opacity:1!important;}
+body[data-page="mermas_control"] .kpi-note{color:#b8c3d0!important;opacity:1!important;}
+body[data-page="mermas_control"] .kpi-value{color:#f3d16e!important;}
+body[data-page="mermas_control"] .loss-main .kpi-value{color:#ffb3ad!important;}
+body[data-page="mermas_control"] .empty,
+body[data-page="mermas"] .empty{background:rgba(255,255,255,.055)!important;color:#dce5ef!important;border:1px solid rgba(255,255,255,.08)!important;}
+body[data-page="mermas"] .date-chip,body[data-page="mermas"] .time-chip,
+body[data-page="mermas_control"] .date-time-stack b,body[data-page="mermas_control"] .date-time-stack small{
+  display:inline-flex!important;align-items:center!important;border:1px solid rgba(255,255,255,.12)!important;border-radius:999px!important;background:rgba(255,255,255,.06)!important;color:#edf4fb!important;padding:3px 8px!important;margin-right:5px!important;font-weight:800!important;line-height:1.1!important;
+}
+body[data-page="mermas_control"] .date-time-stack{display:flex!important;gap:5px!important;align-items:center!important;flex-wrap:wrap!important;}
+body[data-page="mermas"] .waste-row-actions{display:flex!important;gap:10px!important;align-items:center!important;flex-wrap:wrap!important;}
+body[data-page="mermas"] .waste-row-actions button{min-height:38px!important;border-radius:10px!important;}
+
+/* v8_7_334 · Mermas: contraste, botones compactos, cancelación sin flash */
+body[data-page="mermas"] .waste-head-actions .btn,
+body[data-page="mermas"] .waste-head-actions button,
+body[data-page="mermas"] .quick-mode-card,
+body[data-page="mermas"] .waste-entry-tabs .btn{min-height:38px!important;padding:9px 13px!important;border-radius:12px!important;font-size:13px!important;}
+body[data-page="mermas"] .waste-row{background:rgba(16,23,34,.72)!important;border-color:rgba(255,255,255,.10)!important;}
+body[data-page="mermas"] .waste-title, body[data-page="mermas_control"] h1, body[data-page="mermas_control"] h2, body[data-page="mermas_control"] h3{color:#f2f6ff!important;text-shadow:0 1px 0 rgba(0,0,0,.35);}
+body[data-page="mermas_control"] .muted, body[data-page="mermas_control"] .control-card p{color:rgba(235,241,252,.82)!important;}
+body[data-page="mermas_control"] .control-card{background:rgba(17,24,35,.78)!important;border-color:rgba(255,255,255,.12)!important;}
+body[data-page="mermas_control"] .kpi-card{background:rgba(23,30,42,.88)!important;border-color:rgba(255,255,255,.13)!important;color:#f4f7fb!important;}
+body[data-page="mermas_control"] .kpi-card.loss-main{background:rgba(50,22,26,.78)!important;border-color:rgba(196,88,88,.38)!important;}
+body[data-page="mermas_control"] .empty{background:rgba(255,255,255,.06)!important;color:rgba(246,248,252,.78)!important;border-radius:10px!important;}
+body[data-page="mermas"] .date-chip, body[data-page="mermas"] .time-chip, body[data-page="mermas_control"] .date-time-stack b, body[data-page="mermas_control"] .date-time-stack small{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);border-radius:999px;padding:3px 8px;margin-right:4px;color:#eaf2ff!important;}
+body[data-page="mermas"] .waste-row.is-cancelling{opacity:.72;pointer-events:none;}
+body[data-page="mermas"] .status-chip.cancelled{background:rgba(190,210,220,.16)!important;color:#dbe9f2!important;border:1px solid rgba(200,225,235,.24)!important;}
+@media(max-width:760px){body[data-page="mermas"] .quick-mode-grid{grid-template-columns:1fr!important;gap:8px!important} body[data-page="mermas"] .waste-row{padding:12px!important}.waste-tags{gap:5px!important}.waste-row-actions{gap:8px!important}}
+
+/* v8_7_339 · Mermas: entrada rápida compacta y coherente System MAC */
+body[data-page="mermas"] .waste-section{
+  max-width:100%!important;
+}
+body[data-page="mermas"] .waste-assistant-shell{
+  background:linear-gradient(180deg,rgba(13,19,30,.92),rgba(9,14,23,.94))!important;
+  border:1px solid rgba(214,180,94,.18)!important;
+  border-radius:18px!important;
+  padding:12px!important;
+  margin:10px 0 14px!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.22)!important;
+}
+body[data-page="mermas"] .waste-assistant-hero{
+  grid-template-columns:1fr minmax(180px,250px)!important;
+  gap:10px!important;
+  margin-bottom:9px!important;
+  align-items:stretch!important;
+}
+body[data-page="mermas"] .waste-hero-text h2{
+  color:#f4f7fb!important;
+  font-size:1.34rem!important;
+  line-height:1.12!important;
+  margin:5px 0 4px!important;
+}
+body[data-page="mermas"] .waste-hero-text p{
+  color:rgba(220,228,240,.78)!important;
+  font-size:.86rem!important;
+  line-height:1.35!important;
+  margin:0!important;
+}
+body[data-page="mermas"] .waste-kicker{
+  background:rgba(214,180,94,.14)!important;
+  border:1px solid rgba(214,180,94,.26)!important;
+  color:#f0d27d!important;
+  padding:4px 9px!important;
+  font-size:.68rem!important;
+}
+body[data-page="mermas"] .waste-quick-money{
+  background:rgba(255,255,255,.045)!important;
+  border:1px solid rgba(255,255,255,.09)!important;
+  border-radius:14px!important;
+  padding:10px 12px!important;
+  text-align:right!important;
+  min-height:0!important;
+}
+body[data-page="mermas"] .waste-quick-money span{
+  color:rgba(229,236,248,.76)!important;
+  font-size:.68rem!important;
+  letter-spacing:.05em!important;
+}
+body[data-page="mermas"] .waste-quick-money strong{
+  color:#f0d27d!important;
+  font-size:1.42rem!important;
+  line-height:1.05!important;
+  margin-top:2px!important;
+}
+body[data-page="mermas"] .waste-quick-money small{
+  color:rgba(216,225,238,.68)!important;
+  font-size:.74rem!important;
+}
+body[data-page="mermas"] .waste-action-grid{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;
+  margin:8px 0 10px!important;
+}
+body[data-page="mermas"] .waste-action-card{
+  min-height:72px!important;
+  padding:10px 12px!important;
+  border-radius:14px!important;
+  gap:3px!important;
+  background:rgba(255,255,255,.045)!important;
+  color:#eaf0f8!important;
+  border:1px solid rgba(255,255,255,.10)!important;
+  box-shadow:none!important;
+  display:grid!important;
+  grid-template-columns:34px 1fr!important;
+  grid-template-rows:auto auto!important;
+  align-items:center!important;
+  text-align:left!important;
+}
+body[data-page="mermas"] .waste-action-card:hover,
+body[data-page="mermas"] .waste-action-card.active,
+body[data-page="mermas"] .waste-action-card.primary.active{
+  transform:none!important;
+  background:rgba(214,180,94,.12)!important;
+  border-color:rgba(214,180,94,.38)!important;
+  box-shadow:0 0 0 1px rgba(214,180,94,.12) inset!important;
+}
+body[data-page="mermas"] .waste-action-card.primary{
+  background:rgba(255,255,255,.045)!important;
+  color:#eaf0f8!important;
+  border-color:rgba(255,255,255,.10)!important;
+}
+body[data-page="mermas"] .waste-action-card span{
+  grid-row:1 / span 2!important;
+  font-size:1.35rem!important;
+  width:30px!important;
+  height:30px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  opacity:.92!important;
+}
+body[data-page="mermas"] .waste-action-card strong{
+  color:#f4f7fb!important;
+  font-size:.92rem!important;
+  line-height:1.12!important;
+}
+body[data-page="mermas"] .waste-action-card em,
+body[data-page="mermas"] .waste-action-card.primary em{
+  grid-column:2!important;
+  color:rgba(204,215,230,.68)!important;
+  font-size:.75rem!important;
+  line-height:1.18!important;
+  margin-top:1px!important;
+}
+body[data-page="mermas"] .waste-panel.active{
+  margin-top:0!important;
+}
+body[data-page="mermas"] .assistant-card{
+  max-width:none!important;
+  background:rgba(12,18,29,.74)!important;
+  border:1px solid rgba(255,255,255,.09)!important;
+  border-radius:15px!important;
+  padding:11px 12px!important;
+}
+body[data-page="mermas"] .assistant-card h2{
+  font-size:1rem!important;
+  margin-bottom:6px!important;
+}
+body[data-page="mermas"] .assistant-card .muted.small{
+  font-size:.78rem!important;
+  line-height:1.28!important;
+  margin-bottom:4px!important;
+}
+body[data-page="mermas"] .waste-form{
+  gap:6px!important;
+}
+body[data-page="mermas"] .waste-form label{
+  font-size:.78rem!important;
+}
+body[data-page="mermas"] .waste-form input,
+body[data-page="mermas"] .waste-form select,
+body[data-page="mermas"] .waste-form textarea{
+  min-height:36px!important;
+  padding:8px 9px!important;
+  border-radius:9px!important;
+  font-size:.86rem!important;
+  background:#0b111b!important;
+  color:#f3f6fb!important;
+  border-color:rgba(255,255,255,.13)!important;
+}
+body[data-page="mermas"] .waste-form textarea[rows="4"]{
+  min-height:74px!important;
+}
+body[data-page="mermas"] .big-voice,
+body[data-page="mermas"] .waste-form .gold,
+body[data-page="mermas"] .waste-form button{
+  min-height:36px!important;
+  padding:8px 12px!important;
+  border-radius:10px!important;
+  font-size:.86rem!important;
+}
+body[data-page="mermas"] .alert.warn{
+  background:rgba(214,180,94,.10)!important;
+  border-color:rgba(214,180,94,.22)!important;
+  color:#ecd891!important;
+  padding:8px 10px!important;
+  border-radius:12px!important;
+  font-size:.82rem!important;
+}
+@media(max-width:900px){
+  body[data-page="mermas"] .waste-assistant-hero{grid-template-columns:1fr!important;}
+  body[data-page="mermas"] .waste-quick-money{text-align:left!important;}
+  body[data-page="mermas"] .waste-action-grid{grid-template-columns:1fr!important;gap:7px!important;}
+  body[data-page="mermas"] .waste-action-card{min-height:58px!important;padding:8px 10px!important;}
+  body[data-page="mermas"] .waste-hero-text h2{font-size:1.16rem!important;}
+}
+
+/* v8_7_340 · Mermas: botones todavía más discretos y paleta System MAC */
+body[data-page="mermas"] .waste-action-grid{gap:6px!important;margin:6px 0 8px!important;}
+body[data-page="mermas"] .waste-action-card{
+  min-height:54px!important;
+  padding:7px 9px!important;
+  border-radius:12px!important;
+  grid-template-columns:26px 1fr!important;
+  background:rgba(10,15,24,.82)!important;
+  border-color:rgba(214,180,94,.16)!important;
+}
+body[data-page="mermas"] .waste-action-card span{font-size:1rem!important;width:24px!important;height:24px!important;color:#d6b45e!important;}
+body[data-page="mermas"] .waste-action-card strong{font-size:.82rem!important;color:#eef3f8!important;}
+body[data-page="mermas"] .waste-action-card em{font-size:.68rem!important;color:rgba(202,212,226,.66)!important;}
+body[data-page="mermas"] .waste-row{background:rgba(9,14,22,.74)!important;border-color:rgba(255,255,255,.09)!important;}
+body[data-page="mermas"] .waste-row.status-confirmed{opacity:.72!important;}
+body[data-page="mermas"] .waste-row.status-cancelled{opacity:.6!important;}
+body[data-page="mermas"] .date-chip, body[data-page="mermas"] .time-chip{background:rgba(214,180,94,.12)!important;border:1px solid rgba(214,180,94,.22)!important;color:#f0dc9a!important;border-radius:999px!important;padding:2px 7px!important;}
+@media(max-width:900px){body[data-page="mermas"] .waste-action-card{min-height:48px!important;padding:7px 9px!important;}}
+
+
+/* v8_7_357 · Mermas: formulario compacto, contraste y autocompletado limpio */
+body[data-page="mermas"] .waste-card.assistant-card{
+  background:linear-gradient(180deg,rgba(14,21,32,.94),rgba(9,14,22,.96))!important;
+  border-color:rgba(214,180,94,.20)!important;
+  color:#edf3fb!important;
+}
+body[data-page="mermas"] .waste-card.assistant-card h2,
+body[data-page="mermas"] .waste-section h1,
+body[data-page="mermas"] .waste-section h2,
+body[data-page="mermas"] .waste-section h3,
+body[data-page="mermas"] .waste-form label,
+body[data-page="mermas"] .waste-label-strong{
+  color:#f4f7fb!important;
+  opacity:1!important;
+  text-shadow:0 1px 0 rgba(0,0,0,.35)!important;
+}
+body[data-page="mermas"] .waste-form label{font-size:.84rem!important;letter-spacing:.01em!important;font-weight:900!important;}
+body[data-page="mermas"] .waste-form input,
+body[data-page="mermas"] .waste-form select,
+body[data-page="mermas"] .waste-form textarea{
+  background:#0b111b!important;
+  border:1px solid rgba(255,255,255,.14)!important;
+  color:#eef4fc!important;
+  min-height:40px!important;
+}
+body[data-page="mermas"] .waste-form input::placeholder,
+body[data-page="mermas"] .waste-form textarea::placeholder{color:rgba(230,238,248,.58)!important;}
+body[data-page="mermas"] .waste-reason-pills{
+  gap:6px!important;
+  align-items:center!important;
+  margin:4px 0 8px!important;
+}
+body[data-page="mermas"] .waste-reason-pills label{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-height:32px!important;
+  padding:6px 10px!important;
+  border-radius:999px!important;
+  background:rgba(255,255,255,.055)!important;
+  color:#dfe8f4!important;
+  border:1px solid rgba(255,255,255,.13)!important;
+  font-size:.78rem!important;
+  font-weight:800!important;
+  box-shadow:none!important;
+}
+body[data-page="mermas"] .waste-reason-pills label:has(input:checked){
+  background:rgba(214,180,94,.16)!important;
+  border-color:rgba(214,180,94,.46)!important;
+  color:#ffe4a2!important;
+}
+body[data-page="mermas"] .waste-reason-pills input{width:14px!important;height:14px!important;min-height:14px!important;margin:0!important;accent-color:#d6b45e!important;}
+body[data-page="mermas"] .waste-article-row{align-items:start!important;}
+body[data-page="mermas"] .waste-article-search-wrap{position:relative!important;min-width:0!important;width:100%!important;}
+body[data-page="mermas"] .waste-article-search{width:100%!important;}
+body[data-page="mermas"] .waste-article-suggestions{
+  position:absolute!important;
+  left:0!important;right:0!important;top:calc(100% + 5px)!important;
+  z-index:80!important;
+  background:#0d1522!important;
+  border:1px solid rgba(214,180,94,.34)!important;
+  border-radius:12px!important;
+  box-shadow:0 18px 42px rgba(0,0,0,.45)!important;
+  overflow:hidden!important;
+  max-height:268px!important;
+  overflow-y:auto!important;
+}
+body[data-page="mermas"] .waste-article-suggestions button{
+  display:flex!important;
+  justify-content:space-between!important;
+  gap:10px!important;
+  width:100%!important;
+  text-align:left!important;
+  padding:10px 12px!important;
+  background:transparent!important;
+  color:#eef4fc!important;
+  border:0!important;
+  border-bottom:1px solid rgba(255,255,255,.07)!important;
+  cursor:pointer!important;
+  font-weight:800!important;
+}
+body[data-page="mermas"] .waste-article-suggestions button:hover,
+body[data-page="mermas"] .waste-article-suggestions button:focus{background:rgba(214,180,94,.12)!important;outline:none!important;}
+body[data-page="mermas"] .waste-article-suggestions small{color:#f1d27d!important;white-space:nowrap!important;}
+body[data-page="mermas"] .waste-article-suggestions .empty{background:transparent!important;border:0!important;color:#cdd7e5!important;text-align:left!important;padding:10px 12px!important;}
+body[data-page="mermas"] .waste-alert,
+body[data-page="mermas"] .alert.warn{color:#ffe8aa!important;background:rgba(214,180,94,.11)!important;border-color:rgba(214,180,94,.26)!important;}
+@media(max-width:760px){
+  body[data-page="mermas"] .waste-reason-pills label{font-size:.76rem!important;min-height:30px!important;padding:5px 9px!important;}
+  body[data-page="mermas"] .waste-article-suggestions{max-height:220px!important;}
+}
+
+/* v8_7_359 · Mermas: contraste y motivos compactos System MAC */
+body[data-page="mermas"] .waste-head h1,
+body[data-page="mermas"] .section-head h1,
+body[data-page="mermas"] .waste-card h2,
+body[data-page="mermas"] .assistant-card h2{
+  color:#f4f7fb!important;
+  text-shadow:0 1px 0 rgba(0,0,0,.35);
+  opacity:1!important;
+}
+body[data-page="mermas"] .waste-head p,
+body[data-page="mermas"] .waste-card .muted,
+body[data-page="mermas"] .waste-form label,
+body[data-page="mermas"] .waste-label-strong{
+  color:#e3ebf7!important;
+  opacity:1!important;
+  font-weight:800!important;
+}
+body[data-page="mermas"] .waste-form .small,
+body[data-page="mermas"] .waste-form .muted.small{
+  color:#bfc9d8!important;
+  opacity:1!important;
+}
+body[data-page="mermas"] .waste-reason-pills{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:8px!important;
+  margin:8px 0 10px!important;
+}
+body[data-page="mermas"] .waste-reason-pills label{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:7px!important;
+  min-height:34px!important;
+  padding:7px 11px!important;
+  border-radius:999px!important;
+  background:rgba(12,18,28,.82)!important;
+  border:1px solid rgba(255,255,255,.13)!important;
+  color:#e9f0fa!important;
+  font-size:13px!important;
+  font-weight:800!important;
+  line-height:1!important;
+  box-shadow:none!important;
+}
+body[data-page="mermas"] .waste-reason-pills label:has(input:checked){
+  border-color:rgba(214,178,83,.72)!important;
+  background:rgba(214,178,83,.16)!important;
+  color:#f4d98c!important;
+}
+body[data-page="mermas"] .waste-reason-pills input{
+  width:14px!important;
+  height:14px!important;
+  margin:0!important;
+  accent-color:#d6b253!important;
+}
+body[data-page="mermas"] .waste-article-suggestions{
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  top:calc(100% + 6px)!important;
+  z-index:80!important;
+  max-height:238px!important;
+  overflow:auto!important;
+  border-radius:14px!important;
+  background:#0d1420!important;
+  border:1px solid rgba(214,178,83,.34)!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.46)!important;
+}
+body[data-page="mermas"] .waste-article-suggestions button{
+  padding:10px 12px!important;
+  border-bottom:1px solid rgba(255,255,255,.07)!important;
+  color:#f3f7fc!important;
+}
+body[data-page="mermas"] .waste-action-card{
+  min-height:70px!important;
+  padding:13px 16px!important;
+}
+body[data-page="mermas"] .waste-action-card strong{font-size:16px!important;color:#f5f7fb!important;}
+body[data-page="mermas"] .waste-action-card em{font-size:12px!important;color:#c8d1de!important;}
+@media(max-width:760px){
+  body[data-page="mermas"] .waste-reason-pills{gap:6px!important;}
+  body[data-page="mermas"] .waste-reason-pills label{font-size:12px!important;min-height:32px!important;padding:6px 9px!important;}
+}

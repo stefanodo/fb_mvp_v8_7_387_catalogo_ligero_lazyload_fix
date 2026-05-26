@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>System MAC · Created by Mauro Ciccarelli · {{build_id}}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{build_id}}">
+  <link rel="stylesheet" href="/static/css/voice_assistant.css?v={{build_id}}">
+{% if page == 'recetas' %}<link rel="stylesheet" href="/static/css/recipes.css?v={{build_id}}">{% endif %}
+{% if page in ['stock','inventario'] %}<link rel="stylesheet" href="/static/css/stock.css?v={{build_id}}">{% endif %}
+{% if page == 'inventario' %}<link rel="stylesheet" href="/static/css/inventory.css?v={{build_id}}">{% endif %}
+{% if page == 'producciones' %}<link rel="stylesheet" href="/static/css/productions.css?v={{build_id}}">{% endif %}
+{% if page == 'pedidos' %}<link rel="stylesheet" href="/static/css/orders.css?v={{build_id}}">{% endif %}
+{% if page == 'admin' %}<link rel="stylesheet" href="/static/css/admin.css?v={{build_id}}">{% endif %}
+{% if page == 'laboratorio' %}<link rel="stylesheet" href="/static/css/laboratory.css?v={{build_id}}">{% endif %}
+{% if page == 'albaranes' %}<link rel="stylesheet" href="/static/css/receipts.css?v={{build_id}}">{% endif %}
+{% if page in ['mermas','mermas_control'] %}<link rel="stylesheet" href="/static/css/waste.css?v={{build_id}}">{% endif %}
+{% if page == 'operativa' %}<link rel="stylesheet" href="/static/css/operativa.css?v={{build_id}}">{% endif %}
+  <!-- PWA/ServiceWorker desactivado temporalmente (evita caché agresiva en Safari durante el MVP) -->
+  <meta name="theme-color" content="#b68a2a">
+
+  <link rel="stylesheet" href="/static/inline-legacy.css?v={{build_id}}">
+{% if page=='albaranes' and receipt_detail and receipt_detail.ocr and receipt_detail.ocr.status == 'PROCESSING' %}
+<meta http-equiv="refresh" content="4">
+{% endif %}
+</head>
+<body data-page="{{page}}">
+
+<header class="topbar">
+  <!-- Marca -->
+  <div class="brand-left brand-system"><div class="brand-main">System <span>MAC</span></div><div class="brand-sub">Created by Mauro Ciccarelli</div></div>
+
+  <!-- Sección activa visible en móvil -->
+  <div class="mobile-current-section" id="mobileCurrentSection">
+    {% if page == 'operativa' %}🎧 OÍDO ALFI / Operativa rápida
+    {% elif page == 'stock' %}📦 Stock
+    {% elif page == 'inventario' %}🧮 Inventario
+    {% elif page == 'recetas' %}📋 Recetas
+    {% elif page == 'producciones' %}🍳 Producciones
+    {% elif page == 'pedidos' %}🛒 Pedidos
+    {% elif page == 'albaranes' %}🧾 Albaranes
+    {% elif page == 'mermas' %}🗑️ Mermas
+    {% elif page == 'mermas_control' %}📊 Control mermas
+    {% elif page == 'admin' %}🗂 Catálogo
+    {% elif page == 'laboratorio' %}🔬 Laboratorio
+    {% else %}🏠 Inicio{% endif %}
+  </div>
+
+  <!-- Botón hamburguesa (solo móvil) -->
+  <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="Menú">
+    <span></span><span></span><span></span>
+  </button>
+
+  <!-- Nav desktop — siempre visible en pantallas grandes -->
+  <nav class="nav" id="desktopNav">
+    <a class="nav-btn {% if page=='inicio' %}active{% endif %}" href="/?page=inicio&center_id={{selected_center_id}}">🏠 Inicio</a>
+    <a class="nav-btn {% if page=='finanzas' %}active{% endif %}" href="/?page=finanzas&center_id={{selected_center_id}}">💼 Finanzas</a>
+    <a class="nav-btn {% if page=='operativa' %}active{% endif %}" href="/?page=operativa&center_id={{selected_center_id}}">🎧 OÍDO ALFI</a>
+    <a class="nav-btn {% if page=='stock' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}">📦 Stock</a>
+    <a class="nav-btn {% if page=='inventario' %}active{% endif %}" href="/?page=inventario&center_id={{selected_center_id}}">🧮 Inventario</a>
+    <a class="nav-btn {% if page=='recetas' %}active{% endif %}" href="/?page=recetas&center_id={{selected_center_id}}">📋 Recetas</a>
+    <a class="nav-btn {% if page=='producciones' %}active{% endif %}" href="/?page=producciones&center_id={{selected_center_id}}">🍳 Producciones</a>
+    <a class="nav-btn {% if page=='pedidos' %}active{% endif %}" href="/?page=pedidos&center_id={{selected_center_id}}">🛒 Pedidos</a>
+    <a class="nav-btn {% if page=='albaranes' %}active{% endif %}" href="/?page=albaranes&center_id={{selected_center_id}}">🧾 Albaranes</a>
+    <a class="nav-btn {% if page=='mermas' %}active{% endif %}" href="/?page=mermas&center_id={{selected_center_id}}">🗑️ Mermas</a>
+    <a class="nav-btn {% if page=='mermas_control' %}active{% endif %}" href="/?page=mermas_control&center_id={{selected_center_id}}">📊 Control</a>
+    <a class="nav-btn {% if page=='admin' %}active{% endif %}" href="/?page=admin&center_id={{selected_center_id}}">🗂 Catálogo</a>
+    <a class="nav-btn {% if page=='laboratorio' %}active{% endif %}" href="/?page=laboratorio&center_id=0">🔬 Laboratorio</a>
+    <a class="nav-btn nav-btn-ia" href="/recipe-ai/ui">🤖 IA Recetas</a>
+  </nav>
+
+  <!-- Selector restaurante desktop -->
+  {% if page not in ['admin','laboratorio'] %}
+  <div class="filter local-switch" id="desktopRestaurantFilter">
+    <form method="get" action="/">
+      <input type="hidden" name="page" value="{{page}}">
+      {% if request.query_params.get('rid') %}<input type="hidden" name="rid" value="{{request.query_params.get('rid')}}">{% endif %}
+      {% if request.query_params.get('pid') %}<input type="hidden" name="pid" value="{{request.query_params.get('pid')}}">{% endif %}
+      {% if request.query_params.get('oid') %}<input type="hidden" name="oid" value="{{request.query_params.get('oid')}}">{% endif %}
+      {% if request.query_params.get('aid') %}<input type="hidden" name="aid" value="{{request.query_params.get('aid')}}">{% endif %}
+      <label>Local</label>
+      <select name="center_id" onchange="this.form.submit()">
+        <option value="0">Todos</option>
+        {% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% endif %}
+</header>
+
+<!-- Menú móvil desplegable -->
+<div class="mobile-menu" id="mobileMenu">
+  <div class="mobile-menu-inner">
+    {% if page not in ['admin','laboratorio'] %}
+    <div class="mobile-restaurant-row">
+      <form method="get" action="/" style="display:flex;gap:8px;align-items:center;width:100%;">
+        <input type="hidden" name="page" value="{{page}}">
+        {% if request.query_params.get('rid') %}<input type="hidden" name="rid" value="{{request.query_params.get('rid')}}">{% endif %}
+        {% if request.query_params.get('pid') %}<input type="hidden" name="pid" value="{{request.query_params.get('pid')}}">{% endif %}
+        {% if request.query_params.get('oid') %}<input type="hidden" name="oid" value="{{request.query_params.get('oid')}}">{% endif %}
+        {% if request.query_params.get('aid') %}<input type="hidden" name="aid" value="{{request.query_params.get('aid')}}">{% endif %}
+        <select name="center_id" onchange="this.form.submit()" style="flex:1;">
+          <option value="0">Todos los locales</option>
+          {% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}
+        </select>
+      </form>
+    </div>
+    {% endif %}
+    <nav class="mobile-nav">
+      <a class="mobile-nav-btn {% if page=='inicio' %}active{% endif %}" href="/?page=inicio&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🏠<span>Inicio</span></a>
+      <a class="mobile-nav-btn {% if page=='finanzas' %}active{% endif %}" href="/?page=finanzas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">💼<span>Finanzas</span></a>
+      <a class="mobile-nav-btn {% if page=='operativa' %}active{% endif %}" href="/?page=operativa&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🎧<span>OÍDO ALFI</span></a>
+      <a class="mobile-nav-btn {% if page=='stock' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📦<span>Stock</span></a>
+      <a class="mobile-nav-btn {% if page=='inventario' %}active{% endif %}" href="/?page=inventario&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🧮<span>Inventario</span></a>
+      <a class="mobile-nav-btn {% if page=='recetas' %}active{% endif %}" href="/?page=recetas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📋<span>Recetas</span></a>
+      <a class="mobile-nav-btn {% if page=='producciones' %}active{% endif %}" href="/?page=producciones&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🍳<span>Producciones</span></a>
+      <a class="mobile-nav-btn {% if page=='pedidos' %}active{% endif %}" href="/?page=pedidos&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🛒<span>Pedidos</span></a>
+      <a class="mobile-nav-btn {% if page=='albaranes' %}active{% endif %}" href="/?page=albaranes&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🧾<span>Albaranes</span></a>
+      <a class="mobile-nav-btn {% if page=='mermas' %}active{% endif %}" href="/?page=mermas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🗑️<span>Mermas</span></a>
+      <a class="mobile-nav-btn {% if page=='mermas_control' %}active{% endif %}" href="/?page=mermas_control&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📊<span>Control</span></a>
+      <a class="mobile-nav-btn {% if page=='admin' %}active{% endif %}" href="/?page=admin&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🗂<span>Catálogo</span></a>
+      <a class="mobile-nav-btn {% if page=='laboratorio' %}active{% endif %}" href="/?page=laboratorio&center_id=0" onclick="closeMobileMenu()">🔬<span>Laboratorio</span></a>
+      <a class="mobile-nav-btn mobile-nav-ia" href="/recipe-ai/ui" onclick="closeMobileMenu()">🤖<span>IA Recetas</span></a>
+    </nav>
+  </div>
+</div>
+<div class="mobile-menu-backdrop" id="mobileMenuBackdrop" onclick="closeMobileMenu()"></div>
+
+{% if page != 'inicio' %}
+<div class="section-band"></div>
+{% endif %}
+
+<div class="container">
+{% if page == 'inicio' %}{% include "sections/inicio.html" %}{% endif %}
+{% if page == 'operativa' %}{% include "sections/operativa.html" %}{% endif %}
+{% if page == 'finanzas' %}{% include "sections/finanzas.html" %}{% endif %}
+{% if page == 'stock' %}{% include "sections/stock.html" %}{% endif %}
+{% if page == 'inventario' %}{% include "sections/inventario.html" %}{% endif %}
+{% if page == 'recetas' %}{% include "sections/recetas.html" %}{% endif %}
+{% if page == 'producciones' %}{% include "sections/producciones.html" %}{% endif %}
+{% if page == 'pedidos' %}{% include "sections/pedidos.html" %}{% endif %}
+{% if page == 'albaranes' %}{% include "sections/albaranes.html" %}{% endif %}
+{% if page == 'mermas' %}{% include "sections/mermas.html" %}{% endif %}
+{% if page == 'mermas_control' %}{% include "sections/mermas_control.html" %}{% endif %}
+{% if page == 'laboratorio' %}{% include "sections/laboratorio.html" %}{% endif %}
+{% if page == 'admin' %}{% include "sections/admin.html" %}{% endif %}
+</div>
+
+<div id="minMaxModal" class="modal" style="display:none;">
+  <div class="modal-card">
+    <h3>Editar mínimo / máximo</h3>
+    <div id="minMaxTitle" class="muted"></div>
+    <form id="minMaxForm">
+      
+      <div class="row"><label>Mínimo</label><div class="qtyline"><input type="number" step="0.001" name="min_qty" id="minmax_min"><select id="minmax_unit"></select></div></div>
+      <div class="row"><label>Máximo</label><div class="qtyline"><input type="number" step="0.001" name="max_qty" id="minmax_max"><span class="unitlbl" id="minmax_unit_label_max">&nbsp;</span></div></div>
+      <div class="actions"><button class="gold">Guardar</button><button type="button" onclick="closeMinMax()">Cancelar</button></div>
+      <div id="minMaxMsg" class="msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- OÍDO ALFI · asistente operativo movible -->
+{% include "partials/voice_assistant.html" %}
+
+<!-- Toast container — notificaciones flotantes -->
+<div id="toast-container"></div>
+
+<script src="/static/js/ui.js?v={{build_id}}"></script>
+<script>
+window.WAREHOUSES = {{ warehouses|tojson }};
+window.ITEMS = {% if page == 'admin' %}{{ items_pick|tojson }}{% else %}{{ items|tojson }}{% endif %};
+window.SUPPLIERS = {{ suppliers|tojson }};
+window.SUPPLIER_PRICES = {% if page == 'admin' %}[]{% else %}{{ supplier_prices|tojson }}{% endif %};
+</script>
+<script src="/static/js/core.js?v={{build_id}}"></script>
+<script src="/static/js/voice_assistant.js?v={{build_id}}"></script>
+{% if page == 'producciones' %}<script src="/static/js/producciones.js?v={{build_id}}"></script>{% endif %}
+{% if page == 'recetas' %}<script src="/static/js/recetas.js?v={{build_id}}"></script>{% endif %}
+{% if page == 'pedidos' %}<script src="/static/js/orders.js?v={{build_id}}"></script>{% endif %}
+{% if page == 'laboratorio' %}<script src="/static/js/laboratory.js?v={{build_id}}"></script>{% endif %}
+{% if page == 'albaranes' %}<script src="/static/js/albaranes.js?v={{build_id}}"></script>{% endif %}
+{% if page in ['mermas','mermas_control'] %}<script src="/static/js/waste.js?v={{build_id}}"></script>{% endif %}
+{% if page == 'operativa' %}<script src="/static/js/operativa.js?v={{build_id}}"></script>{% endif %}
+{% if page == 'inicio' %}<script src="/static/js/home_dashboard.js?v={{build_id}}"></script>{% endif %}
+
+</body>
+</html>

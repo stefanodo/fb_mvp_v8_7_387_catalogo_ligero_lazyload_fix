@@ -1,0 +1,9 @@
+{% if receipt_detail %}
+<div class="panel mt" id="receiptPanel">
+  {% include "partials/receipts_detail_header.html" %}
+  {% include "partials/receipts_detail_photos_manual.html" %}
+  {% include "partials/receipts_detail_ocr.html" %}
+  {% include "partials/receipts_detail_lines.html" %}
+  {% include "partials/receipts_detail_actions.html" %}
+</div>
+{% endif %}

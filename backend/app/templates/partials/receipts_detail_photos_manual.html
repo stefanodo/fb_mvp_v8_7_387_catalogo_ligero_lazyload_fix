@@ -1,0 +1,62 @@
+<div class="grid2 mt receipt-top-grid">
+        <div>
+          <h4>Fotos</h4>
+          <div class="receipt-summary"><span class="badge ok">{{ receipt_detail.photos|length if receipt_detail.photos else 0 }} página(s)</span><span class="muted">Puedes seguir añadiendo páginas al mismo albarán.</span></div>
+          <form method="post" action="/receipt/{{receipt_detail.id}}/upload_photos" enctype="multipart/form-data" id="receiptUploadForm">
+            <div class="photo-actions"><button type="button" class="mini js-primary-upload-btn" onclick="document.getElementById('up_single').click()">📄 Escanear / subir 1 foto</button><button type="button" class="mini js-multi-upload-btn" onclick="document.getElementById('up_multi').click()">🗂️ Añadir páginas</button><button type="button" class="mini" onclick="clearReceiptUploadFiles()">Limpiar selección</button><span id="up_count" class="muted" style="margin-left:8px;">0 seleccionadas</span></div><div class="hint">La previsualización muestra siempre los originales que se van a guardar. El sistema genera además una copia de trabajo preparada en Python para OCR, sin sustituir la foto original.</div><input id="up_master" type="file" name="files" multiple accept="image/jpeg,image/jpg,image/png,image/heic,image/heif" capture="environment" style="display:none"><input id="up_single" type="file" accept="image/jpeg,image/jpg,image/png,image/heic,image/heif" capture="environment" style="display:none"><input id="up_multi" type="file" multiple accept="image/jpeg,image/jpg,image/png,image/heic,image/heif" style="display:none">
+            <div class="row" style="margin-top:8px;"><label class="ocr-inline-check compact"><input type="checkbox" name="auto_ocr" value="1" checked><span>Procesar OCR automáticamente tras subir fotos</span></label></div>
+            <div class="hint">Puedes añadir más páginas del mismo albarán en cualquier momento. Las nuevas fotos se guardan en este mismo albarán.</div>
+            {% if request.query_params.get('upmsg') == 'empty' %}<div class="notice warn"><span class="notice-icon">⚠</span><span class="notice-text">No se recibió ninguna foto. Elige Cámara, Fototeca o Seleccionar archivos y luego pulsa “Añadir páginas / fotos”.</span></div>{% endif %}
+            {% if request.query_params.get('upmsg','').startswith('saved') %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Fotos añadidas correctamente a este mismo albarán.</span></div>{% endif %}
+            <div id="up_preview" class="photo-grid mt"></div>
+            <div class="actions"><button class="gold" type="submit" id="up_submit">Añadir páginas / fotos</button></div><div class="hint mt">Puedes repetir la selección varias veces para seguir añadiendo Página 2, Página 3, Página 4... y volver a procesar el OCR.</div>
+          </form>
+          {% if receipt_detail.photos %}
+            <div class="photo-grid mt">
+              {% for p in receipt_detail.photos %}
+                <div class="photo-thumb">
+                  <button type="button" class="photo-open" onclick="openPhoto('/uploads/{{p.file_path}}')">
+                    <img src="/uploads/{{p.file_path}}" alt="foto">
+                  </button>
+                  <div class="photo-caption">Página {{loop.index}}</div>
+                  <div class="actions wrap" style="justify-content:center; margin-top:2px;"><a class="mini" href="/uploads/{{p.file_path}}" target="_blank" rel="noopener">Ver foto</a></div>
+                  {% if receipt_detail.status == 'PENDING' %}
+                  <form method="post" action="/receipt/{{receipt_detail.id}}/delete_photo/{{p.id}}" onsubmit="return confirm('¿Borrar esta foto?')">
+                    <button class="photo-del" type="submit">✕</button>
+                  </form>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% elif receipt_detail.ocr %}
+            <div class="muted mt">Las fotos ya fueron procesadas en OCR en una sesión anterior.</div>
+          {% else %}
+            <div class="muted mt">Aún no hay fotos cargadas.</div>
+          {% endif %}
+
+        <div id="manualSafeBox" class="alert ok" style="margin-bottom:10px;">
+          <b>Modo seguro operativo:</b> si el OCR falla o mezcla cabecera con productos, usa <b>Añadir línea</b> y valida el albarán manualmente. El negocio no debe depender al 100% del OCR.
+          <div class="actions wrap" style="margin-top:8px;">
+            <a class="mini" href="#manualLineSection">Ir a Añadir línea</a>
+            <a class="mini" href="#receiptLinesSection">Ir a Líneas reales</a>
+            <a class="mini" href="#validateReceiptSection">Ir a Validar</a>
+          </div>
+        </div>
+
+        <div id="manualLineSection">
+          <h4>Añadir línea</h4>
+          <form method="post" action="/receipt/{{receipt_detail.id}}/add_line_form">
+            <div class="row"><label>Artículo</label>
+              <input type="text" class="mini smart-item" name="item_query" list="items_datalist" placeholder="Escribe (ej. dorada, aceite…)" />
+            </div>
+            <div class="row"><label>Cantidad</label>
+              <div class="qtyline">
+                <input type="number" step="0.001" name="qty_value" value="1">
+                <select name="qty_unit"><option value="kg">kg</option><option value="l">l</option><option value="g">g</option><option value="ml">ml</option><option value="manojo">manojo</option><option value="ud">ud</option></select>
+              </div>
+            </div>
+            <div class="row"><label>Precio unitario (opcional)</label><input type="number" step="0.0001" name="price_unit" placeholder="Opcional"></div>
+            <div class="actions"><button class="gold" type="submit">Añadir</button></div>
+          </form>
+        </div>
+      </div>

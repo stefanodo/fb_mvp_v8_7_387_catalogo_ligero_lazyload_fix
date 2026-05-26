@@ -1,0 +1,58 @@
+System MAC · v8_7_274 · Voz audio real + mermas + validación
+
+Base de trabajo: v8_7_273_admin_probar_ia_articulos_operativa_macfix.
+
+Cambios aplicados:
+
+1) Operativa rápida · audio real
+- Se intenta usar MediaRecorder/getUserMedia para grabar audio real y enviarlo a /api/operativa/transcribe.
+- Se elimina la restricción artificial que impedía intentar grabar si se entraba desde http://IP_DEL_MAC.
+- Si el navegador/iPhone bloquea micrófono real por no ser contexto seguro, el sistema avisa claramente y cae a dictado web/teclado.
+- La extensión enviada se ajusta según MIME: m4a para audio/mp4, ogg para ogg, webm por defecto.
+- El flujo sigue siendo: dictar/grabar → detener → transcribir → interpretar → guardar solo si hay datos mínimos.
+
+2) Interpretación operativa
+- Mejoras de normalización del dictado:
+  - mima/merna → merma
+  - so/san/saint Pedro → soy Pedro
+  - kilo y medio → 1.5 kg
+  - litro y medio → 1.5 l
+  - pescado roca/pescao roca → pescado de roca
+  - tomatoes/tomato → tomate/tomates
+- La IA recibe instrucciones más explícitas para entender “merma de cuatro huevos” como qty=4, unit=ud, name=huevos.
+- El motor local también detecta “mima de cuatro huevos” como HUEVOS, 4 ud.
+
+3) Mermas · voz
+- parse_voice_text ahora usa como primera capa interpret_operational_command(..., WASTE), por lo que aprovecha IA/contexto de Operativa cuando esté configurada.
+- Si OpenAI no está disponible, usa reglas locales mejoradas.
+- Se corrige caso de huevos: “cuatro huevos” debe registrar 4 ud y no inventar kg.
+- Mermas con receta/subreceta intentan mantener recipe_id y, si existe artículo producido con el mismo nombre, también vincular article_id para stock.
+
+4) Mermas · grabación desde pantalla Mermas
+- El botón “Dictar ahora” intenta grabar audio real y enviar a OpenAI STT.
+- Si el móvil bloquea la grabación por HTTP/no seguro, cae a Web Speech o micrófono del teclado iPhone.
+- El botón puede pulsarse otra vez para detener; también se corta solo a los 8 segundos para evitar grabaciones colgadas.
+
+5) Validaciones de confirmación de merma
+- Ya no devuelve solo error genérico.
+- Bloquea confirmación con mensajes precisos si falta:
+  - local concreto,
+  - responsable,
+  - artículo/elaboración real vinculada,
+  - cantidad/unidad válida,
+  - almacén correcto del local.
+- ui.js muestra toasts específicos para esos errores.
+
+6) Pedidos con artículos inexistentes
+- Se mantiene bloqueo de artículo inexistente: no entra en carrito normal si no existe en catálogo/stock.
+- “pescado de roca” queda como artículo no encontrado salvo que se cree antes.
+
+Validación realizada:
+- compileall backend/app y app/backend/app: OK.
+- Importación FastAPI: OK.
+- parse de “mima de cuatro huevos”: HUEVOS, 4 ud, match artículo Huevos: OK.
+- parse de “soy Juan merma de cuatro huevos por mal estado”: responsable Juan, HUEVOS, 4 ud, motivo mal estado: OK.
+- pedido “pescado de roca” no existente: bloqueado con ARTICLE_NOT_FOUND: OK.
+
+Limitación importante:
+- Para grabación real de audio desde iPhone, iOS/Safari puede bloquear getUserMedia si se entra por http://IP_DEL_MAC. En ese caso el sistema avisa y usa fallback. Para máxima fiabilidad de audio real, en fase posterior conviene servir por HTTPS/PWA segura o túnel seguro local.

@@ -1,0 +1,17 @@
+<div class="panel recipe-toolbar-panel recipe-toolbar-panel-compact">
+  <h3>Recetas / ficha técnica</h3>
+  <form method="get" action="/" class="recipe-toolbar-form recipe-toolbar-form-inline">
+    <input type="hidden" name="page" value="recetas">
+    <input type="hidden" name="center_id" value="{{selected_center_id}}">
+    <input type="hidden" name="rid" id="recipe_search_rid" value="{{ recipe_detail.id if recipe_detail else '' }}">
+    <div class="recipe-toolbar-inline-row">
+      <label class="recipe-toolbar-label" for="recipe_search_input">Receta</label>
+      <div class="recipe-toolbar-searchwrap">
+        <input type="text" name="q_recipe" id="recipe_search_input" class="recipe-toolbar-search" placeholder="Buscar receta por nombre..." value="{{ recipe_detail.name|upper if recipe_detail else (request.query_params.get('q_recipe') or '')|upper }}" autocomplete="off" spellcheck="false">
+        <div id="recipe_search_suggest" class="recipe-search-suggest"></div>
+      </div>
+      <button type="submit" class="gold compact-action">Abrir ficha</button>
+      <a class="btn compact-action" href="/?page=recetas&new=1&center_id={{selected_center_id}}">Crear receta</a>
+    </div>
+  </form>
+</div>

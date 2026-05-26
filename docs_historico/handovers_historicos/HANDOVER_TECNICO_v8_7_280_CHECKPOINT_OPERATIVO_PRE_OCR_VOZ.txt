@@ -1,0 +1,39 @@
+HANDOVER TÉCNICO — v8_7_280_checkpoint_operativo_pre_ocr_voz
+Fecha: 2026-05-17 21:40
+
+OBJETIVO
+Crear un checkpoint antes de retomar OCR y voz.
+
+ALCANCE
+Este checkpoint consolida reglas operativas y documentación de los bloques cerrados en conversación:
+- Normalización base inicial.
+- Motor de necesidades.
+- Producciones planificadas/confirmadas.
+- Carrito y pedidos por proveedor.
+- Costes, precios estimados/confirmados y mano de obra separada.
+- Pedido vs albarán vs stock real.
+- Inventario teórico/físico.
+- Mermas y pérdidas económicas.
+- Panel de control operativo.
+- Arquitectura ligera por módulos.
+
+REGLAS CRÍTICAS
+1. Carrito y pedido no impactan stock.
+2. Solo albarán validado impacta stock de compras.
+3. Rectificación de albarán impacta solo la diferencia.
+4. Producción planificada no impacta stock.
+5. Producción confirmada descuenta insumos brutos y entra elaboración producida.
+6. Merma validada descuenta stock; merma pendiente no.
+7. Inventario cerrado ajusta stock; inventario abierto no.
+8. Food cost no incluye mano de obra.
+9. Precios estimados no deben presentarse como precios confirmados.
+10. Líneas en revisión no bloquean el pedido completo.
+
+ESTADO
+Checkpoint preparado. OCR y voz no se han tocado en este paquete.
+
+VALIDACIÓN RECOMENDADA EN MAC
+1. Abrir con REINICIAR_LIMPIO.command.
+2. Verificar que arranca sin puerto ocupado.
+3. Probar Catálogo, Recetas, Producciones, Pedidos, Albaranes, Inventario, Mermas.
+4. No activar OCR/voz hasta cerrar prueba funcional base.

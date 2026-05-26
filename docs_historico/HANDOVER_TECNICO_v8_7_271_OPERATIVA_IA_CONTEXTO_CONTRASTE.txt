@@ -1,0 +1,53 @@
+System MAC · v8_7_271 · Operativa rápida con IA + contexto real
+
+Cambios aplicados:
+
+1) IA como motor principal si está configurada
+- La interpretación operativa usa IA cuando existen:
+  OPERATIVA_AI_MODE=openai
+  OPENAI_API_KEY=...
+  OPERATIVA_AI_MODEL=gpt-4o-mini (por defecto)
+- Si no hay clave o falla la API, el sistema vuelve a reglas locales mejoradas sin romper la operativa.
+- La IA devuelve JSON estructurado: tipo, responsable, artículos/recetas, cantidad, unidad, motivo, confianza y necesidad de revisión.
+
+2) Candidatos reales antes de interpretar
+- Antes de pedir interpretación a IA, el backend busca candidatos dentro del sistema:
+  - artículos/stock (items)
+  - recetas/subrecetas
+  - proveedores
+  - producciones históricas si la tabla tiene nombre disponible
+- Esos candidatos se envían como contexto a la IA para reducir invenciones.
+- Después de interpretar, el sistema vuelve a resolver cada línea contra candidatos reales.
+
+3) Seguridad de guardado
+- Pedido -> Carrito compartido de pedidos.
+- Producción -> Cola de producciones.
+- Merma -> Mermas pendientes.
+- Nunca descuenta stock ni cierra pedidos automáticamente.
+- Si hay coincidencia ambigua, no guarda pedidos/producciones; pide especificar mejor.
+- Ejemplo: “tomate” puede devolver varios tomates y queda para revisión. “tomate rama” sí puede quedar claro.
+
+4) Flujo de dictado
+- Se elimina interpretación constante por cada palabra escrita.
+- Mientras se dicta, solo se muestra el texto provisional.
+- Al detener o cerrar el dictado, analiza una vez.
+- Si confianza alta y datos completos, guarda y limpia campo.
+- Si hay duda, muestra interpretación y no guarda automáticamente.
+
+5) UI/contraste
+- Mejorados botones de editar total, marcar validado y anular.
+- Tarjetas con más contraste.
+- Estados y alternativas más legibles.
+- Si hay coincidencias posibles, se muestran como detalles desplegables.
+
+Validación interna:
+- Compilación backend/app y app/backend/app: OK.
+- Importación FastAPI: OK.
+- Interpretación local probada:
+  - “Soy Pedro agrega un kilo de zanahoria al pedido” -> ORDER / ZANAHORIA / 1 kg / sin revisión.
+  - “Soy Pedro agrega un kilo de tomate al pedido” -> ORDER / varias coincidencias / revisión.
+  - “Soy Pedro agrega un kilo de tomate rama al pedido” -> ORDER / TOMATE RAMA / 1 kg / sin revisión.
+  - “Soy Juan merma de salsa de tomate por mal estado” -> WASTE / pendiente de revisión si no hay producción/receta clara.
+
+Nota:
+- La IA real no se activa sin OPENAI_API_KEY. Sin clave, funciona en modo local con menor precisión.

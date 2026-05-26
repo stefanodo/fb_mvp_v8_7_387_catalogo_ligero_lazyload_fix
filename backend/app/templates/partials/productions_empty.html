@@ -1,0 +1,18 @@
+<div class="production-empty-state mt">
+  <div class="production-empty-title">No hay una producción abierta</div>
+  <div class="muted">Selecciona local y almacén para crear una nueva, o abre una del historial de la izquierda.</div>
+  <div class="production-empty-grid mt">
+    <div class="production-empty-item">
+      <div class="production-empty-label">Local seleccionado</div>
+      <div>{{ selected_center_name or 'Todos' }}</div>
+    </div>
+    <div class="production-empty-item">
+      <div class="production-empty-label">Producciones listadas</div>
+      <div>{{ productions|length }}</div>
+    </div>
+    <div class="production-empty-item full">
+      <div class="production-empty-label">Siguiente paso</div>
+      <div>Crea una nueva producción o abre una confirmada/borrador desde el historial.</div>
+    </div>
+  </div>
+</div>

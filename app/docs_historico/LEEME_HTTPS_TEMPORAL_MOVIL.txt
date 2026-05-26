@@ -1,0 +1,22 @@
+System MAC · Acceso HTTPS temporal para móvil
+
+Para probar voz/audio real desde iPhone:
+
+1) Ejecuta: CONFIGURAR_IA_OPENAI.command
+   - Solo si todavía no configuraste la clave.
+
+2) Ejecuta: INICIAR_HTTPS_TEMPORAL.command
+   - El comando instala/usa cloudflared.
+   - Genera un enlace HTTPS temporal.
+   - Abre una pantalla con QR para el móvil.
+
+3) En el móvil abre el QR o el enlace HTTPS que aparece.
+
+Importante:
+- Mantén abierta la ventana de Terminal.
+- Al cerrar la Terminal, el enlace HTTPS se cierra.
+- El enlace HTTPS temporal es público mientras esté activo. No lo compartas fuera de tu equipo.
+- Este modo es para pruebas de voz real. Para producción, lo correcto será un servidor con dominio HTTPS y login.
+
+El arranque local normal sigue intacto:
+DESBLOQUEAR_y_INICIAR.command

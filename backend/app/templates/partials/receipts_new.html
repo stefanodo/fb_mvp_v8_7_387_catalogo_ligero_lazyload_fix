@@ -1,0 +1,309 @@
+      <div class="panel">
+        <h3>🧾 Nuevo albarán</h3>
+        <form id="receiptNewForm" method="post" action="/receipt/new_form" enctype="multipart/form-data">
+          <div class="row"><label>Local</label>
+            <select name="center_id" required>
+              {% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="row"><label>Almacén</label>
+            <select name="warehouse_id" required>
+              {% for w in warehouses %}<option value="{{w.id}}">{{w.center_name}} · {{w.name}}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="row"><label>Proveedor</label>
+            <select name="supplier_id" id="supplierSelect">
+              <option value="0">— Seleccionar —</option>
+              {% for s in suppliers %}{% if s.name != "Proveedor pendiente OCR" %}<option value="{{s.id}}">{{s.name}}</option>{% endif %}{% endfor %}
+            </select>
+          </div>
+          <div class="row">
+            <label></label>
+            <button type="button" class="mini" onclick="toggleNewSupplier()">+ Nuevo proveedor</button>
+          </div>
+
+          <div id="newSupplierBox" class="panel mt" style="display:none; padding:12px;">
+            <div class="muted">Crear proveedor al vuelo (se guardará en Proveedores y quedará seleccionado).</div>
+            <div class="grid3 mt">
+              <div class="row"><label>Nombre</label><input name="new_supplier_name" placeholder="Obligatorio"></div>
+              <div class="row"><label>Teléfono</label><input name="new_supplier_phone" placeholder="Opcional"></div>
+              <div class="row"><label>Email</label><input name="new_supplier_email" placeholder="Opcional"></div>
+            </div>
+            <div class="row" style="max-width:320px;"><label>CIF/NIF</label><input name="new_supplier_tax_id" placeholder="Opcional"></div>
+            <div class="row"><label>Dirección</label><input name="new_supplier_address" placeholder="Opcional"></div>
+            <div class="hint">Si rellenas Nombre, se creará el proveedor y no hace falta seleccionar uno.</div>
+          </div>
+          <div class="grid3">
+            <div class="row"><label>Nº albarán/nota</label><input name="doc_number" placeholder="Opcional"></div>
+            <div class="row"><label>Fecha</label><input name="doc_date" placeholder="YYYY-MM-DD (opcional)"></div>
+            <div class="row"><label>Nota</label><input name="note" placeholder="Opcional"></div>
+          </div>
+          <div class="row mt"><label>Fotos / páginas (opcional)</label>
+            <div class="photo-actions">
+              <button type="button" class="mini js-primary-upload-btn" onclick="document.getElementById('files_single').click()">📄 Escanear / subir 1 foto</button>
+              <button type="button" class="mini js-multi-upload-btn" onclick="document.getElementById('files_multi').click()">🗂️ Añadir páginas</button>
+              <button type="button" class="mini" onclick="clearReceiptDraftFiles()">Limpiar selección</button>
+              <span id="files_count" class="muted" style="margin-left:8px;">0 seleccionadas</span>
+            </div>
+            <div class="hint">Usa el primer botón para una sola imagen. Usa “Añadir páginas” para acumular más páginas del mismo albarán.</div>
+            <div class="receipt-summary"><span class="badge">Borrador multipágina</span><span id="files_pages_hint" class="muted">Páginas preparadas: 0</span></div>
+            <div id="files_preview" class="photo-grid mt"></div>
+            <input id="files_master" type="file" name="files" multiple accept="image/jpeg,image/jpg,image/png,image/heic,image/heif" style="display:none">
+            <input id="files_single" type="file" accept="image/jpeg,image/jpg,image/png,image/heic,image/heif" style="display:none">
+            <input id="files_multi" type="file" multiple accept="image/jpeg,image/jpg,image/png,image/heic,image/heif" style="display:none">
+          </div>
+          <div class="actions actions-mobile-stack">
+            <button id="receiptNewSubmit" class="gold btn-section" type="submit" style="min-height:46px;font-size:15px;">Crear borrador</button>
+            <span id="receiptNewMsg" class="muted" style="margin-left:10px;"></span>
+          </div>
+        </form>
+        <div class="notice info mt"><span class="notice-icon">ℹ</span><span class="notice-text">El albarán no impacta en stock hasta que se valide.</span></span></div>
+      </div>
+
+      <script>
+        function toggleNewSupplier(){
+          const box = document.getElementById('newSupplierBox');
+          if(!box) return;
+          const isHidden = box.style.display === 'none' || box.style.display === '';
+          box.style.display = isHidden ? 'block' : 'none';
+          if(isHidden){
+            const sel = document.getElementById('supplierSelect');
+            if(sel) sel.value = '0';
+          }
+        }
+      
+        function renderPreview(files, targetId){
+          const box = document.getElementById(targetId);
+          if(!box) return;
+          box.innerHTML = '';
+          (files||[]).forEach(file => {
+            if(!file || !file.type || !file.type.startsWith('image/')) return;
+            const wrap = document.createElement('div');
+            wrap.className = 'photo-thumb';
+            const img = document.createElement('img');
+            img.alt = file.name || 'foto';
+            img.src = URL.createObjectURL(file);
+            wrap.appendChild(img);
+            const cap = document.createElement('div');
+            cap.className = 'photo-caption';
+            cap.textContent = file.name || 'foto';
+            wrap.appendChild(cap);
+            box.appendChild(wrap);
+          });
+        }
+        function _appendFiles(targetInputId, files, previewId, countId, mirrorInputId){
+          const target = document.getElementById(targetInputId);
+          if(!target || !files || !files.length) return;
+          const dt = new DataTransfer();
+          const existing = target.files ? Array.from(target.files) : [];
+          existing.forEach(f => dt.items.add(f));
+          Array.from(files).forEach(f => { if(f && f.type && f.type.startsWith('image/')) dt.items.add(f); });
+          target.files = dt.files;
+          const mirror = mirrorInputId ? document.getElementById(mirrorInputId) : null;
+          if(mirror) mirror.files = dt.files;
+          const out = document.getElementById(countId);
+          if(out) out.textContent = dt.files.length + ' seleccionada' + (dt.files.length===1 ? '' : 's');
+          renderPreview(Array.from(target.files || []), previewId);
+        }
+        function updateFilesCount(){
+          const master = document.getElementById('files_master');
+          const out = document.getElementById('files_count');
+          const all = master && master.files ? Array.from(master.files) : [];
+          if(out) out.textContent = all.length + ' seleccionada' + (all.length===1 ? '' : 's');
+          const pages=document.getElementById('files_pages_hint'); if(pages) pages.textContent='Páginas preparadas: '+all.length;
+          renderPreview(all, 'files_preview');
+        }
+        function updateUploadCount(){
+          const master = document.getElementById('up_master');
+          const out = document.getElementById('up_count');
+          const all = master && master.files ? Array.from(master.files) : [];
+          if(out) out.textContent = all.length + ' seleccionada' + (all.length===1 ? '' : 's');
+          renderPreview(all, 'up_preview');
+        }
+        function clearReceiptDraftFiles(){
+          ['files_master','files_single','files_multi'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+          const box=document.getElementById('files_preview'); if(box) box.innerHTML='';
+          const out=document.getElementById('files_count'); if(out) out.textContent='0 seleccionadas';
+          const pages=document.getElementById('files_pages_hint'); if(pages) pages.textContent='Páginas preparadas: 0';
+        }
+        function clearReceiptUploadFiles(){
+          ['up_master','up_single','up_multi'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+          const box=document.getElementById('up_preview'); if(box) box.innerHTML='';
+          const out=document.getElementById('up_count'); if(out) out.textContent='0 seleccionadas';
+        }
+        function setupPhotoButtons(){
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '') || (navigator.maxTouchPoints||0) > 1;
+          document.querySelectorAll('.js-primary-upload-btn').forEach(btn => {
+            btn.textContent = isMobile ? '📄 Escanear / subir 1 foto' : '📎 Subir 1 foto';
+            btn.style.display = 'inline-flex';
+          });
+          document.querySelectorAll('.js-multi-upload-btn').forEach(btn => {
+            btn.textContent = isMobile ? '🗂️ Añadir páginas' : '🗂️ Añadir varias fotos';
+            btn.style.display = 'inline-flex';
+          });
+        }
+        document.addEventListener('change', function(e){
+          if(!e.target) return;
+          if(e.target.id==='files_single' || e.target.id==='files_multi'){
+            _appendFiles('files_master', e.target.files, 'files_preview', 'files_count');
+            e.target.value='';
+          }
+          if(e.target.id==='up_single' || e.target.id==='up_multi'){
+            _appendFiles('up_master', e.target.files, 'up_preview', 'up_count');
+            e.target.value='';
+          }
+        });
+        document.addEventListener('DOMContentLoaded', setupPhotoButtons);
+
+function bindReceiptCreateAjax(){
+  const form = document.getElementById('receiptNewForm');
+  const btn = document.getElementById('receiptNewSubmit');
+  const msg = document.getElementById('receiptNewMsg');
+  if(!form || !btn) return;
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    try{
+      btn.disabled = true;
+      if(msg) msg.textContent = 'Creando borrador...';
+      const fd = new FormData(form);
+      const res = await fetch(form.action, {method:'POST', body:fd, redirect:'follow'});
+      if(msg) msg.textContent = 'Abriendo borrador...';
+      if(res.redirected && res.url){
+        window.location.href = res.url;
+        return;
+      }
+      const txt = await res.text();
+      const m = String(txt||'').match(/\?page=albaranes[^"'\s<>]*/);
+      if(m && m[0]){
+        window.location.href = m[0].startsWith('/') ? m[0] : ('/' + m[0]);
+        return;
+      }
+      window.location.reload();
+    }catch(err){
+      console.error(err);
+      if(msg) msg.textContent = 'No se pudo abrir solo. Recarga una vez.';
+      btn.disabled = false;
+    }
+  });
+}
+
+function bindOCRSubmitOnce(){
+  const forms = document.querySelectorAll('form[action*="/process_ocr"]');
+  forms.forEach((form)=>{
+    form.addEventListener('submit', function(){
+      const btn = form.querySelector('button[type="submit"]');
+      if(btn){
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.dataset.oldText = old;
+        btn.textContent = old.includes('GET') ? 'Procesando…' : 'Procesando OCR…';
+      }
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  bindReceiptCreateAjax();
+  bindOCRSubmitOnce();
+});
+
+
+(function(){
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (document.body && params.get("page") === "albaranes") {
+      const aid = params.get("aid");
+      const needsFocus = params.get("ocr_ok") || params.get("head_ok") || params.get("ocr_err") || params.get("ocr_wait") || params.get("ocr_line_ok") || params.get("ocr_line_err");
+      if (aid && needsFocus) {
+        requestAnimationFrame(() => {
+          const lineId = params.get("ocr_line_id");
+          const row = lineId ? document.getElementById(`ocrLineRow${lineId}`) : null;
+          const target = row || document.getElementById("ocrSection") || document.getElementById("receiptPanel");
+          if (target) target.scrollIntoView({behavior:"auto", block: row ? "center" : "start"});
+        });
+      }
+    }
+  } catch (e) {}
+})();
+(function(){
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (document.body && params.get("page") === "albaranes") {
+      const statusNode = document.querySelector('[data-ocr-status]');
+      const aid = params.get('aid');
+      const status = statusNode ? (statusNode.getAttribute('data-ocr-status') || '').toUpperCase() : '';
+      if (aid && status === 'PROCESSING') {
+        let tries = 0;
+        let seenReady = false;
+        const poll = () => {
+          tries += 1;
+          try {
+            fetch(`/api/receipt/${aid}/ocr_status?ts=` + Date.now(), {cache:'no-store', headers:{'X-Requested-With':'XMLHttpRequest'}})
+              .then(r => r.json())
+              .then(data => {
+                const nextStatus = String((data && data.status) || '').toUpperCase();
+                if (nextStatus && nextStatus !== 'PROCESSING') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('ocr_ok','1');
+                  url.searchParams.set('ts', String(Date.now()));
+                  window.location.replace(url.toString() + '#ocrSection');
+                  return;
+                }
+                if (tries < 80) setTimeout(poll, 1200);
+              })
+              .catch(() => { if (tries < 80) setTimeout(poll, 1500); });
+          } catch(e) { if (tries < 80) setTimeout(poll, 1500); }
+        };
+        setTimeout(poll, 900);
+      }
+    }
+  } catch (e) {}
+})();
+
+
+function recipeUnitOptionsFor(base){
+  const b=(base||'ud').toLowerCase();
+  if(b==='g' || b==='kg') return ['g','kg'];
+  if(b==='ml' || b==='l') return ['g','kg'];
+  return [b||'ud'];
+}
+function toggleRecipeComponentType(sel){
+  const form = sel.closest('form');
+  if(!form) return;
+  const item = form.querySelector('[data-component-item="1"]');
+  const sub = form.querySelector('[data-component-subrecipe="1"]');
+  const unitSel = form.querySelector('select[name="qty_unit"]');
+  const isSub = (sel.value||'item') === 'subrecipe';
+  if(item) item.style.display = isSub ? 'none' : '';
+  if(sub) sub.style.display = isSub ? '' : 'none';
+  if(isSub && sub){
+    const subSel = sub.querySelector('select[name="subrecipe_id"]');
+    const opt = subSel && subSel.options ? subSel.options[subSel.selectedIndex] : null;
+    const base = opt ? (opt.getAttribute('data-yield-unit')||'g') : 'g';
+    if(unitSel){
+      const prev = unitSel.value||'';
+      const opts = recipeUnitOptionsFor(base);
+      unitSel.innerHTML = opts.map(u=>`<option value="${u}">${u}</option>`).join('');
+      unitSel.value = opts.includes(prev) ? prev : opts[0];
+    }
+  }
+}
+(function(){
+  document.addEventListener('submit', function(e){
+    const f=e.target;
+    if(f && f.matches('form[data-ocr-line-form="1"]')){
+      try{ sessionStorage.setItem('ocrScrollY', String(window.scrollY||0)); }catch(_e){}
+    }
+  });
+  window.addEventListener('load', function(){
+    try{
+      const params = new URLSearchParams(location.search);
+      if(params.get('ocr_line_ok')==='1'){
+        const y = parseFloat(sessionStorage.getItem('ocrScrollY')||'0');
+        if(!isNaN(y) && y>0){ setTimeout(()=>window.scrollTo({top:y, behavior:'auto'}), 40); }
+      }
+    }catch(_e){}
+  });
+})();
+
+</script>

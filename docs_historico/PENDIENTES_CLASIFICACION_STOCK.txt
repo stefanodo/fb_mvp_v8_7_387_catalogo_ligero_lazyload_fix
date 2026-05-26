@@ -1,0 +1,16 @@
+Vaciado de stock_area cerrado para esta base.
+
+Clasificaciones finales aplicadas para cerrar pendientes:
+- Fideos -> SECOS
+- Film transparente -> SECOS
+- Fondo blanco -> FRESCOS
+- Fondo oscuro -> FRESCOS
+- Nata para cocinar -> SECOS
+- Papel aluminio -> SECOS
+- Papel horno -> SECOS
+- Pasta de wasabi -> SECOS
+- Salsa base cocina central -> FRESCOS
+- Tapa take away M -> SECOS
+- Tortilla de trigo -> SECOS
+
+Nota externa no incluida en esta base: 'Yema pasteurizada brick' sigue dependiendo de su temperatura de conservación.

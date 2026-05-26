@@ -1,0 +1,77 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Manual System MAC</title><style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:900px;margin:32px auto;line-height:1.45;color:#1f2937}h1,h2,h3{color:#111827}h1{border-bottom:3px solid #8a6a2f;padding-bottom:12px}code{background:#f3f4f6;padding:2px 5px;border-radius:4px}@media print{body{margin:16mm}.no-print{display:none}}</style></head><body><div class="no-print"><button onclick="window.print()">Imprimir manual</button></div><h1>Manual de usuario · System MAC / F&amp;B MAC</h1>
+<p>Versión viva del manual. Este documento debe actualizarse en cada ZIP cuando se añadan o cambien funciones.</p>
+<h2>1. Primer arranque</h2>
+<p>1. Descomprime el ZIP.</p>
+<p>2. Abre `DESBLOQUEAR_y_INICIAR.command`.</p>
+<p>3. Espera a que aparezca el servidor local.</p>
+<p>4. En Mac entra por `http://127.0.0.1:8000`.</p>
+<p>5. En beta móvil local usa la pantalla `Acceso móvil beta`; en versión final online se usará dominio, login y PWA.</p>
+<h2>2. Principio de seguridad</h2>
+<p>System MAC prioriza no romper stock, recetas maestras ni datos contables. Las acciones críticas quedan en borrador, revisión o PREVIEW hasta validación humana.</p>
+<h2>3. Catálogo</h2>
+<h3>Artículos</h3>
+<p>Sirve para crear y editar materias primas y preparaciones.</p>
+<ul>
+<li>`Insumo`: materia prima comprable/inventariable.</li>
+<li>`Preparación`: elaboración interna/subreceta con posible stock propio.</li>
+<li>`Guardar todas las modificaciones`: permite editar varias filas y guardar en bloque sin perder cambios.</li>
+</ul>
+<h3>Comparativa proveedores</h3>
+<p>Antes llamada `Precios proveedor`. Sirve para comparar precios por artículo/proveedor, proveedor habitual, último precio, fecha y diferencias. El Dashboard muestra alertas; esta pestaña permite revisar el detalle.</p>
+<h2>4. Recetas</h2>
+<p>Permite crear fichas técnicas con ingredientes, mermas, coste, foto, alérgenos, rendimiento y carga estructural. Si no hay ingredientes, el sistema debe avisar que no puede calcular coste real.</p>
+<h2>5. Producciones</h2>
+<p>Debe mostrar solo elaboraciones internas producibles, no platos finales de carta salvo que estén marcados como producibles.</p>
+<h2>6. Pedidos</h2>
+<p>Flujo recomendado:</p>
+<p>1. Selecciona local, responsable y nota opcional.</p>
+<p>2. Crea o abre pedido.</p>
+<p>3. Añade líneas por bloque: frescos, secos, limpieza, producciones o libres.</p>
+<p>4. Revisa detalle.</p>
+<p>5. No se envía automáticamente sin validación.</p>
+<h2>7. Mermas</h2>
+<p>Permite registrar pérdidas por artículo o elaboración. En modo pendiente no descuenta stock definitivo hasta confirmación.</p>
+<h2>8. Inventario</h2>
+<p>Flujo recomendado:</p>
+<p>1. Selecciona almacén: Todos, Cocina, Cámara o Economato.</p>
+<p>2. Selecciona responsable.</p>
+<p>3. Estado normal: `En conteo`.</p>
+<p>4. Pulsa `Guardar sesión` para cabecera.</p>
+<p>5. Elige bloque/familia.</p>
+<p>6. Cuenta líneas y pulsa `Guardar conteo real`.</p>
+<p>7. Al terminar, usa `Cerrar y conciliar stock`.</p>
+<p>8. `Nueva sesión desde cero` crea otra sesión; no guarda el conteo actual.</p>
+<h2>9. OÍDO ALFI</h2>
+<p>Pantalla operativa para escribir o dictar comandos. En móvil se recomienda usar el micrófono del teclado y luego `Ejecutar`. Las acciones críticas se crean como borrador o pendiente.</p>
+<h2>10. Laboratorio</h2>
+<p>Laboratorio no debe tocar producción real salvo que el sistema lo indique explícitamente. Sirve para probar y preparar futuro.</p>
+<h3>Integraciones TPV / Ventas</h3>
+<ul>
+<li>Simula ventas desde TPV.</li>
+<li>Preserva venta cruda.</li>
+<li>Mapea producto TPV a receta/artículo.</li>
+<li>Interpreta modificadores.</li>
+<li>Genera consumo teórico en `PREVIEW`.</li>
+<li>No descuenta stock real.</li>
+<li>No modifica recetas maestras.</li>
+</ul>
+<h3>Continuidad / Anti-caída</h3>
+<ul>
+<li>Simula trabajo sin internet.</li>
+<li>Guarda eventos offline.</li>
+<li>Sincroniza en modo LAB.</li>
+<li>Eventos críticos van a conflicto/revisión.</li>
+<li>Recomendación futura por local: router dual WAN con SIM 4G/5G y SAI para router, TPV, servidor local e impresora.</li>
+</ul>
+<h3>Conciliación albarán/factura/pago proveedor</h3>
+<ul>
+<li>Prepara relación documental por proveedor.</li>
+<li>Compara albarán OCR contra factura.</li>
+<li>Genera propuesta de vencimiento/pago.</li>
+<li>No ejecuta pagos reales.</li>
+<li>Requiere validación humana final.</li>
+</ul>
+<h2>11. Albaranes y facturas para gestoría</h2>
+<p>Objetivo futuro: agrupar documentos por proveedor, fecha, mes, local, estado OCR, estado de conciliación y estado contable para crear paquete PDF imprimible/enviable.</p>
+<h2>12. Versión final online</h2>
+<p>La beta local usa IP/QR. La versión final debe funcionar con dominio, HTTPS, servidor web, base central, login, roles, permisos, sesión persistente y PWA en iPhone, Android, Mac, Windows y tablets.</p></body></html>

@@ -1,0 +1,5 @@
+<h3>📊 Stock actual</h3>
+{% if request.query_params.get('stock_ok')=='1' %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Stock actualizado correctamente.</span></div>{% endif %}
+<div class="row stock-search-row">
+  <input id="stockSearch" type="text" placeholder="Buscar artículo (A–Z)..." value="{{stock_q}}" style="width:100%;"/>
+</div>

@@ -1,0 +1,53 @@
+<form method="post" action="/recipe/create_form" class="panel recipe-new-shell" id="recipeNewForm">
+  <div class="recipe-new-grid">
+    <div class="recipe-new-section">
+      <h4>Datos base</h4>
+      <div class="row"><label>Nombre</label><input name="name" required autocomplete="off"></div>
+      <div class="row"><label>Subcategoría operativa</label><select name="subcategory">{% for cat in subcategories %}<option value="{{cat}}">{{cat}}</option>{% endfor %}</select></div>
+      <div class="row"><label>Categoría general</label><select name="category">{% for cat in categories %}<option value="{{cat}}">{{cat}}</option>{% endfor %}</select></div>
+      <div class="row"><label>Tipo</label><select name="is_subrecipe"><option value="0">RECETA</option><option value="1">SUB-RECETA</option></select></div>
+    </div>
+
+    <div class="recipe-new-section">
+      <h4>Rendimiento y objetivos</h4>
+      <div class="row"><label>Raciones (yield)</label><input type="number" step="0.001" min="0.001" name="yield_qty" value="1"></div>
+      <div class="row"><label>Rend. lote</label><div class="qtyline"><input type="number" step="0.001" min="0.001" name="yield_final_qty" value="1"><select name="yield_final_unit"><option value="g">g</option><option value="kg">kg</option><option value="manojo">manojo</option><option value="manojo">manojo</option><option value="ud">ud</option></select></div></div>
+      <div class="row"><label>Merma global del proceso %</label><input type="number" step="0.01" name="waste_pct" value="0"></div>
+      <div class="row"><label>Contingencia %</label><input type="number" step="0.01" name="contingency_pct" value="5"></div>
+      <div class="row"><label>Food cost obj. %</label><input type="number" step="0.01" name="target_food_cost_pct" value="30"></div>
+      <div class="row"><label>Margen obj. %</label><input type="number" step="0.01" name="target_margin_pct" value="70"></div>
+      <div class="row"><label>Precio manual</label><input type="number" step="0.01" name="manual_price" value="0"></div>
+    </div>
+
+    <div class="recipe-new-section">
+      <h4>Alcance</h4>
+      {% set _new_scope_global = not selected_center_id %}
+      <div class="scope-box">
+        <label class="checkline"><input type="checkbox" name="scope_global" value="1" {% if _new_scope_global %}checked{% endif %} data-scope-global="1"><span class="checkline-text">Global (todos los restaurantes)</span></label>
+        <div class="scope-centers" data-scope-centers="1">
+          {% for c in centers %}
+          <label class="checkline {% if _new_scope_global %}is-disabled{% endif %}"><input type="checkbox" name="scope_centers" value="{{c.id}}" {% if (not _new_scope_global) and selected_center_id==c.id %}checked{% endif %} {% if _new_scope_global %}disabled{% endif %}><span class="checkline-text">{{c.name}}</span></label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="recipe-new-section">
+      <h4>Alérgenos UE (14)</h4>
+      <div class="allergen-grid" id="allergenGrid">
+        {% for a in allergens_ue %}
+        <label class="allergen-pill"><input type="checkbox" name="allergens_list" value="{{a.name}}"><span class="a-ico">{{a.icon}}</span><span class="a-name">{{a.name}}</span></label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="recipe-new-section">
+      <h4>Elaboración paso a paso</h4>
+      <div class="row full"><textarea name="prep_steps" rows="6" placeholder="1. ...&#10;2. ..."></textarea></div>
+    </div>
+
+    <div class="actions"><button type="submit" class="gold">Crear receta</button></div>
+    <div class="muted mt">Después de crearla, abre la ficha y añade ingredientes.</div>
+    <div id="newRecipeMsg" class="msg"></div>
+  </div>
+</form>

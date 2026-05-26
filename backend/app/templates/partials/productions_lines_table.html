@@ -1,0 +1,51 @@
+<div id="productionLinesSection"></div>
+<h4 class="mt" id="receiptLinesSection">Líneas</h4>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Tipo</th><th>Artículo</th><th>Cantidad</th><th>Editar</th><th></th></tr></thead>
+    <tbody>
+      {% for ln in production_detail.lines %}
+        <tr id="prod-line-{{ln.id}}">
+          <td>{% if ln.line_type=='OUT' %}<span class="badge danger">OUT</span>{% else %}<span class="badge ok">IN</span>{% endif %}</td>
+          <td>{{ln.item_name}}</td>
+          <td>
+            {{ human_qty(ln.qty_input, ln.input_unit) }}
+            {% if ln.qty_base_valid %}
+              <div class="muted">pedido bruto: {{ human_qty(ln.qty_base, ln.base_unit) }}</div>
+            {% else %}
+              <div class="msg err small">Equiv. base pendiente. No se convierte {{ ln.input_unit }} a {{ ln.base_unit }} automáticamente.</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if production_detail.status=='DRAFT' %}
+              <form method="post" action="/production/{{production_detail.id}}/update_line/{{ln.id}}" class="compact preserve-flow" data-flow-target="productionDetailPanel" data-flow-row-id="prod-line-{{ln.id}}">
+                <div class="qtyline" style="flex-wrap:nowrap;gap:6px;">
+                  <input type="number" step="any" min="0" name="qty_value"
+                         value="{{ '%.3f'|format(ln.qty_input)|replace('.000','')|replace(',000','') }}"
+                         required style="flex:1;min-width:70px;max-width:none;">
+                  <select name="qty_unit" data-smart-unit="1" data-base-unit="{{ln.base_unit}}" required style="flex:0 0 80px;">
+                    <option value="g" {% if ln.input_unit=='g' %}selected{% endif %}>g</option>
+                    <option value="kg" {% if ln.input_unit=='kg' %}selected{% endif %}>kg</option>
+                    <option value="ud" {% if ln.input_unit=='ud' %}selected{% endif %}>ud</option>
+                    <option value="raciones" {% if ln.input_unit=='raciones' %}selected{% endif %}>raciones</option>
+                    <option value="porciones" {% if ln.input_unit=='porciones' %}selected{% endif %}>porciones</option>
+                  </select>
+                  <button type="submit" class="mini">Guardar</button>
+                </div>
+              </form>
+            {% else %}
+              <span class="muted">Bloqueado</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if production_detail.status=='DRAFT' %}
+              <form method="post" action="/production/{{production_detail.id}}/delete_line/{{ln.id}}" style="display:inline" onsubmit="return confirm('¿Quitar esta línea del borrador?');" class="preserve-flow" data-flow-target="productionDetailPanel" data-flow-row-id="prod-line-{{ln.id}}">
+                <button class="mini" type="submit">Quitar</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

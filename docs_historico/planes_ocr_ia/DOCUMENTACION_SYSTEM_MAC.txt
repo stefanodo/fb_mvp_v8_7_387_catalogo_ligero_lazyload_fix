@@ -1,0 +1,1487 @@
+SYSTEM MAC · DOCUMENTACIÓN ÚNICA
+Versión base: v8_7_277_doc_unica_reinicio_bloques
+
+Objetivo de esta documentación:
+- Sustituir la acumulación de handovers sueltos por un único archivo de lectura.
+- Mantener los históricos archivados en docs_historico/ para trazabilidad.
+- Dejar visibles solo los comandos operativos principales.
+
+COMANDOS PRINCIPALES
+1) DESBLOQUEAR_y_INICIAR.command
+   Arranca el sistema local. Si el puerto 8000 está ocupado, reinicia el proceso anterior automáticamente.
+2) REINICIAR_LIMPIO.command
+   Cierra cualquier proceso en el puerto 8000 y arranca limpio.
+3) CONFIGURAR_IA_OPENAI.command
+   Guarda la clave OpenAI en .env local. No la muestra.
+4) INICIAR_HTTPS_TEMPORAL.command
+   Intenta abrir acceso HTTPS temporal para móvil.
+5) LIMPIAR_PEDIDOS_Y_PRODUCCIONES.command
+   Deja pedidos y producciones en blanco sin tocar recetas, stock, catálogo, albaranes ni mermas.
+
+ARQUITECTURA POR BLOQUES
+El backend ya está organizado por routers y servicios separados:
+- routers/stock.py
+- routers/recetas.py
+- routers/producciones.py
+- routers/pedidos.py
+- routers/albaranes.py
+- routers/mermas.py
+- routers/operativa.py
+- routers/admin.py
+- routers/inventario.py
+- routers/laboratorio.py
+
+El frontend usa CSS/JS por bloque cuando existe:
+- static/css/recipes.css, orders.css, productions.css, waste.css, operativa.css, stock.css, admin.css...
+- static/js/recetas.js, orders.js, producciones.js, waste.js, operativa.js, albaranes.js...
+
+Regla de mantenimiento:
+- No meter toda la lógica en index.html.
+- Cada mejora debe tocar solo su bloque salvo dependencias claras.
+- Mantener carga bajo demanda y búsquedas progresivas para móvil.
+
+REGLAS DE UNIDADES Y COSTE
+- Materias primas por peso: kg como unidad operativa principal.
+- Cantidades pequeñas en receta: permitir g, convertir internamente contra €/kg.
+- Líquidos operativos: aceite, vino, vinagre, nata, fondos y salsas se tratan por peso, kg/g, salvo excepción explícita.
+- Precio visible recomendado: €/kg o €/ud, no €/g como dato principal.
+- Coste ingrediente = cantidad usada convertida × precio normalizado.
+- Merma ingrediente: bruto = neto / (1 - merma%).
+- Producción confirmada descuenta bruto real de insumos y entra stock de producción.
+
+OPERATIVA RÁPIDA / IA
+- La IA solo crea propuestas pendientes.
+- No cierra pedidos, no confirma producciones y no descuenta stock sin validación.
+- Pedido por voz debe ir a carrito.
+- Producción por voz debe ir a cola de producciones.
+- Merma por voz debe ir a mermas pendientes.
+- Si el artículo no existe en catálogo/stock, no debe entrar como línea normal. Debe pedir alta o revisión.
+
+ARRANQUE Y PUERTO 8000
+En versiones anteriores el arranque se cerraba si el puerto 8000 estaba ocupado.
+Desde v8_7_277:
+- DESBLOQUEAR_y_INICIAR.command reinicia automáticamente el proceso anterior del puerto 8000.
+- REINICIAR_LIMPIO.command fuerza cierre + arranque.
+
+ESTADO ACTUAL DE ESTA VERSIÓN
+- Documentación unificada.
+- Históricos movidos a docs_historico/.
+- Arranque local más robusto.
+- Se mantiene la estructura modular existente por routers/servicios/static.
+- No se modifican fórmulas de stock ni confirmación de pedidos/producciones en esta capa.
+
+
+
+--- HISTÓRICO: AUDITORIA_FORMULAS_COSTEO_v8_7_276.txt ---
+AUDITORÍA DE FÓRMULAS · System MAC v8_7_276
+
+Alcance revisado:
+- Normalización de precios de artículos.
+- Coste de recetas por ingrediente.
+- Merma de ingrediente: bruto = neto / (1 - merma%).
+- Subrecetas dentro de recetas.
+- Producciones desde receta y carga de insumos.
+- Confirmación de producciones como movimientos de stock.
+- Pedidos/producciones en blanco para empezar desde cero.
+
+1) PRECIOS / ARTÍCULOS
+Estado: correcto con ajuste de UX aplicado.
+- Para artículos con unidad base g, el precio introducido como €/kg se normaliza internamente a €/g.
+- Ejemplo: 1,50 €/kg -> 0,0015 €/g.
+- Esto es correcto para cálculo, pero se mostraba confuso. En esta versión se corrige la visualización: el usuario ve precio compra €/kg y el dato €/g queda como interno.
+- Se acepta coma o punto mediante _parse_float.
+
+Riesgo controlado:
+- No se cambia la fórmula de normalización, solo la presentación y el flujo de guardado.
+
+2) RECETAS / COSTE POR INGREDIENTE
+Estado: correcto con mejora de impresión aplicada.
+- Coste de línea = cantidad bruta requerida × precio base unitario.
+- Si el ingrediente tiene merma, la cantidad bruta ya se calcula como neto / (1 - merma%).
+- La impresión ahora muestra por ingrediente: cantidad, precio usado y coste de línea.
+- Si un ingrediente no tiene precio, aparece SIN PRECIO para evitar costes falsamente bajos.
+
+3) MERMA DE INGREDIENTE
+Estado: alineado con la especificación.
+- Alta de ingrediente usa: bruto = neto / (1 - merma%).
+- El stock y la producción deben consumir bruto real requerido, no neto útil.
+- Ejemplo: 900 g netos con 10% merma => 1000 g brutos.
+
+4) SUBRECETAS
+Estado: razonable y alineado con directriz vigente.
+- En coste de receta, la subreceta se costea como unidad elaborada proporcional a su rendimiento.
+- Para coste no se añade una segunda merma extra sobre la subreceta; se usa el coste base proporcional de la subreceta.
+- Esto evita inflar coste dos veces.
+
+5) PRODUCCIONES / CARGA DE INSUMOS
+Estado: correcto en la lógica principal.
+- Producciones desde receta recogen las salidas OUT desde ingredientes requeridos.
+- Usa _production_required_gross, que respeta qty_gross y, si falta, calcula bruto desde neto y merma.
+- Confirmar producción crea movimientos SALIDA para insumos y ENTRADA para elaborado cuando existe artículo de salida vinculado.
+- No descuenta stock hasta confirmar producción.
+
+6) PUNTOS A VIGILAR EN PRÓXIMAS FASES
+- Mantener una única fuente viva: backend/app. app/backend/app queda sincronizado en este ZIP por compatibilidad, pero la ruta viva recomendada sigue siendo backend/app.
+- Seguir revisando conversiones especiales que no sean peso/ud, aunque la directriz actual prioriza kg/g incluso para líquidos.
+- Cuando se implemente suficiencia de pedidos desde producciones, debe comparar stock actual + pedido pendiente - necesidad de producciones pendientes - min/max.
+
+7) LIMPIEZA PARA EMPEZAR DESDE CERO
+Aplicado en este paquete:
+- Se limpiaron pedidos, líneas de pedido, producciones, líneas de producción y cola operativa del runtime incluido.
+- Se añadió LIMPIAR_PEDIDOS_Y_PRODUCCIONES.command para repetir esta limpieza sin tocar recetas, stock, artículos, albaranes, mermas ni inventario.
+
+Conclusión:
+Las fórmulas base de coste y consumo están alineadas con las especificaciones principales: precios normalizados, merma por bruto real, coste por ingrediente, subrecetas proporcionales y producción sin impacto hasta confirmación. Los cambios de esta versión son principalmente de UX, impresión, limpieza operativa y presentación de datos para evitar errores de uso.
+
+
+
+--- HISTÓRICO: AUDITORIA_PREVIA_v236.txt ---
+AUDITORÍA PREVIA — v236
+
+Ámbito auditado antes de empaquetar:
+- Pedidos
+- Stock
+- Producciones
+- Inventario
+- Sin tocar Albaranes
+
+Verificaciones realizadas:
+- Revisión de rutas críticas de Pedidos, Stock, Producciones e Inventario
+- Comprobación de integridad local/almacén en flujos sensibles
+- Revisión de redirects, aliases de bloque y compatibilidad de unidades
+- Compilación Python satisfactoria de módulos críticos
+
+Correcciones incluidas en este build sobre la base v235:
+1) Pedidos
+- CONGELADOS ya no se mapea a FRESCOS
+- Resolución de almacén preferido para congelados más coherente
+- Alias de bloque más robustos (frescos/secos/limpieza/congelados/libres)
+- add_suggestions_form valida almacén real del local y no sigue si no existe
+- add_block_to_max_form corrige INSERT con is_checked
+- add_line_form reutiliza línea existente en vez de duplicarla
+- update_line_form conserva proveedor con COALESCE y corta si la unidad es incompatible
+
+Base de partida:
+- fb_mvp_v8_7_235_stock_deep_search_fullscan_norm_units.zip
+
+Nota:
+- Este ZIP no incluye cambios en Albaranes.
+- Se ha priorizado corrección conservadora y de bajo riesgo.
+
+
+
+--- HISTÓRICO: AUDITORIA_PREVIA_v237.txt ---
+AUDITORIA PREVIA v237
+
+Base usada: v236 desempaquetada y revisada en árbol vivo.
+
+Cambios verificados en esta actualización:
+- Stock: anchors robustos por sección real en movimiento/carga inicial.
+- Inventario: validación local/almacén en crear sesión, actualizar sesión y línea libre.
+- Producciones: helper único de redirect de detalle; validación local/almacén en creación normal y batch.
+
+Comprobaciones previas hechas:
+- revisión de routers de Stock, Inventario y Producciones en backend/app y app/backend/app
+- compilación Python de los archivos tocados
+- no se tocó Albaranes
+
+Riesgo asumido: bajo. Son cambios de integridad y redirección, no de cálculo contable.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_PEDIDOS_v8_7_261.txt ---
+HOTFIX PEDIDOS v8_7_261
+
+Fallo principal corregido:
+- El listado manual de Pedidos no estaba saliendo de una fuente única y estable de base de datos.
+- Mezclaba señales de stock colapsado, heurísticas de inventario y campos no presentes en esta base (como order_category), lo que provocaba omisiones y clasificaciones erróneas.
+- Además, la búsqueda del selector dependía de un endpoint genérico sin filtro firme por bloque/categoría.
+
+Qué se tocó:
+- backend/app/main.py
+- backend/app/routers/stock.py
+- backend/app/services/orders_service.py
+- backend/app/static/js/orders.js
+- sincronización completa a app/backend/
+
+Lógica final usada:
+- Fuente real del listado manual: tabla items.
+- Campo principal de bloque: items.stock_area.
+- Mapeo de bloque:
+  - FRESCOS -> fresh
+  - CONGELADOS -> frozen
+  - SECOS -> dry
+  - LIMPIEZA -> clean
+  - resto -> free
+- Subclasificación dentro de FRESCOS:
+  - verduras / pescados / carnes / huevos / lacteos
+  - se infiere de forma determinista por nombre del artículo cuando no existe campo explícito en la base.
+
+Qué hace ahora:
+- La lista manual por bloque en Pedidos se construye directamente desde items, ordenada por nombre.
+- El endpoint /api/items/search acepta block y fresh_group para no mezclar categorías en búsquedas del front.
+- El JS del selector manda esos filtros al backend para que la búsqueda coincida con el bloque activo.
+
+Validación interna realizada:
+- VERDURAS: visible y filtrado correcto.
+- PESCADOS: visible y filtrado correcto.
+- CARNES: visible y filtrado correcto.
+- CONGELADOS: visible y filtrado correcto.
+- SECOS: visible y filtrado correcto.
+- LIMPIEZA: visible y filtrado correcto.
+- búsqueda dentro de bloque: devuelve artículos válidos sin mezclar familias.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_PEDIDOS_v8_7_262.txt ---
+HOTFIX PEDIDOS v8_7_262
+
+Fallo real corregido:
+- La pantalla de Pedidos sí intentaba construir el listado manual por bloque, pero en la carga principal de la página no estaba ejecutando ensure_columns() sobre la conexión usada para ese detalle.
+- Eso hacía que helpers como _suggest_supplier_id fallaran silenciosamente por columnas/tablas aún no garantizadas en runtime.
+- Como el bloque estaba envuelto en try/except por línea, terminaba descartando todos los artículos y la tabla quedaba vacía: “No hay artículos visibles en este bloque”.
+
+Qué corregí:
+- Añadí ensure_columns(curx) en la carga del detalle de pedido dentro de backend/app/main.py.
+- Blindé la resolución de proveedor preferente para que, si esa parte falla, el artículo no desaparezca del listado manual.
+- Sincronicé el mismo cambio en app/backend/app/main.py para evitar divergencias de runtime.
+
+Archivos tocados:
+- backend/app/main.py
+- app/backend/app/main.py
+
+Lógica final de filtrado:
+- Fuente real: tabla items
+- Bloque principal: stock_area normalizado
+- Subgrupo de frescos: clasificación determinista por nombre (verduras, pescados, carnes, huevos, lacteos)
+
+Validación interna:
+- Frescos cargando 93 artículos
+- Verduras: 60
+- Pescados: 11
+- Carnes: 14
+- Huevos: 1
+- Lácteos: 7
+- Congelados: 7
+- Secos: 71
+- Limpieza: 5
+- El HTML del bloque manual ya renderiza filas reales por categoría en lugar del mensaje vacío
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_260.txt ---
+HANDOVER TÉCNICO — v8_7_260_stable_hotfix_structural_sync
+
+Raíz estructural corregida
+- Runtime real confirmado: los scripts Mac arrancan desde backend/.
+- Se detectó duplicidad peligrosa entre backend/... y app/backend/... con diferencias reales en Python, plantillas y JS.
+- Se declaró backend/ como fuente canónica.
+- Se eliminó la divergencia sincronizando app/backend/ desde backend/ para que ambos puntos de arranque queden idénticos.
+- Se limpiaron __pycache__ para evitar que el runtime use restos obsoletos.
+
+Módulos tocados
+- Estructura/runtime:
+  - backend/ + sincronización completa a app/backend/
+- Recetas:
+  - backend/app/routers/recetas.py
+  - corregido bug real en update de ingredientes que podía lanzar error interno por referencia fuera de contexto.
+- Producciones:
+  - backend/app/routers/producciones.py
+  - backend/app/services/productions_redirect_service.py
+  - backend/app/static/js/core.js
+  - se redujo la dependencia de anchors en redirects de detalle y se reforzó restauración de scroll/contexto.
+- Inventario:
+  - backend/app/main.py
+  - se relajó el filtro excesivamente restrictivo por almacén preferente para que Cocina pueda ver sus artículos reales al inventariar.
+- Albaranes OCR:
+  - backend/app/routers/albaranes.py
+  - validación final ya no inventa proveedores nuevos a partir del OCR si siguen pendientes; solo reutiliza uno existente si encaja exactamente.
+  - si el proveedor sigue pendiente, se actualiza el precio actual del artículo pero no se crea precio por proveedor pendiente.
+
+Validación interna ejecutada
+- Arranque de app OK.
+- Recetas:
+  - creación/control de subreceta de prueba
+  - cálculo de receta final con subreceta como coste neto base de materia prima
+- Producciones:
+  - crear borrador
+  - añadir líneas
+  - borrar línea intermedia
+  - cargar receta
+  - confirmar
+  - comprobar que una segunda confirmación no duplica movimientos
+- Pedidos:
+  - crear pedido
+  - añadir línea manual por bloque
+  - añadir sugerencias
+  - confirmar y reabrir
+- Inventario:
+  - crear sesión con responsable
+  - comprobar materias primas visibles en Cocina
+  - comprobar producciones visibles en inventario de producciones
+- OCR / Albaranes:
+  - aceptar línea OCR asistida
+  - validar albarán
+  - comprobar impacto en stock/precio actual
+
+Pendiente real
+- No quedó una batería UI visual automatizada de todas las pantallas móviles; la validación hecha es funcional/backend y de render principal.
+- El OCR de proveedor sigue siendo asistido: si el proveedor queda pendiente, la regla ahora es conservadora y no lo inventa al validar.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_263_ASISTENTE_VOZ.txt ---
+HANDOVER TÉCNICO — v8_7_263_voice_assistant_mobile
+
+Base de trabajo:
+- ZIP recibido: fb_mvp_v8_7_262_orders_manual_list_runtime_fix_macfix.zip
+- Ruta viva del launcher principal: backend/app
+- Se mantuvo copia sincronizada en app/backend/app para evitar confusión entre árboles duplicados.
+
+Objetivo aplicado:
+Actualizar puntos críticos de uso constante e incorporar un asistente operativo para móvil y ordenador con comando de voz/texto, enfocado en:
+- carga de albaranes,
+- realizar pedidos,
+- realizar producciones.
+
+Cambios añadidos:
+1) Asistente operativo flotante
+- Nuevo partial: backend/app/templates/partials/voice_assistant.html
+- Nuevo CSS: backend/app/static/css/voice_assistant.css
+- Nuevo JS: backend/app/static/js/voice_assistant.js
+- Incluido globalmente en backend/app/templates/index.html
+- Se carga en todas las páginas, sin modificar la lógica de negocio existente.
+
+2) Voz y texto
+- Usa Web Speech API del navegador cuando está disponible.
+- Si el navegador no expone reconocimiento de voz, mantiene campo de texto con los mismos comandos.
+- No usa IA externa, no envía audio a backend y no introduce dependencias nuevas.
+
+3) Comandos operativos principales
+Albaranes:
+- “abrir albaranes”
+- “crear albarán” / “nuevo albarán” / “crear borrador”
+- “subir foto” / “escanear”
+- “procesar OCR”
+- “validar albarán”
+
+Pedidos:
+- “abrir pedidos”
+- “crear pedido”
+- “mostrar frescos”
+- “mostrar verduras”
+- “mostrar pescados”
+- “mostrar carnes”
+- “mostrar huevos”
+- “mostrar lácteos”
+- “mostrar congelados”
+- “mostrar secos”
+- “mostrar limpieza”
+- “revisar proveedor”
+- “confirmar pedido”
+
+Producciones:
+- “abrir producciones”
+- “crear producción”
+- “buscar receta”
+- “añadir línea”
+- “confirmar producción”
+- “imprimir producción”
+
+Otros:
+- “abrir stock”
+- “abrir recetas”
+- “inicio”
+
+4) Puntos críticos de uso constante cubiertos
+- Navegación rápida móvil entre Albaranes, Pedidos y Producciones.
+- Acceso directo a creación de borradores.
+- Acceso directo a foto/OCR/validación de albaranes.
+- Selección rápida de bloques de pedido por voz, incluyendo categorías frescas.
+- Acceso directo a confirmar/imprimir producciones.
+- Panel con botones rápidos para uso sin voz.
+
+5) Seguridad operativa
+- Capa aislada en frontend.
+- No se han cambiado fórmulas de stock, costes, recetas, producciones ni albaranes.
+- No se han añadido dependencias Python.
+- No se han tocado rutas de validación ni confirmación existentes.
+- El asistente solo dispara acciones ya existentes en la interfaz.
+
+Validación realizada:
+- python3 -m compileall -q app: OK
+- Import de app.main: OK
+- Smoke test con uvicorn en localhost: OK
+  - /: 200
+  - /?page=pedidos&center_id=1: 200
+  - /?page=albaranes&center_id=1: 200
+  - /?page=producciones&center_id=1: 200
+  - /static/js/voice_assistant.js: 200
+  - /static/css/voice_assistant.css: 200
+- node --check voice_assistant.js: OK
+
+Limitaciones conocidas:
+- El reconocimiento de voz depende del navegador y permisos de micrófono. En iPhone/Safari puede variar según versión y permisos; por eso se mantiene el campo de texto como fallback.
+- El asistente no interpreta cantidades complejas todavía. Por seguridad, no rellena cantidades por voz sin validación humana.
+- Para confirmar albaranes/pedidos/producciones, debe existir un borrador abierto con el botón correspondiente visible.
+
+Siguiente evolución recomendada:
+- Añadir comandos estructurados con cantidades: “añade 2 kilos de tomate a pedido”.
+- Añadir endpoints backend seguros para ejecutar acciones con validación JSON, en vez de simular clicks del front.
+- Añadir confirmación verbal antes de acciones irreversibles: validar albarán, confirmar pedido, confirmar producción.
+- Integrar una capa IA opcional para interpretar lenguaje natural, pero manteniendo revisión humana y sin inventar datos.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_264_MERMAS_CONTROL_VOZ_FOTO.txt ---
+HANDOVER TÉCNICO — v8_7_264_mermas_control_voz_foto
+Sistema F&B MAC
+
+OBJETIVO IMPLEMENTADO
+Se añade un bloque independiente de MERMAS y otro bloque de CONTROL DE MERMAS para analítica económica y operativa.
+
+BLOQUE 1 — MERMAS
+Ruta UI:
+- /?page=mermas&center_id=<id>
+
+Funcionalidad:
+- Alta manual de merma.
+- Alta por voz mediante dictado del navegador.
+- Alta por foto con evidencia guardada.
+- Registro obligatorio recomendado de responsable.
+- Asociación con centro/local y almacén.
+- Asociación con artículo/elaboración cuando sea identificable.
+- Estados: DRAFT, REVIEW, CONFIRMED, CANCELLED.
+- Confirmación humana antes de impactar stock.
+- Impacto en stock solo al confirmar.
+- Registro de coste estimado por unidad y pérdida total.
+- Histórico con edición/revisión y acceso a foto.
+
+REGLA CRÍTICA DE STOCK
+- Si la merma corresponde a materia prima: descuenta de movements como OUT sobre el artículo.
+- Si la merma corresponde a elaboración producida: se vincula al artículo producido si existe como item; no recalcula ni vuelve a descontar ingredientes de receta.
+- No se toca food cost de recetas, escandallos ni lógica interna de producción.
+
+BLOQUE 2 — CONTROL DE MERMAS
+Ruta UI:
+- /?page=mermas_control&center_id=<id>
+
+Analíticas incluidas:
+- Dinero perdido confirmado.
+- Pérdida potencial pendiente.
+- Número de registros confirmados.
+- Coste medio por merma.
+- Productos con más pérdida.
+- Motivos principales.
+- Responsables que registran más pérdida.
+- Familias afectadas.
+- Últimos registros incluidos.
+- Lectura operativa: compras, producción, manipulación y coste.
+
+ARCHIVOS NUEVOS
+- backend/app/services/waste_service.py
+- backend/app/routers/mermas.py
+- backend/app/templates/sections/mermas.html
+- backend/app/templates/sections/mermas_control.html
+- backend/app/static/css/waste.css
+- backend/app/static/js/waste.js
+
+ARCHIVOS MODIFICADOS
+- backend/app/core.py
+  - BUILD_ID actualizado.
+  - Migración/tabla waste_records añadida.
+- backend/app/main.py
+  - Router de mermas incluido.
+  - Nuevas páginas permitidas: mermas, mermas_control.
+  - Contexto de waste_records y waste_control añadido al template.
+- backend/app/templates/index.html
+  - Menú desktop y móvil con Mermas y Control.
+  - Includes de secciones, CSS y JS de mermas.
+- backend/app/templates/partials/voice_assistant.html
+  - Botones y ayuda del asistente ampliados.
+- backend/app/static/js/voice_assistant.js
+  - Comandos de mermas añadidos.
+
+COMANDOS DE ASISTENTE AÑADIDOS
+- abrir mermas
+- registrar merma por voz
+- registrar merma por foto
+- ver mermas pendientes
+- ver mermas confirmadas
+- control de mermas
+- dinero perdido en mermas
+
+FOTO / RECONOCIMIENTO
+En esta versión, la foto se guarda como evidencia y el sistema puede crear una propuesta con apoyo del texto/nota/nombre de archivo. No se fuerza reconocimiento visual real si no hay proveedor IA/OCR visual configurado. Regla: si no hay confianza suficiente, queda en REVIEW. No se inventan cantidades ni producto.
+
+VOZ / RECONOCIMIENTO
+El dictado usa SpeechRecognition/webkitSpeechRecognition del navegador cuando esté disponible. Si Safari/iPhone no lo permite, queda campo de texto manual. La voz intenta extraer:
+- responsable
+- producto/elaboración
+- cantidad
+- unidad
+- motivo
+Siempre crea pendiente/revisión; no confirma stock automáticamente.
+
+TABLA NUEVA
+waste_records:
+- id
+- center_id
+- warehouse_id
+- responsible_user_id
+- responsible_name
+- source_type
+- item_type
+- article_id
+- recipe_id
+- item_name_detected
+- qty
+- unit
+- qty_base
+- base_unit
+- reason
+- notes
+- photo_path
+- voice_text_raw
+- image_text_raw
+- confidence
+- status
+- unit_cost_snapshot
+- total_cost_snapshot
+- movement_id
+- created_at
+- confirmed_at
+- confirmed_by
+
+VALIDACIONES REALIZADAS
+- compileall backend/app: OK.
+- Import app.main: OK.
+- TestClient GET:
+  - Inicio: OK.
+  - Mermas: OK.
+  - Control de mermas: OK.
+  - Pedidos: OK.
+  - Producciones: OK.
+  - Albaranes: OK.
+- Test de alta manual temporal + confirmación + movimiento OUT: OK.
+- Registro temporal de prueba eliminado de waste_records y movements después del test.
+
+RIESGOS CONTROLADOS
+- No se ha tocado cálculo de recetas.
+- No se ha tocado OCR de albaranes.
+- No se ha tocado lógica de pedidos.
+- No se ha tocado confirmación de producciones.
+- El bloque impacta stock solo al confirmar merma.
+
+LIMITACIÓN EXPLÍCITA
+El reconocimiento visual real por contenido de imagen requiere integrar proveedor de IA/visión u OCR visual. La estructura queda preparada, pero esta versión no inventa datos desde la foto si no puede verificarlos.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_265_MOBILE_AUTO_MERMAS_ASISTENTE.txt ---
+HANDOVER TÉCNICO — v8_7_265_mobile_auto_mermas_asistente
+
+Base de trabajo:
+- fb_mvp_v8_7_264_mermas_control_voz_foto_macfix.zip
+
+Objetivo aplicado:
+1) Facilitar acceso desde móvil sin que el usuario tenga que escribir IP manualmente.
+2) Rediseñar Mermas como asistente operativo con entrada rápida por voz/foto/manual.
+3) Permitir que una frase natural tipo “hay una merma de salsa de tomate...” cree una propuesta pendiente, buscando artículos y recetas/elaboraciones.
+4) Mantener validación humana antes de impactar stock.
+
+Cambios principales:
+
+A) Acceso móvil automático
+- Se actualizó INICIAR_F&B_MVP.command en raíz y en app/.
+- Arranque forzado en host 0.0.0.0 y puerto 8000.
+- Detección automática de IP local del Mac.
+- Se exportan FB_LAN_URL, FB_BONJOUR_URL, FB_SERVER_HOST y FB_SERVER_PORT.
+- Al arrancar, abre automáticamente /movil en Safari.
+- Se generan ABRIR_DESDE_MOVIL.html y ABRIR_DESDE_MOVIL.txt con el enlace LAN.
+- Se añade ruta /movil con pantalla de acceso móvil.
+- Se añade ruta /mobile_qr.png para mostrar QR si qrcode está disponible.
+- Se mantiene enlace Mac: http://127.0.0.1:8000.
+- El enlace móvil debe usarse desde iPhone/iPad en la misma red Wi-Fi.
+
+B) Mermas como asistente
+- Se reemplaza el layout de tres formularios paralelos por una pantalla tipo asistente:
+  - 🎙️ Decir merma por voz
+  - 📷 Registrar con foto
+  - ✍️ Escribir manual
+- Solo se muestra el panel elegido.
+- La foto se puede añadir opcionalmente en el flujo por voz.
+- La foto sigue siendo evidencia; sin IA visual externa configurada, no se inventa producto/cantidad.
+- Se mantiene registro pendiente antes de confirmación.
+- Se mantiene responsable, local, cantidad, unidad, motivo, notas y coste estimado.
+
+C) Voz para mermas
+- /waste/from_voice acepta ahora foto opcional y nota de foto.
+- El asistente flotante puede crear directamente una merma pendiente desde frases naturales.
+- Ejemplos soportados:
+  - “Hay una merma de salsa de tomate.”
+  - “Hay una merma de dos kilos de tomate por mal estado responsable Juan.”
+  - “Merma de 2 kg de salmón por caducidad.”
+- El parser de voz normaliza números hablados frecuentes: un/una/dos/tres/cuatro/cinco/seis/siete/ocho/nueve/diez antes de kg/g/ud/ración/litro.
+- Se mejoró el matching para evitar falsos positivos cortos, por ejemplo SAL dentro de SALSA.
+
+D) Validación humana y stock
+- Las mermas creadas por voz/foto quedan en REVIEW.
+- No descuentan stock automáticamente.
+- Para impactar stock hay que abrir el registro, revisar datos y pulsar Confirmar merma.
+- La confirmación crea movimiento OUT y enlaza movement_id.
+- Si una receta/elaboración no tiene artículo producido vinculado, queda pendiente y debe revisarse manualmente.
+
+Archivos tocados:
+- INICIAR_F&B_MVP.command
+- app/INICIAR_F&B_MVP.command
+- backend/requirements.txt
+- backend/app/main.py
+- backend/app/core.py
+- backend/app/routers/mermas.py
+- backend/app/services/waste_service.py
+- backend/app/templates/sections/mermas.html
+- backend/app/static/css/waste.css
+- backend/app/static/js/waste.js
+- backend/app/static/js/voice_assistant.js
+
+Validación realizada:
+- compileall backend/app: OK.
+- Importación app.main: OK.
+- TestClient GET /: OK.
+- TestClient GET /?page=mermas&center_id=1: OK.
+- TestClient GET /?page=mermas_control&center_id=1: OK.
+- TestClient GET /movil: OK.
+- TestClient GET /mobile_qr.png: OK en entorno con qrcode.
+- POST /waste/from_voice con frase natural: OK; crea REVIEW con responsable detectado y sin confirmar stock.
+- Registro temporal de prueba eliminado.
+
+Limitaciones explícitas:
+- No se implementó IA visual real. La foto se guarda como evidencia y puede apoyar el matching mediante texto/nota/nombre de archivo.
+- El acceso móvil automático no puede abrir físicamente Safari en el iPhone desde el Mac. Se resuelve con pantalla /movil y QR/enlace automático, sin escribir IP manualmente.
+- La voz en iPhone puede depender de permisos y de restricciones del navegador en HTTP local. Por eso queda también el campo de texto como respaldo.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_266_MERMAS_UI_CONTRASTE_Y_CANCELAR.txt ---
+System MAC · HOTFIX v8_7_266
+
+Cambios aplicados:
+1) Mermas · voz en iPhone
+- Se elimina el alert bloqueante cuando el navegador no expone SpeechRecognition.
+- Nuevo comportamiento: se muestra mensaje de apoyo no bloqueante y se invita a usar el micrófono del teclado de iPhone dentro del textarea.
+- Se mantiene reconocimiento directo si el navegador lo permite.
+
+2) Mermas · visibilidad/contraste
+- Se mejora contraste general de textos, placeholders, etiquetas, tarjetas y chips.
+- Se refuerzan bordes y fondos para lectura clara en modo oscuro del sistema.
+- Se mejora contraste de la zona de edición/validación.
+
+3) Mermas · anular merma
+- Botón “Anular merma” más visible.
+- Estado visible si la merma ya está anulada o confirmada.
+- Acciones visibles en bloque de botones más claro.
+
+4) Riesgo controlado
+- No se modifica lógica de stock ni confirmación.
+- No se toca recetas, pedidos, producciones ni OCR.
+- El cambio es principalmente de UX/CSS/JS del bloque Mermas.
+
+Pendiente propuesto para siguiente bloque:
+A) Pedido por voz con carrito borrador
+- dictado/texto natural → parser simple → líneas de pedido borrador
+- revisión humana → validación final del pedido
+
+B) Producción por voz con cola pendiente
+- dictado de receta + cantidad
+- cálculo de necesidades
+- detección de faltantes
+- botón “agregar faltantes a pedido”
+- confirmación humana antes de descontar stock
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_267_OPERATIVA_RAPIDA_VOZ_LIVE.txt ---
+System MAC · v8_7_267 · Operativa rápida con voz live
+
+Cambios principales:
+1) Nuevo bloque visible: ⚡ Operativa rápida.
+- Se añade al menú desktop y móvil.
+- Pantalla diseñada para uso rápido desde móvil.
+- No sustituye Pedidos, Producciones ni Mermas; actúa como entrada rápida previa.
+
+2) Dictado con texto en directo.
+- Si el navegador permite Web Speech API, el textarea muestra texto parcial mientras se dicta.
+- Se usa interimResults=true y continuous=true para ver lo que se está diciendo.
+- Si iPhone/Safari no expone voz web, el sistema no bloquea: enfoca el campo e indica usar el micrófono del teclado iOS.
+
+3) Carrito compartido de pedidos.
+- Una frase tipo “Agrega 2 kilos de zanahoria al pedido” crea línea pendiente.
+- Si otra persona dicta “Agrega medio kilo de zanahoria al pedido”, se consolida en la misma línea si coincide local + artículo + unidad + estado pendiente.
+- Se guardan aportes internos por persona en operational_queue_contributions.
+- La línea consolidada muestra total y aportes.
+
+4) Cola compartida de producciones.
+- Una frase tipo “Quiero producir 12 raciones de lasaña de verduras” crea una propuesta pendiente.
+- Si se repite misma producción/unidad/local, se consolida.
+- No descuenta stock ni confirma producción.
+
+5) Mermas desde Operativa rápida.
+- Las frases de merma se guardan como propuestas rápidas pendientes dentro de Operativa.
+- Para foto/evidencia y validación completa se mantiene el bloque Mermas.
+
+6) Seguridad operativa.
+- Nada impacta stock automáticamente.
+- Nada crea pedido cerrado automáticamente.
+- Nada confirma producción automáticamente.
+- Las líneas pueden editarse, validarse o anularse.
+
+Archivos principales añadidos/modificados:
+- backend/app/services/operational_quick_service.py
+- backend/app/routers/operativa.py
+- backend/app/templates/sections/operativa.html
+- backend/app/templates/partials/operativa_line.html
+- backend/app/static/js/operativa.js
+- backend/app/static/css/operativa.css
+- backend/app/main.py
+- backend/app/templates/index.html
+
+Validación realizada:
+- Compilación Python OK.
+- Importación FastAPI OK.
+- Smoke test páginas OK: inicio, operativa, pedidos, producciones, mermas.
+- Prueba de consolidación simulada OK: zanahoria 2 kg + 0,5 kg queda en una línea consolidada.
+
+Limitación consciente:
+- La lógica de suficiencia stock + pedido pendiente + producción pendiente queda como siguiente fase. Esta versión consolida aportes y evita duplicados simples, pero aún no calcula si “ya es suficiente” contra stock/min/max/producciones reales.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_268_OPERATIVA_INTENCION_RESPONSABLE_IA.txt ---
+System MAC · v8_7_268 · Operativa rápida con intención, responsable y panel automático
+
+Cambios implementados:
+1) Operativa rápida más visual
+- Botones y paneles más destacados.
+- Accesos rápidos a Pedidos, Producciones y Mermas.
+- Panel correcto se ilumina después de interpretar o crear una propuesta.
+- Caja de interpretación visible antes de guardar.
+
+2) Detección de intención
+- Modo AUTO: detecta si la frase es Pedido, Producción o Merma.
+- También permite forzar manualmente: Pedido / Producción / Merma.
+- Si hay duda, avisa que requiere revisión humana.
+
+3) Responsable
+- Campo de responsable visible.
+- Detección automática de frases tipo “Soy Juan...” o “Responsable Pedro...”.
+- Si no hay responsable, la interfaz exige completarlo antes de crear propuesta.
+
+4) Voz en directo
+- Si el navegador soporta Web Speech API, muestra texto parcial mientras se dicta.
+- Si iPhone/Safari no lo permite, mantiene fallback usando el micrófono del teclado de iOS en el textarea.
+
+5) Interpretación más intuitiva
+- Soporta frases naturales como:
+  “Soy Juan, agrega 2 kilos de zanahoria al pedido”.
+  “Soy Pedro, quiero producir 12 raciones de lasaña de verduras”.
+  “Hay una merma de salsa de tomate, 2 kilos, por mal estado”.
+- Soporta varias líneas en una frase simple:
+  “pide dos kilos de zanahoria y medio kilo de cebolla”.
+- Consolida líneas iguales en la cola compartida.
+
+6) IA externa opcional
+- Se añadió soporte opcional para interpretación con IA externa vía OPENAI_API_KEY.
+- No se activa por defecto.
+- Para activarla: OPERATIVA_AI_MODE=openai y OPENAI_API_KEY.
+- Si no está configurada, usa reglas locales sin romper el sistema.
+
+Validación realizada:
+- compileall backend/app: OK.
+- Importación FastAPI: OK.
+- TestClient páginas Inicio, Operativa, Pedidos, Producciones, Mermas: HTTP 200.
+- Endpoint /api/operativa/interpret: OK.
+- Prueba de frase multiartículo: zanahoria + cebolla crea dos líneas y se limpiaron los registros temporales.
+
+Notas de seguridad:
+- No confirma stock automáticamente.
+- No cierra pedidos automáticamente.
+- No confirma producciones automáticamente.
+- No usa biometría de voz.
+- El responsable se detecta por texto/frase, no por identificación biométrica.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_269_OPERATIVA_UI_VOZ_IA_RESPONSIVE.txt ---
+System MAC · v8_7_269 · Operativa UI + voz IA + responsive
+
+Base: v8_7_268_operativa_intencion_responsable_ia_macfix
+
+Cambios aplicados:
+
+1) Operativa rápida · interfaz visual
+- Se refuerza la cabecera del bloque Operativa rápida para que se lea sobre fondo oscuro.
+- Se elimina la duplicidad visual de botones pequeños Pedido/Producción/Merma que confundían con el selector principal.
+- Se dejan ejemplos como texto guiado, no como botones de acción.
+- Se refuerzan botones principales: Dictar/grabar, Interpretar y Crear propuesta.
+- Se refuerza el panel de modo único: Auto, Pedido, Producción, Merma.
+- Se iluminan los paneles correspondientes cuando la intención detectada es Pedido, Producción o Merma.
+
+2) Móvil/escritorio
+- En móvil se mantiene la voz como flujo principal.
+- En ordenador se marca el dictado como opcional y se prioriza la escritura como modo más fiable.
+- Inputs y textarea pasan a 16px mínimo en móvil para evitar zoom automático de Safari al enfocar campos.
+- Viewport más cerrado: maximum-scale=1 y user-scalable=no para comportamiento más parecido a app.
+
+3) Voz con IA real configurable
+- Se añade endpoint /api/operativa/transcribe para enviar audio grabado al backend.
+- Se añade función transcribe_audio_bytes() con soporte opcional para OpenAI audio transcription.
+- Variables:
+  OPERATIVA_STT_MODE=openai
+  OPENAI_API_KEY=...
+  OPERATIVA_STT_MODEL=gpt-4o-mini-transcribe
+  OPERATIVA_STT_TIMEOUT=20
+- Si no está configurado, no inventa transcripción: devuelve aviso y mantiene fallback con dictado del navegador o micrófono del teclado del iPhone.
+
+4) Interpretación de voz/texto
+- Se mejora parser local de pedidos, producciones y mermas.
+- Se mejora reconocimiento de unidades y puntuación: "2 kilos," ya se interpreta como kg.
+- Se corrige caso de merma con cantidad posterior al producto: "merma de salsa de tomate, 2 kilos, por fermentada".
+- Se añaden más sinónimos operativos para pedido, producción y merma.
+- Se mejora matching contra base de datos con búsqueda por tokens, para nombres tipo "salsa tomate" contra "salsa de tomate".
+
+5) Seguridad operativa
+- No se confirma stock automáticamente.
+- No se cierran pedidos automáticamente.
+- No se confirman producciones automáticamente.
+- Todo sigue quedando como propuesta pendiente para validación humana.
+
+Validaciones realizadas:
+- Compilación Python backend/app y app/backend/app: OK.
+- Import FastAPI: OK.
+- Smoke test Inicio/Operativa/Pedidos/Producciones/Mermas: OK.
+- /api/operativa/interpret: OK.
+- /api/operativa/transcribe sin clave: devuelve aviso controlado, no rompe.
+- Prueba simulada de creación de línea operativa y limpieza posterior: OK.
+
+Pruebas de frases:
+- "Soy Juan, agrega 2 kilos de zanahoria y medio kilo de cebolla al pedido" -> Pedido, 2 líneas, responsable Juan.
+- "Soy Pedro, quiero producir 12 raciones de lasaña de verduras" -> Producción, 12 raciones, responsable Pedro.
+- "Hay una merma de salsa de tomate, 2 kilos, por fermentada" -> Merma, 2 kg, motivo fermentada.
+
+Pendiente recomendado:
+- Añadir cálculo de suficiencia: stock actual + pedido pendiente - producciones pendientes - min/max.
+- Conectar faltantes de cola de producción al carrito compartido de pedido.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_270_OPERATIVA_AUTO_ANALISIS_LIMPIEZA.txt ---
+System MAC · v8_7_270 · Operativa rápida — análisis automático del dictado
+
+Base de trabajo:
+- Continuación directa de v8_7_269_operativa_ui_voz_ia_responsive_macfix.
+
+Objetivo aplicado:
+- Al terminar de dictar o pulsar “Detener y analizar”, el sistema interpreta automáticamente el texto.
+- Si la confianza es alta y hay responsable + cantidad + producto, crea automáticamente la propuesta pendiente y limpia el campo.
+- Si falta dato o la confianza es baja/media, no guarda automáticamente: muestra interpretación para revisión humana.
+
+Cambios principales:
+1) Frontend Operativa
+- Botón único dinámico:
+  - “Dictar / grabar”
+  - “Detener y analizar” mientras escucha/graba.
+- Eliminado botón “Interpretar” como acción principal.
+- Al parar el dictado: interpretación automática.
+- En iPhone con micrófono del teclado: al cerrar/salir del campo se analiza automáticamente.
+- Tras guardado correcto: el campo de dictado se vacía automáticamente.
+- Si la propuesta se guarda, se muestra destino:
+  - Carrito de pedidos.
+  - Cola de producciones.
+  - Mermas pendientes.
+- Ejemplos largos quedan plegados en “Ver ejemplos rápidos” para reducir ruido visual.
+
+2) Backend/API
+- Nuevo endpoint POST /api/operativa/create para crear propuesta desde JS sin depender de submit tradicional.
+- Mantiene /operativa/from_voice por compatibilidad.
+
+3) Comprensión local mejorada
+- Correcciones conservadoras para dictados deformados en iPhone/Safari:
+  - “Saint/San Pedro...” al inicio → “Soy Pedro...”
+  - “arega/arrega” → “agrega”
+  - “san auria/sanahoria/sanauria” → “zanahoria”
+  - “calabasa/calabassa” → “calabaza”
+  - limpieza de basura frecuente tipo “are you in”, “mastrado”.
+- Limpieza de artículo reforzada para detectar productos claros aunque el texto venga contaminado.
+
+4) Seguridad operativa
+- Nada confirma pedidos, producciones ni mermas finales.
+- Solo crea propuestas pendientes en:
+  - carrito compartido,
+  - cola de producciones,
+  - mermas pendientes.
+- No descuenta stock automáticamente.
+- Baja confianza/falta de cantidad/falta de responsable → revisión humana.
+
+Pruebas realizadas:
+- Compilación Python: OK.
+- Importación FastAPI: OK.
+- GET Operativa: OK.
+- GET /api/operativa/interpret: OK.
+- POST /api/operativa/create: OK.
+- Limpieza de registro temporal de prueba: OK.
+- Frase deformada probada:
+  “Saint Pedro Arega Tres kilos Emilio de San auria ... Tres kilos de Calabasa...”
+  Resultado esperado local:
+  Pedido · Pedro · Zanahoria 3 kg · Calabaza 3 kg.
+
+Pendiente recomendado:
+- Conectar STT real con OPENAI_API_KEY para que el audio no dependa del dictado del navegador.
+- Añadir cálculo de suficiencia: stock actual + carrito pendiente + producciones pendientes + mínimos.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_271_OPERATIVA_IA_CONTEXTO_CONTRASTE.txt ---
+System MAC · v8_7_271 · Operativa rápida con IA + contexto real
+
+Cambios aplicados:
+
+1) IA como motor principal si está configurada
+- La interpretación operativa usa IA cuando existen:
+  OPERATIVA_AI_MODE=openai
+  OPENAI_API_KEY=...
+  OPERATIVA_AI_MODEL=gpt-4o-mini (por defecto)
+- Si no hay clave o falla la API, el sistema vuelve a reglas locales mejoradas sin romper la operativa.
+- La IA devuelve JSON estructurado: tipo, responsable, artículos/recetas, cantidad, unidad, motivo, confianza y necesidad de revisión.
+
+2) Candidatos reales antes de interpretar
+- Antes de pedir interpretación a IA, el backend busca candidatos dentro del sistema:
+  - artículos/stock (items)
+  - recetas/subrecetas
+  - proveedores
+  - producciones históricas si la tabla tiene nombre disponible
+- Esos candidatos se envían como contexto a la IA para reducir invenciones.
+- Después de interpretar, el sistema vuelve a resolver cada línea contra candidatos reales.
+
+3) Seguridad de guardado
+- Pedido -> Carrito compartido de pedidos.
+- Producción -> Cola de producciones.
+- Merma -> Mermas pendientes.
+- Nunca descuenta stock ni cierra pedidos automáticamente.
+- Si hay coincidencia ambigua, no guarda pedidos/producciones; pide especificar mejor.
+- Ejemplo: “tomate” puede devolver varios tomates y queda para revisión. “tomate rama” sí puede quedar claro.
+
+4) Flujo de dictado
+- Se elimina interpretación constante por cada palabra escrita.
+- Mientras se dicta, solo se muestra el texto provisional.
+- Al detener o cerrar el dictado, analiza una vez.
+- Si confianza alta y datos completos, guarda y limpia campo.
+- Si hay duda, muestra interpretación y no guarda automáticamente.
+
+5) UI/contraste
+- Mejorados botones de editar total, marcar validado y anular.
+- Tarjetas con más contraste.
+- Estados y alternativas más legibles.
+- Si hay coincidencias posibles, se muestran como detalles desplegables.
+
+Validación interna:
+- Compilación backend/app y app/backend/app: OK.
+- Importación FastAPI: OK.
+- Interpretación local probada:
+  - “Soy Pedro agrega un kilo de zanahoria al pedido” -> ORDER / ZANAHORIA / 1 kg / sin revisión.
+  - “Soy Pedro agrega un kilo de tomate al pedido” -> ORDER / varias coincidencias / revisión.
+  - “Soy Pedro agrega un kilo de tomate rama al pedido” -> ORDER / TOMATE RAMA / 1 kg / sin revisión.
+  - “Soy Juan merma de salsa de tomate por mal estado” -> WASTE / pendiente de revisión si no hay producción/receta clara.
+
+Nota:
+- La IA real no se activa sin OPENAI_API_KEY. Sin clave, funciona en modo local con menor precisión.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_272_CONFIG_IA_OPENAI.txt ---
+System MAC · v8_7_272_CONFIG_IA_OPENAI
+
+Objetivo:
+- Dejar la IA de Operativa rápida configurable sin tocar código.
+- Activar OpenAI como motor principal de interpretación y transcripción cuando el usuario añada su clave.
+- Mantener fallback local si no hay clave o falla la conexión.
+
+Cambios:
+1) Nuevo CONFIGURAR_IA_OPENAI.command
+- Pide OPENAI_API_KEY sin mostrarla en pantalla.
+- Crea .env en la carpeta raíz del sistema.
+- Copia .env también a backend/.env.
+- Activa:
+  OPERATIVA_AI_MODE=openai
+  OPERATIVA_STT_MODE=openai
+  OPERATIVA_AI_MODEL=gpt-4o-mini
+  OPERATIVA_STT_MODEL=gpt-4o-mini-transcribe
+
+2) Launcher actualizado
+- INICIAR_F&B_MVP.command y app/INICIAR_F&B_MVP.command cargan automáticamente .env.
+- Si detecta OPENAI_API_KEY, activa IA y STT OpenAI por defecto.
+- Si no hay clave, mantiene modo local sin romper la app.
+- Muestra estado de IA al arrancar.
+
+3) Servicio operativo blindado
+- operational_quick_service.py carga .env sin depender de python-dotenv.
+- Funciona aunque se lance el backend manualmente.
+
+4) Documentación
+- .env.example en raíz, backend, app y app/backend.
+- LEEME_CONFIGURAR_IA_OPENAI.txt.
+
+Validaciones:
+- bash -n launchers/config: OK.
+- compileall backend/app y app/backend/app: OK.
+- import FastAPI: OK.
+- interpretación local sin clave: OK.
+
+Limitación real:
+- No se incluye una clave API real en el ZIP. El usuario debe pegar su propia OPENAI_API_KEY.
+- La IA crea propuestas pendientes; no cierra pedidos, no confirma producciones ni descuenta stock automáticamente.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_273_ADMIN_PROBAR_IA_ARTICULOS_OPERATIVA.txt ---
+System MAC · v8_7_273 · Admin Probar IA + Operativa segura
+
+Cambios aplicados:
+
+1) Admin/Catálogo · nueva pantalla “🤖 Probar IA”
+- Nueva pestaña en Catálogo/Admin para ver estado de IA.
+- Muestra si OpenAI está activa o si está en modo local.
+- Muestra modo texto, modo voz, modelos y si hay clave cargada sin exponerla.
+- Botón “Probar IA ahora” con diagnóstico:
+  - OK conectado.
+  - NO_KEY si no hay OPENAI_API_KEY.
+  - 401 si clave inválida/revocada/mal pegada.
+  - 429 si no hay cuota/saldo/facturación.
+  - 404 si el modelo no está disponible.
+
+2) Operativa rápida · estado visible de IA
+- La tarjeta de dictado muestra claramente si está en OPENAI ACTIVA o LOCAL / SIN IA EXTERNA.
+- Si está en local, aparece aviso claro: comprensión limitada por reglas locales.
+- Link directo a Catálogo → Probar IA.
+
+3) Pedidos por voz · bloqueo de artículos inexistentes
+- Si el usuario dicta un pedido de un artículo que no existe en catálogo/stock, no se guarda como línea normal.
+- Ejemplo: “pescado de roca” si no está creado, devuelve ARTICLE_NOT_FOUND.
+- Mensaje: primero debe crearse como artículo para poder pedirlo.
+
+4) Alta rápida de artículo desde Operativa
+- Cuando falta un artículo, Operativa muestra un formulario:
+  - Nombre artículo
+  - Cantidad
+  - Unidad
+  - Crear artículo y añadir al carrito
+- Crea el artículo en catálogo/stock y lo añade al carrito como propuesta pendiente.
+- Clasificación inicial automática básica:
+  - pescado/salmón/merluza/atún/lubina/dorada/bacalao/roca → PESCADOS, cámara, kg
+  - verduras comunes → VERDURAS, cámara, kg
+  - carnes comunes → CARNES, cámara, kg
+  - resto → SIN_CLASIFICAR, cocina, kg
+- Se debe revisar después proveedor/precio en Catálogo.
+
+5) Seguridad operativa
+- La IA y el dictado solo crean propuestas pendientes.
+- No cierra pedidos.
+- No confirma producciones.
+- No descuenta stock.
+- Pedido solo puede entrar como artículo real de catálogo/stock, no como receta.
+
+Validación realizada:
+- Compilación backend/app: OK.
+- Compilación app/backend/app: OK.
+- Importación FastAPI: OK.
+- Admin: OK.
+- Operativa: OK.
+- /api/admin/ia_status: OK.
+- /api/admin/probar_ia sin clave: devuelve NO_KEY correctamente.
+- “Soy Pedro agrega 1 kilo de pescado de roca al pedido”: bloqueado como ARTICLE_NOT_FOUND.
+- Alta rápida de artículo test: crea artículo y línea; test eliminado después.
+
+Uso:
+1) Ejecutar CONFIGURAR_IA_OPENAI.command y pegar clave nueva.
+2) Reiniciar con DESBLOQUEAR_y_INICIAR.command.
+3) Entrar en Catálogo → Probar IA.
+4) Pulsar “Probar IA ahora”.
+5) Si aparece OPENAI ACTIVA, probar Operativa rápida.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_274_VOZ_AUDIO_REAL_MERMAS_VALIDACION.txt ---
+System MAC · v8_7_274 · Voz audio real + mermas + validación
+
+Base de trabajo: v8_7_273_admin_probar_ia_articulos_operativa_macfix.
+
+Cambios aplicados:
+
+1) Operativa rápida · audio real
+- Se intenta usar MediaRecorder/getUserMedia para grabar audio real y enviarlo a /api/operativa/transcribe.
+- Se elimina la restricción artificial que impedía intentar grabar si se entraba desde http://IP_DEL_MAC.
+- Si el navegador/iPhone bloquea micrófono real por no ser contexto seguro, el sistema avisa claramente y cae a dictado web/teclado.
+- La extensión enviada se ajusta según MIME: m4a para audio/mp4, ogg para ogg, webm por defecto.
+- El flujo sigue siendo: dictar/grabar → detener → transcribir → interpretar → guardar solo si hay datos mínimos.
+
+2) Interpretación operativa
+- Mejoras de normalización del dictado:
+  - mima/merna → merma
+  - so/san/saint Pedro → soy Pedro
+  - kilo y medio → 1.5 kg
+  - litro y medio → 1.5 l
+  - pescado roca/pescao roca → pescado de roca
+  - tomatoes/tomato → tomate/tomates
+- La IA recibe instrucciones más explícitas para entender “merma de cuatro huevos” como qty=4, unit=ud, name=huevos.
+- El motor local también detecta “mima de cuatro huevos” como HUEVOS, 4 ud.
+
+3) Mermas · voz
+- parse_voice_text ahora usa como primera capa interpret_operational_command(..., WASTE), por lo que aprovecha IA/contexto de Operativa cuando esté configurada.
+- Si OpenAI no está disponible, usa reglas locales mejoradas.
+- Se corrige caso de huevos: “cuatro huevos” debe registrar 4 ud y no inventar kg.
+- Mermas con receta/subreceta intentan mantener recipe_id y, si existe artículo producido con el mismo nombre, también vincular article_id para stock.
+
+4) Mermas · grabación desde pantalla Mermas
+- El botón “Dictar ahora” intenta grabar audio real y enviar a OpenAI STT.
+- Si el móvil bloquea la grabación por HTTP/no seguro, cae a Web Speech o micrófono del teclado iPhone.
+- El botón puede pulsarse otra vez para detener; también se corta solo a los 8 segundos para evitar grabaciones colgadas.
+
+5) Validaciones de confirmación de merma
+- Ya no devuelve solo error genérico.
+- Bloquea confirmación con mensajes precisos si falta:
+  - local concreto,
+  - responsable,
+  - artículo/elaboración real vinculada,
+  - cantidad/unidad válida,
+  - almacén correcto del local.
+- ui.js muestra toasts específicos para esos errores.
+
+6) Pedidos con artículos inexistentes
+- Se mantiene bloqueo de artículo inexistente: no entra en carrito normal si no existe en catálogo/stock.
+- “pescado de roca” queda como artículo no encontrado salvo que se cree antes.
+
+Validación realizada:
+- compileall backend/app y app/backend/app: OK.
+- Importación FastAPI: OK.
+- parse de “mima de cuatro huevos”: HUEVOS, 4 ud, match artículo Huevos: OK.
+- parse de “soy Juan merma de cuatro huevos por mal estado”: responsable Juan, HUEVOS, 4 ud, motivo mal estado: OK.
+- pedido “pescado de roca” no existente: bloqueado con ARTICLE_NOT_FOUND: OK.
+
+Limitación importante:
+- Para grabación real de audio desde iPhone, iOS/Safari puede bloquear getUserMedia si se entra por http://IP_DEL_MAC. En ese caso el sistema avisa y usa fallback. Para máxima fiabilidad de audio real, en fase posterior conviene servir por HTTPS/PWA segura o túnel seguro local.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_275_HTTPS_TEMPORAL_MOVIL_AUDIO_REAL.txt ---
+System MAC · v8_7_275 · HTTPS temporal para móvil/audio real
+
+Objetivo:
+- Añadir un modo opcional de acceso HTTPS temporal para iPhone sin romper el arranque local actual.
+- Facilitar entrada móvil mediante enlace HTTPS y QR.
+- Permitir probar grabación de audio real en navegador móvil cuando el contexto seguro lo permita.
+
+Cambios:
+1) Nuevo comando:
+   INICIAR_HTTPS_TEMPORAL.command
+
+2) Funcionamiento del comando:
+   - Carga .env y configuración OpenAI si existe.
+   - Usa cloudflared para crear un túnel HTTPS temporal.
+   - Si cloudflared no existe, intenta instalarlo automáticamente:
+     a) con Homebrew si está disponible;
+     b) si no, descarga binario portable de GitHub según arquitectura del Mac.
+   - Arranca la app local en 0.0.0.0:8000.
+   - Expone la app por una URL https://...trycloudflare.com.
+   - Abre /movil para mostrar QR.
+   - Genera ABRIR_HTTPS_TEMPORAL.html y ABRIR_HTTPS_TEMPORAL.txt.
+
+3) main.py:
+   - /movil y /mobile_qr.png ahora priorizan FB_PUBLIC_HTTPS_URL cuando está definida.
+   - Esto hace que el QR apunte al túnel HTTPS si se arrancó con INICIAR_HTTPS_TEMPORAL.command.
+
+4) Seguridad:
+   - El enlace HTTPS temporal es público mientras la Terminal esté abierta.
+   - Recomendado solo para pruebas de voz/audio real.
+   - No sustituye el futuro despliegue profesional con dominio HTTPS, login y roles.
+
+5) No tocado:
+   - No se elimina ni modifica el arranque local normal.
+   - DESBLOQUEAR_y_INICIAR.command sigue funcionando como antes.
+   - No se cambia lógica de stock, recetas, pedidos, producciones ni mermas.
+
+Validación realizada:
+- Sintaxis bash de launchers: OK.
+- Compilación backend/app: OK.
+- Compilación app/backend/app: OK.
+- Importación FastAPI: OK.
+
+
+
+--- HISTÓRICO: HANDOVER_TECNICO_v8_7_276_RECETAS_COSTES_LIMPIEZA.txt ---
+System MAC · v8_7_276
+
+Cambios incluidos:
+1) Recetas · alta de ingredientes
+- Formulario compacto en una sola línea: tipo, artículo/subreceta, cantidad, unidad, merma %, + Añadir.
+- Merma % queda junto a cantidad y unidad.
+- Tabla de ingredientes más alineada; edición de cantidad/unidad/merma en una línea compacta.
+
+2) Impresión de recetas
+- Añadidas columnas: Precio usado y Coste de ingrediente.
+- Aviso visible si hay ingredientes sin precio.
+- Resumen económico reorganizado: coste MP, coste con contingencia, raciones, coste por ración, PVP sugerido.
+
+3) Catálogo / precios de artículos
+- Guardado de artículos no deja al usuario en JSON si JavaScript no intercepta.
+- El formulario normal redirige al catálogo; JavaScript añade ajax=1 solo cuando usa fetch.
+- Precio se muestra como precio operativo €/kg o €/ud; precio base interno queda como dato secundario.
+
+4) Pedidos y producciones en blanco
+- Runtime incluido queda sin pedidos, líneas de pedido, producciones, líneas de producción ni cola operativa.
+- Añadido comando: LIMPIAR_PEDIDOS_Y_PRODUCCIONES.command.
+- No toca stock, recetas, artículos, albaranes, mermas ni inventario.
+
+5) Auditoría de fórmulas
+- Añadido AUDITORIA_FORMULAS_COSTEO_v8_7_276.txt.
+- Conclusión: coste por bruto real, normalización de precios, subrecetas proporcionales y confirmación de producción están alineados con las especificaciones principales.
+
+Validación pendiente sugerida en uso real:
+- Abrir receta con varios ingredientes y comprobar visual de una línea.
+- Imprimir receta con costes y comprobar coste por ingrediente.
+- Guardar precio de artículo desde Catálogo y verificar que no aparece JSON.
+- Ejecutar comando de limpieza si se desea empezar otra vez desde cero.
+
+
+
+--- HISTÓRICO: LEEME.txt ---
+F&B MVP · v8.7.175 MODULAR + UI
+
+VERSIÓN MODULAR con mejoras de interfaz.
+
+CAMBIOS TÉCNICOS (v8.7.175):
+- main.py: 8.523 líneas → 435 líneas
+- Código separado en 10 módulos (stock, recetas, producciones,
+  pedidos, albaranes, laboratorio, admin, core, ocr/engine)
+- 6 funciones duplicadas eliminadas
+- OCR engine aislado en subprocess separado
+
+MEJORAS DE INTERFAZ:
+- Cada sección con su color propio en la barra de navegación
+  (azul=stock, lila=recetas, verde=producciones, ámbar=pedidos,
+   rojo=albaranes, cyan=laboratorio, gris=admin)
+- Franja de color bajo la nav que indica dónde estás
+- Iconos en la navegación (📦🍳🛒🧾...)
+- Sistema de notificaciones toast (banners flotantes visibles)
+  que sustituyen los mensajes pequeños que se perdían
+- Mensajes de error y éxito con color y ícono claros
+- Formularios con grupos visuales y campos obligatorios marcados
+- CSS reescrito: 1.343 líneas → 582 líneas sin !important
+- Botones principales diferenciados por tipo y sección
+
+EJECUCIÓN:
+1. Ejecuta DESBLOQUEAR_y_INICIAR.command
+2. Verifica: v8_7_175_modular
+3. Abre http://127.0.0.1:8000
+
+HTTPS TEMPORAL PARA MÓVIL
+-------------------------
+Para probar micrófono/audio real en iPhone, usa:
+INICIAR_HTTPS_TEMPORAL.command
+Genera una URL https://...trycloudflare.com y QR. Mantén la Terminal abierta.
+
+
+
+--- HISTÓRICO: LEEME_CONFIGURAR_IA_OPENAI.txt ---
+System MAC · configurar IA para Operativa rápida
+
+Qué hace:
+- Activa IA real para interpretar dictados/textos de Operativa rápida.
+- Activa speech-to-text real para audio cuando el navegador permita grabar audio.
+- Mantiene reglas locales como respaldo si no hay clave o falla la conexión.
+
+Cómo configurarlo en Mac:
+1) Ejecuta CONFIGURAR_IA_OPENAI.command.
+2) Pega tu OPENAI_API_KEY cuando lo pida.
+3) Cierra y vuelve a abrir la app con DESBLOQUEAR_y_INICIAR.command.
+
+Variables que se guardan en .env:
+OPERATIVA_AI_MODE=openai
+OPERATIVA_STT_MODE=openai
+OPENAI_API_KEY=tu_clave
+OPERATIVA_AI_MODEL=gpt-4o-mini
+OPERATIVA_STT_MODEL=gpt-4o-mini-transcribe
+
+Importante:
+- La clave API no va incluida en el ZIP.
+- El archivo .env queda en tu Mac y no debe compartirse.
+- La IA crea propuestas pendientes; no cierra pedidos, no confirma producciones y no descuenta stock automáticamente.
+
+
+
+--- HISTÓRICO: LEEME_HTTPS_TEMPORAL_MOVIL.txt ---
+System MAC · Acceso HTTPS temporal para móvil
+
+Para probar voz/audio real desde iPhone:
+
+1) Ejecuta: CONFIGURAR_IA_OPENAI.command
+   - Solo si todavía no configuraste la clave.
+
+2) Ejecuta: INICIAR_HTTPS_TEMPORAL.command
+   - El comando instala/usa cloudflared.
+   - Genera un enlace HTTPS temporal.
+   - Abre una pantalla con QR para el móvil.
+
+3) En el móvil abre el QR o el enlace HTTPS que aparece.
+
+Importante:
+- Mantén abierta la ventana de Terminal.
+- Al cerrar la Terminal, el enlace HTTPS se cierra.
+- El enlace HTTPS temporal es público mientras esté activo. No lo compartas fuera de tu equipo.
+- Este modo es para pruebas de voz real. Para producción, lo correcto será un servidor con dominio HTTPS y login.
+
+El arranque local normal sigue intacto:
+DESBLOQUEAR_y_INICIAR.command
+
+
+
+--- HISTÓRICO: LEEME_MAC.txt ---
+MAC · W94 NETWORK + PENDING CLEAN
+
+1. Cierra cualquier servidor anterior con Control+C
+2. Si quieres limpiar pendientes locales antes de abrir:
+   ejecuta LIMPIAR_PENDIENTES_RUNTIME.command
+3. Ejecuta DESBLOQUEAR_y_INICIAR.command
+4. Comprueba arriba:
+   v8_7_56_receipts_w94_network_pendingclean
+5. Mira en la terminal la URL de móvil:
+   http://TU_IP_LOCAL:8000
+
+
+
+--- HISTÓRICO: LEEME_PERMISOS.txt ---
+Esta edición vuelve a marcar los .command como ejecutables dentro del paquete.
+Usa primero DESBLOQUEAR_y_INICIAR.command.
+
+
+
+--- HISTÓRICO: PENDIENTES_CLASIFICACION_STOCK.txt ---
+Vaciado de stock_area cerrado para esta base.
+
+Clasificaciones finales aplicadas para cerrar pendientes:
+- Fideos -> SECOS
+- Film transparente -> SECOS
+- Fondo blanco -> FRESCOS
+- Fondo oscuro -> FRESCOS
+- Nata para cocinar -> SECOS
+- Papel aluminio -> SECOS
+- Papel horno -> SECOS
+- Pasta de wasabi -> SECOS
+- Salsa base cocina central -> FRESCOS
+- Tapa take away M -> SECOS
+- Tortilla de trigo -> SECOS
+
+Nota externa no incluida en esta base: 'Yema pasteurizada brick' sigue dependiendo de su temperatura de conservación.
+
+
+
+--- HISTÓRICO: RESUMEN_CONTINUACION_UNIDADES_Y_UI.txt ---
+Actualización de continuación sobre la directriz global g/kg.
+
+Aplicado en esta iteración:
+- Recetas: visualización de ingredientes más coherente; bruto/neto se muestran en la misma unidad visible de receta.
+- Recetas: selector inteligente de unidades mapea ml->g y l->kg.
+- Catálogo: unidades visibles reducidas a g/kg/ud; precios visibles a €/g €/kg €/ud.
+- Precios proveedor: compra visible reducida a g/kg/ud.
+- Producciones: se quitan ml/l de la edición visible de líneas.
+- Pedidos: se quitan ml/l de la edición visible de líneas.
+- Albaranes manual/OCR: la UI prioriza g/kg/ud; litros viejos pasan a kg/g en la selección visible.
+- Humanización de cantidades: ml/l se muestran como g/kg en el render amigable.
+
+Pendiente aún de revisión fina:
+- posibles textos heredados en OCR o lógica interna histórica que sigan mencionando l/ml.
+- casos excepcionales por unidad (ud) que requieran conversión manual definida por artículo.
+
+
+
+--- HISTÓRICO: RESUMEN_DIRECTRIZ_UNIDADES_PESO.txt ---
+DIRECTRIZ APLICADA
+- El sistema pasa a trabajar operativamente con peso como unidad principal.
+- Líquidos: equivalencia operativa 1 l = 1 kg y 1 ml = 1 g.
+- Unidades principales visibles: g y kg.
+- ud solo para excepciones reales.
+
+CAMBIOS APLICADOS
+- Core de unidades: conversión y render centrados en g/kg.
+- Recetas: formularios y tabla de ingredientes sin ml/l como opción operativa principal.
+- Producciones: unidades operativas simplificadas a g/kg/ud/raciones.
+- Stock / inventario / pedidos: selectores visibles actualizados para g/kg/ud.
+- Albaranes/OCR: litros/ml siguen siendo aceptados como entrada legado/proveedor, pero se normalizan a peso.
+- Base de datos incluida: artículos y recetas con unidades ml/l migrados a g o kg equivalentes operativos.
+
+NOTA
+- La equivalencia 1:1 es operativa, no una densidad físico-química exacta para todos los líquidos.
+- El sistema queda preparado para excepciones futuras por artículo si más adelante quieres densidades específicas.
+
+
+## v8_7_278 · Catálogo, recetas, inventario y producciones
+- Catálogo: alta de artículos por defecto en kg y precio operativo €/kg.
+- Catálogo: redistribución de columnas para evitar solapes; artículo más ancho, unidad/precio/merma más compactos.
+- Recetas: ajustes CSS para alta compacta e ingredientes sin solapamiento entre Merma %, Guardar y Quitar.
+- Recetas/producciones: búsqueda tolerante de recetas para cargar producciones desde receta/subreceta.
+- Inventario: búsqueda transversal de producciones; si estás en una familia vacía y buscas una salsa, muestra enlaces a la familia correcta.
+- Inventario: añade recetas producibles como líneas esperadas sin stock para poder contarlas o detectarlas, sin afectar stock ni confirmar movimientos.
+
+---
+Actualización v8_7_279 · Inventario móvil
+- Se corrige el comportamiento de Inventario en móvil para que no vuelva al inicio al cambiar rubros o familias.
+- Se añaden anclas internas #inventoryWorkArea y #inventoryCountArea.
+- Guardar conteos vuelve al bloque de conteo activo.
+
+
+
+======================================================================
+CHECKPOINT v8_7_280_checkpoint_operativo_pre_ocr_voz — 2026-05-17 21:40
+======================================================================
+Este paquete queda como punto de control antes de retomar OCR y voz.
+
+Resumen de bloques cerrados conceptualmente en esta fase:
+1. Normalización base inicial: stock operativo a cero, nombres normalizados, separación INSUMO/PREPARACION.
+2. Motor de necesidades: producción planificada -> insumos brutos -> stock proyectado -> faltantes.
+3. Producciones: planificada no impacta stock; confirmada sí impacta stock con salida de insumos y entrada de elaborado.
+4. Carrito/pedidos: sugeridos al carrito, consolidación por artículo/proveedor/unidad/centro, líneas en revisión no bloquean el pedido completo.
+5. Costes/precios: precio confirmado vs estimado vs sin precio fiable; mano de obra separada del food cost.
+6. Pedido/albarán/stock: pedido no impacta stock; solo albarán validado impacta stock; rectificación ajusta solo diferencia.
+7. Inventario: abierto no impacta; cerrado ajusta con diferencia económica auditada.
+8. Mermas: pendiente no impacta; validada descuenta stock y calcula pérdida.
+9. Inicio/Control: alertas ligeras y dinero en juego.
+10. Arquitectura ligera: cada módulo carga bajo demanda.
+
+Punto pendiente antes de usar en producción real:
+- Ejecutar validación real en Mac con datos del usuario antes de tratarlo como versión estable.
+- OCR y voz quedan fuera de este checkpoint y deben retomarse al final.
+
+
+=== v8_7_281 · runtime, stock cero y mano de obra en recetas ===
+- Base incluida limpia de stock operativo, pedidos y producciones.
+- Nuevo comando PONER_STOCK_PEDIDOS_PRODUCCIONES_A_CERO.command para aplicar el cero a la base real del Mac con backup previo.
+- Inicio muestra base activa, recuento movements/orders/productions e IA cargada.
+- Recetas incorporan tiempo de producción y mano de obra. La fórmula está activa pero no modifica food cost.
+- Catálogo y recetas reciben ajuste visual para reducir solapamientos.
+- Líquidos alimentarios se mantienen por peso: kg/g, no ml/l.
+
+
+=== v8_7_282 · Catálogo kg / precios / preparaciones ===
+- Unidad operativa principal: kg para alimentos y líquidos.
+- Recetas pueden seguir usando g; el sistema convierte contra €/kg.
+- Artículos sin precio 0,00 pasan a precio estimado y quedan marcados como PRECIO_ESTIMADO.
+- Nuevo campo Tipo en Catálogo: INSUMO / PREPARACION.
+- Nuevo comando: NORMALIZAR_CATALOGO_UNIDADES_PRECIOS_PREPARACIONES.command.
+- Preparaciones reales se separan de insumos; AGUACHILES se tratará como PREPARACION si existe en la base real.
+
+
+=== v8_7_283 · Hotfix móvil scroll y visualización ===
+- Eliminado click sintético global en touchend, causa probable de pedidos/guardados accidentales durante scroll móvil.
+- Nuevo pedido protegido contra scroll-submit y doble submit.
+- Pedidos, Catálogo/Admin, Proveedores, Producciones y Recetas tienen tarjetas móviles y controles más grandes.
+- No toca OCR ni voz.
+- No cambia la regla de stock: pedidos no impactan stock; albarán validado sí.

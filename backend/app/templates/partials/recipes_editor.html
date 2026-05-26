@@ -1,0 +1,34 @@
+<div class="panel recipe-editor-shell" id="recipePanel" {% if request.query_params.get('new') and not recipe_detail %}style="display:none"{% endif %}>
+  <h3>Ficha técnica</h3>
+  {% if recipe_detail %}
+    {% include "partials/recipes_editor_header.html" %}
+    {% include "partials/recipes_summary.html" %}
+    <form id="recipeUpdateForm" method="post" action="/recipe/{{recipe_detail.id}}/update_form" class="mt preserve-flow" data-flow-target="recipePanel">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}">
+      <div class="recipe-edit-grid">
+        <div class="recipe-primary-fields">
+          {% include "partials/recipes_form_main.html" %}
+        </div>
+        <div class="recipe-costs-block">
+          {% include "partials/recipes_costs.html" %}
+        </div>
+      </div>
+      <div class="recipe-meta-block">
+        {% include "partials/recipes_meta.html" %}
+      </div>
+      {% include "partials/recipes_actions.html" %}
+    </form>
+    <form id="deleteRecipeForm{{recipe_detail.id}}" method="post" action="/recipe/{{recipe_detail.id}}/delete_form" style="display:none">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}">
+    </form>
+
+    <div id="recipeIngredientsBlock">
+      <hr class="mt">
+      <h4 class="mt">Ingredientes</h4>
+      {% include "partials/recipes_ingredients_form.html" %}
+      {% include "partials/recipes_ingredients_table.html" %}
+    </div>
+  {% else %}
+    <div class="muted">Selecciona una receta para verla.</div>
+  {% endif %}
+</div>

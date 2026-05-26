@@ -1,0 +1,44 @@
+<div class="admin-tab" id="tab-usuarios" style="display:none;">
+  <div class="grid2">
+    <div class="panel panel-accent">
+      <h3>Añadir usuario</h3>
+      <form method="post" action="/user/create_form">
+        <div class="row required"><label>Nombre visible</label><input name="name" required placeholder="Ej. MAURO"></div>
+        <div class="row"><label>Rol</label>
+          <select name="role">
+            {% for r in ['ADMIN','GERENTE','JEFE_COCINA','ENCARGADO','OPERATIVO'] %}<option value="{{r}}">{{r}}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="row"><label>Centro</label>
+          <select name="center_id"><option value="0">General (todos)</option>{% for c in centers %}<option value="{{c.id}}">{{c.name}}</option>{% endfor %}</select>
+        </div>
+        <div class="row"><label><input type="checkbox" name="is_active" value="1" checked> Activo</label></div>
+        <div class="actions"><button type="submit" class="gold btn-section">Añadir usuario</button></div>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>Usuarios básicos</h3>
+      <div class="tablewrap" style="max-height:460px;">
+        <table class="table">
+          <thead><tr><th>Nombre</th><th>Rol</th><th>Centro</th><th>Activo</th><th></th></tr></thead>
+          <tbody>
+            {% for u in users %}
+            {% if (u.name or "")|upper != "ADMIN GENERAL" %}
+            <tr>
+              <form method="post" action="/user/{{u.id}}/update_form">
+                <td><input name="name" value="{{u.name}}" required></td>
+                <td><select name="role">{% for r in ['ADMIN','GERENTE','JEFE_COCINA','ENCARGADO','OPERATIVO'] %}<option value="{{r}}" {% if u.role==r %}selected{% endif %}>{{r}}</option>{% endfor %}</select></td>
+                <td><select name="center_id"><option value="0" {% if (u.center_id|int)==0 %}selected{% endif %}>General</option>{% for c in centers %}<option value="{{c.id}}" {% if (u.center_id|int)==(c.id|int) %}selected{% endif %}>{{c.name}}</option>{% endfor %}</select></td>
+                <td><label><input type="checkbox" name="is_active" value="1" {% if u.is_active %}checked{% endif %}> Sí</label></td>
+                <td class="user-actions"><button type="submit" class="mini">Guardar</button>
+                <button type="submit" formaction="/user/{{u.id}}/delete_form" formmethod="post" class="mini ghost danger" onclick="return confirm('Quitar este usuario?');">Quitar</button></td>
+              </form>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

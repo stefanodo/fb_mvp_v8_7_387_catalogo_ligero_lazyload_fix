@@ -1,0 +1,149 @@
+<form method="post" action="/recipe/{{recipe_detail.id}}/ingredient/add_form" class="mt preserve-flow recipe-ing-add-compact" data-flow-target="recipePanel" onsubmit="return attachRecipeDraft(this)">
+  <div class="ingredient-add-line">
+    <div class="recipe-add-field add-type"><label>Tipo</label>
+      <select name="component_type" id="component_type_select" onchange="toggleRecipeComponentType(this)">
+        <option value="item">ARTÍCULO</option>
+        <option value="subrecipe">SUB-RECETA</option>
+      </select>
+    </div>
+    <div class="recipe-add-field add-search recipe-search-row" data-component-item="1"><label>Artículo</label>
+      <input type="text" class="mini recipe-item-query" name="item_query" list="items_datalist" placeholder="Buscar ingrediente…" autocomplete="off" />
+      <input type="hidden" name="item_id" value="" data-smart-item-id="1" />
+      <div class="smart-inline-results recipe-item-results" style="display:none"></div>
+    </div>
+    <div class="recipe-add-field add-search recipe-search-row" data-component-subrecipe="1" style="display:none"><label>Sub-receta</label>
+      <input type="text" class="mini subrecipe-search" name="subrecipe_query" list="subrecipes_datalist" placeholder="Buscar sub-receta…" autocomplete="off" />
+      <input type="hidden" name="subrecipe_id" value="" data-subrecipe-id="1" />
+      <div class="smart-inline-results recipe-subrecipe-results" style="display:none"></div>
+      <datalist id="subrecipes_datalist">{% for sr in recipes|sort(attribute="name") %}{% if sr.is_subrecipe %}<option value="{{sr.name|upper}}" data-id="{{sr.id}}" data-yield-unit="{% if (sr.yield_final_unit or 'g') == 'ud' %}ud{% else %}g{% endif %}"></option>{% endif %}{% endfor %}</datalist>
+    </div>
+    <div class="recipe-add-field add-qty"><label>Cantidad</label>
+      <div class="qtyline compact-qtyline">
+        <input type="number" step="0.001" name="qty_value" value="1" required>
+        <select name="qty_unit" data-smart-unit="1" required>
+          <option value="g">g</option><option value="kg">kg</option><option value="manojo">manojo</option><option value="ud">ud</option>
+        </select>
+      </div>
+    </div>
+    <div class="recipe-add-field add-waste"><label>Merma %</label><input type="number" step="0.01" name="waste_pct" value="" placeholder="auto"></div>
+    <div class="recipe-add-field add-button"><label>&nbsp;</label><button type="submit" class="gold">+ Añadir</button></div>
+  </div>
+  <div id="recipe_draft_fields"></div>
+</form>
+{% if request.query_params.get('ing_ok') %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Ingrediente guardado.</span></div>{% endif %}
+{% if request.query_params.get('err') %}
+  {% set e = request.query_params.get('err') %}
+  {% if e=='item' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar: artículo no encontrado (asegúrate de seleccionar uno de la lista).</span></div>
+  {% elif e=='unit' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar: unidad no válida para ese artículo.</span></div>
+  {% elif e=='qty' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar: cantidad inválida.</span></div>
+  {% elif e=='ing' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar: ingrediente no encontrado.</span></div>
+  {% elif e=='subrecipe' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar: sub-receta no válida o no seleccionada.</span></div>
+  {% else %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar (revisa cantidad/unidad/artículo).</span></div>
+  {% endif %}
+{% endif %}
+{% if request.query_params.get('err') %}
+  <div class="warn mt">
+    {% set e = request.query_params.get('err') %}
+    {% if e=='item' %}Selecciona un artículo válido (elige uno existente).{% endif %}
+    {% if e=='qty' %}Cantidad inválida (debe ser mayor que 0).{% endif %}
+    {% if e=='unit' %}Unidad inválida para el artículo o sub-receta.{% endif %}
+    {% if e=='subrecipe' %}Selecciona una sub-receta válida.{% endif %}
+  </div>
+{% endif %}
+
+<script>
+(function(){
+  function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn, {once:true}); }
+  function debounce(fn, ms){ let t; return function(){ const a=arguments; clearTimeout(t); t=setTimeout(()=>fn.apply(this,a), ms); }; }
+  function setUnitOptions(form, unit){
+    const sel = form && form.querySelector('select[name="qty_unit"][data-smart-unit]');
+    if(!sel) return;
+    const u = String(unit||'ud').toLowerCase();
+    if(u==='g' || u==='kg' || u==='ml' || u==='l'){ sel.innerHTML = '<option value="g">g</option><option value="kg">kg</option><option value="manojo">manojo</option><option value="ud">ud</option>'; sel.value = (u==='kg' || u==='l' ? 'kg' : 'g'); return; }
+    sel.innerHTML = '<option value="ud">ud</option><option value="g">g</option><option value="kg">kg</option><option value="manojo">manojo</option>';
+    sel.value = (u==='ud' ? 'ud' : 'g');
+  }
+  async function fetchJson(url){ const r = await fetch(url, {headers:{'Accept':'application/json'}}); return await r.json(); }
+  function wireForm(form){
+    if(!form || form.dataset.recipeIngSearchBootstrap==='1') return;
+    form.dataset.recipeIngSearchBootstrap='1';
+    const typeSel = form.querySelector('select[name="component_type"]');
+    const itemRow = form.querySelector('[data-component-item="1"]');
+    const subRow = form.querySelector('[data-component-subrecipe="1"]');
+    const itemInput = form.querySelector('input[name="item_query"]');
+    const itemHidden = form.querySelector('input[name="item_id"][data-smart-item-id]');
+    const itemResults = form.querySelector('.recipe-item-results');
+    const subInput = form.querySelector('input[name="subrecipe_query"]');
+    const subHidden = form.querySelector('input[name="subrecipe_id"][data-subrecipe-id]');
+    const subResults = form.querySelector('.recipe-subrecipe-results');
+    function hide(box){ if(box){ box.style.display='none'; box.innerHTML=''; } }
+    function syncMode(){
+      const isSub = !!typeSel && String(typeSel.value||'item').toLowerCase()==='subrecipe';
+      if(itemRow) itemRow.style.display = isSub ? 'none' : '';
+      if(subRow) subRow.style.display = isSub ? '' : 'none';
+      if(itemInput) itemInput.disabled = isSub;
+      if(subInput) subInput.disabled = !isSub;
+      hide(itemResults); hide(subResults);
+      if(isSub){ if(itemHidden) itemHidden.value=''; }
+      else { if(subHidden) subHidden.value=''; }
+      return isSub;
+    }
+    function renderItems(items){
+      if(!itemResults) return;
+      if(!items || !items.length){ hide(itemResults); return; }
+      itemResults.innerHTML = items.map(it => `<button type="button" data-id="${it.id}" data-name="${String(it.name||'').replace(/"/g,'&quot;')}" data-unit="${String(it.unit||'ud').replace(/"/g,'&quot;')}">${it.name} <small>[${it.unit||'ud'}]</small></button>`).join('');
+      itemResults.style.display='block';
+    }
+    function renderSubs(items){
+      if(!subResults) return;
+      if(!items || !items.length){ hide(subResults); return; }
+      subResults.innerHTML = items.map(it => `<button type="button" data-id="${it.id}" data-name="${String(it.name||'').replace(/"/g,'&quot;')}" data-unit="${String(it.yield_unit||'g').replace(/"/g,'&quot;')}">${it.name} <small>[SUB-RECETA]</small></button>`).join('');
+      subResults.style.display='block';
+    }
+    const doItemSearch = debounce(async ()=>{
+      if(syncMode()) return;
+      const q = String(itemInput && itemInput.value || '').trim();
+      if(itemHidden) itemHidden.value='';
+      if(q.length < 1){ hide(itemResults); return; }
+      try{ const js = await fetchJson('/api/items/search?q='+encodeURIComponent(q)+'&limit=12'); renderItems((js&&js.items)||[]); }catch(_){ hide(itemResults); }
+    }, 120);
+    const doSubSearch = debounce(async ()=>{
+      if(!syncMode()) return;
+      const q = String(subInput && subInput.value || '').trim();
+      if(subHidden) subHidden.value='';
+      if(q.length < 1){ hide(subResults); return; }
+      try{ const js = await fetchJson('/api/recipes/search?q='+encodeURIComponent(q)+'&limit=12&subrecipes_only=1'); renderSubs((js&&js.items)||[]); }catch(_){ hide(subResults); }
+    }, 120);
+    if(typeSel) typeSel.addEventListener('change', syncMode);
+    if(itemInput){ itemInput.addEventListener('input', doItemSearch); itemInput.addEventListener('focus', doItemSearch); }
+    if(subInput){ subInput.addEventListener('input', doSubSearch); subInput.addEventListener('focus', doSubSearch); }
+    if(itemResults){
+      itemResults.addEventListener('mousedown', e=>e.preventDefault());
+      itemResults.addEventListener('click', function(e){
+        const b=e.target.closest('button[data-id]'); if(!b) return;
+        if(itemInput) itemInput.value = b.dataset.name + ' [#' + b.dataset.id + ']';
+        if(itemHidden) itemHidden.value = b.dataset.id || '';
+        setUnitOptions(form, b.dataset.unit || 'ud');
+        hide(itemResults);
+      });
+    }
+    if(subResults){
+      subResults.addEventListener('mousedown', e=>e.preventDefault());
+      subResults.addEventListener('click', function(e){
+        const b=e.target.closest('button[data-id]'); if(!b) return;
+        if(subInput) subInput.value = b.dataset.name || '';
+        if(subHidden) subHidden.value = b.dataset.id || '';
+        setUnitOptions(form, b.dataset.unit || 'g');
+        hide(subResults);
+      });
+    }
+    document.addEventListener('click', function(e){
+      if(itemResults && itemInput && e.target!==itemInput && !itemResults.contains(e.target)) hide(itemResults);
+      if(subResults && subInput && e.target!==subInput && !subResults.contains(e.target)) hide(subResults);
+    });
+    syncMode();
+  }
+  ready(function(){ document.querySelectorAll('form[action$="/ingredient/add_form"]').forEach(wireForm); });
+  document.addEventListener('focusin', function(e){ const f = e.target && e.target.closest && e.target.closest('form[action$="/ingredient/add_form"]'); if(f) wireForm(f); });
+})();
+</script>

@@ -1,0 +1,16 @@
+<section id="producciones" class="page {% if page=='producciones' %}active{% endif %}">
+  {% include "partials/module_exit.html" %}
+    <div class="grid2 productions-layout">
+      <div class="panel production-sidebar">
+        <div class="section-head">
+          <h3>Producciones</h3>
+          <div class="muted">Crea una nueva o reabre una existente.</div>
+        </div>
+
+        {% include "partials/productions_new.html" %}
+        {% include "partials/productions_history.html" %}
+      </div>
+
+      {% include "partials/productions_detail.html" %}
+    </div>
+  </section>

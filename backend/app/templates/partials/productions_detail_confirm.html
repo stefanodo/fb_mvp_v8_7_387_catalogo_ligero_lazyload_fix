@@ -1,0 +1,7 @@
+{% if production_detail.status=='DRAFT' %}
+  <form method="post" action="/production/{{production_detail.id}}/confirm_form" class="mt">
+    <div class="actions">
+      <button type="submit" class="gold">Confirmar producción (descuenta bruto / crea movimientos)</button>
+    </div>
+  </form>
+{% endif %}

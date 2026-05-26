@@ -1,0 +1,230 @@
+
+<div class="panel mb16 stock-search-panel">
+  <div class="stock-nav-title">Buscar ingrediente / artículo</div>
+  <div class="muted" style="margin-bottom:8px;font-size:12px;">Empieza a escribir para localizar un artículo, abrirlo en Stock y ver rápido mínimo, máximo, ubicación y estado.</div>
+  <form method="get" action="/" class="row stock-lookup-row" style="margin-bottom:0;position:relative;overflow:visible;gap:8px;align-items:center;">
+    <input type="hidden" name="page" value="stock">
+    <input type="hidden" name="center_id" value="{{ selected_center_id or 0 }}">
+    <input type="hidden" name="stock_section" value="current_all">
+    <input id="stockLookup" name="stock_q" placeholder="Buscar artículo, ver mín./máx. y abrir en stock..." data-center-id="{{ selected_center_id or 0 }}" value="{{ stock_q or "" }}" autocomplete="off" spellcheck="false">
+    <button class="btn stock-search-hidden" type="submit" aria-hidden="true" tabindex="-1">Buscar</button>
+    <a class="btn stock-search-clear {% if not stock_q %}stock-search-clear-hidden{% endif %}" id="stockLookupClear" href="/?page=stock&center_id={{ selected_center_id or 0 }}&stock_section=current_all">Limpiar</a>
+    <div id="stockLookupSuggest" class="stock-lookup-suggest" style="display:none"></div>
+  </form>
+</div>
+<div class="stock-nav-blocks panel mb16" id="stockNavBlocks">
+  <div class="stock-nav-title">Bloques de stock</div>
+  <div class="stock-nav-grid stock-nav-grid-8">
+    <a class="btn stock-block-btn {% if stock_section=='fresh' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=fresh">Frescos</a>
+    <a class="btn stock-block-btn {% if stock_section=='productions' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=productions">Producciones</a>
+    <a class="btn stock-block-btn {% if stock_section=='frozen' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=frozen">Congelados</a>
+    <a class="btn stock-block-btn {% if stock_section=='dry' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=dry">Secos</a>
+    <a class="btn stock-block-btn {% if stock_section=='cleaning' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=cleaning">Limpieza</a>
+    <a class="btn stock-block-btn {% if stock_section=='unclassified' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=unclassified">Pend. clasificar</a>
+    <a class="btn stock-block-btn {% if stock_section=='unlocated' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=unlocated">Sin ubicar</a>
+    <a class="btn stock-block-btn {% if stock_section=='current_all' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}&stock_section=current_all">Stock actual</a>
+  </div>
+  <div class="muted stock-operational-note">Se carga solo el bloque elegido para dejar la vista de Stock más limpia y ligera. En bloques operativos, cada artículo intenta mostrarse en su almacén principal coherente (Cámara o Economato) sin reescribir todavía el histórico real de movimientos.</div>
+</div>
+
+{% if stock_section == 'fresh' %}
+<div id="stockFreshPanel" class="stock-section-block">
+  <div class="panel mb16">
+    <h3 style="margin:0 0 8px 0;">🥬 Insumos frescos</h3>
+    <div class="muted">Carnes, pescados, verduras, frutas, huevos y otros perecederos.</div>
+  </div>
+  <div class="grid2 wide-grid">
+    {% include "partials/stock_form.html" %}
+    {% set show_stock_table_header = false %}
+    {% set show_stock_table_anchor = true %}
+    {% set stock_table_rows = stock_groups.fresh %}
+    {% include "partials/stock_table.html" %}
+  </div>
+</div>
+{% elif stock_section == 'productions' %}
+  {% include "partials/stock_elaborados.html" %}
+{% elif stock_section == 'frozen' %}
+<div id="stockFrozenPanel" class="panel mt stock-placeholder-panel">
+  <h3 style="margin:0 0 8px 0;">❄️ Stock congelados</h3>
+  <div class="muted" style="margin-bottom:10px;">Artículos marcados como congelados para inventario y conteo.</div>
+  {% set show_stock_table_header = false %}
+  {% set stock_table_rows = stock_groups.frozen %}
+  {% include "partials/stock_table.html" %}
+</div>
+{% elif stock_section == 'dry' %}
+<div id="stockDryPanel" class="panel mt stock-placeholder-panel">
+  <h3 style="margin:0 0 8px 0;">🥫 Productos secos</h3>
+  <div class="muted" style="margin-bottom:10px;">Despensa, bebidas, salsas, legumbres, pastas, arroz, latas y similares.</div>
+  {% set show_stock_table_header = false %}
+  {% set stock_table_rows = stock_groups.dry %}
+  {% include "partials/stock_table.html" %}
+</div>
+{% elif stock_section == 'cleaning' %}
+<div id="stockCleaningPanel" class="panel mt stock-placeholder-panel">
+  <h3 style="margin:0 0 8px 0;">🧼 Limpieza</h3>
+  <div class="muted" style="margin-bottom:10px;">Productos de limpieza y apoyo no alimentario.</div>
+  {% set show_stock_table_header = false %}
+  {% set stock_table_rows = stock_groups.cleaning %}
+  {% include "partials/stock_table.html" %}
+</div>
+{% elif stock_section == 'unclassified' %}
+<div id="stockUnclassifiedPanel" class="panel mt stock-placeholder-panel">
+  <h3 style="margin:0 0 8px 0;">🗂️ Pendientes de clasificar</h3>
+  <div class="muted" style="margin-bottom:10px;">Artículos activos sin familia operativa cerrada. Puedes buscarlos y recolocarlos rápido.</div>
+  {% set show_stock_table_header = false %}
+  {% set stock_table_rows = stock_groups.unclassified %}
+  {% include "partials/stock_table.html" %}
+</div>
+{% elif stock_section == 'unlocated' %}
+<div id="stockUnlocatedPanel" class="panel mt stock-placeholder-panel">
+  <h3 style="margin:0 0 8px 0;">⚠️ Sin ubicar</h3>
+  <div class="muted" style="margin-bottom:10px;">Artículos heredados o antiguos sin ubicación guardada. Conviene vaciar este bloque y llevarlos a una categoría o a “Pend. clasificar”.</div>
+  {% set show_stock_table_header = false %}
+  {% set stock_table_rows = stock_groups.unlocated %}
+  {% include "partials/stock_table.html" %}
+</div>
+{% elif stock_section == 'current_all' %}
+<div id="stockCurrentAllPanel" class="panel mt stock-placeholder-panel">
+  <h3 style="margin:0 0 8px 0;">📦 Stock actual global</h3>
+  <div class="muted" style="margin-bottom:10px;">Vista maestra para auditar todo el stock sin depender del bloque operativo.</div>
+  {% set show_stock_table_header = false %}
+  {% set stock_table_rows = stock_groups.current_all %}
+  {% include "partials/stock_table.html" %}
+</div>
+{% endif %}
+
+
+<script>
+(function(){
+  const STOCK_SCROLL_KEY = 'systemMacStockScrollY';
+  try{
+    const y = Number(sessionStorage.getItem(STOCK_SCROLL_KEY)||'0');
+    if(y > 0){
+      setTimeout(()=>window.scrollTo({top:y, behavior:'auto'}), 30);
+      setTimeout(()=>sessionStorage.removeItem(STOCK_SCROLL_KEY), 120);
+    }
+  }catch(_e){}
+  document.addEventListener('click', function(ev){
+    const a = ev.target.closest('a.stock-block-btn');
+    if(!a) return;
+    try{ sessionStorage.setItem(STOCK_SCROLL_KEY, String(window.scrollY||0)); }catch(_e){}
+  }, true);
+})();
+</script>
+
+<script>
+(function(){
+  const input = document.getElementById('stockLookup');
+  const suggest = document.getElementById('stockLookupSuggest');
+  const clearBtn = document.getElementById('stockLookupClear');
+  if(!input || !suggest) return;
+  const form = input.closest('form');
+  let ctrl = null;
+  function normText(v){ return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+  function currentRows(){
+    return Array.from(document.querySelectorAll('.stock-table tbody tr')).map(tr=>({row:tr,name:(tr.getAttribute('data-article')||tr.children[1]?.textContent||'').trim()}));
+  }
+  function renderLocal(){
+    const q = normText(input.value||'');
+    const rows = currentRows();
+    rows.forEach(({row,name})=>{ row.style.display = (!q || normText(name).includes(q)) ? '' : 'none'; });
+    if(clearBtn) clearBtn.classList.toggle('stock-search-clear-hidden', !q);
+  }
+  async function fetchSuggest(){
+    const q = String(input.value||'').trim();
+    renderLocal();
+    if(q.length < 2){ suggest.style.display='none'; suggest.innerHTML=''; return; }
+    if(ctrl) ctrl.abort();
+    ctrl = new AbortController();
+    try{
+      const isProductions = (new URLSearchParams(window.location.search).get('stock_section') || '').toLowerCase() === 'productions';
+      if(isProductions){ suggest.style.display='none'; suggest.innerHTML=''; return; }
+      const res = await fetch(`/api/items/search?q=${encodeURIComponent(q)}&limit=12`, {signal: ctrl.signal});
+      const data = await res.json();
+      const out = (data.items||[]).map(it=>String(it.name||'').trim()).filter(Boolean);
+      suggest.innerHTML = out.map(n=>`<button type="button" data-name="${n.replace(/"/g,'&quot;')}">${n}</button>`).join('');
+      suggest.style.display = out.length ? 'block' : 'none';
+    }catch(err){
+      if(err && err.name === 'AbortError') return;
+      suggest.style.display='none';
+    }
+  }
+  input.addEventListener('input', fetchSuggest);
+  input.addEventListener('focus', fetchSuggest);
+  suggest.addEventListener('mousedown', e=>e.preventDefault());
+  suggest.addEventListener('click', (e)=>{
+    const b=e.target.closest('button[data-name]'); if(!b) return;
+    input.value=b.dataset.name||'';
+    const exact = currentRows().find(x=>normText(x.name)===normText(input.value||''));
+    if(exact){
+      exact.row.scrollIntoView({behavior:'smooth', block:'center'});
+      exact.row.style.outline='2px solid #c8a96a';
+      setTimeout(()=>exact.row.style.outline='', 1400);
+      renderLocal();
+      suggest.style.display='none';
+      return;
+    }
+    if(form) form.submit();
+  });
+  document.addEventListener('click', (e)=>{ if(e.target!==input && !suggest.contains(e.target)) suggest.style.display='none'; });
+  renderLocal();
+})();
+</script>
+
+<script>
+(function(){
+  // v8_7_334 · navegación Stock sin flash ni salto brusco.
+  const SECTION_SEL = 'section#stock';
+  function setupStockLookup(){
+    const input = document.getElementById('stockLookup');
+    const suggest = document.getElementById('stockLookupSuggest');
+    if(!input || !suggest || input.dataset.enhanced334==='1') return;
+    input.dataset.enhanced334='1';
+    const clearBtn = document.getElementById('stockLookupClear');
+    let ctrl=null;
+    function norm(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+    function rows(){return Array.from(document.querySelectorAll('.stock-table tbody tr')).map(tr=>({row:tr,name:(tr.getAttribute('data-article')||tr.children[1]?.textContent||'').trim()}));}
+    function local(){const q=norm(input.value); rows().forEach(x=>x.row.style.display=(!q||norm(x.name).includes(q))?'':'none'); if(clearBtn) clearBtn.classList.toggle('stock-search-clear-hidden',!q);}
+    async function update(){const q=input.value.trim(); local(); if(q.length<2){suggest.style.display='none';suggest.innerHTML='';return;} if(ctrl)ctrl.abort(); ctrl=new AbortController(); try{const res=await fetch('/api/items/search?q='+encodeURIComponent(q)+'&limit=12',{signal:ctrl.signal}); const js=await res.json(); const items=js.items||[]; suggest.innerHTML=items.map(it=>`<button type="button" data-name="${String(it.name||'').replace(/"/g,'&quot;')}">${it.name}<small>${it.unit||''}</small></button>`).join('') || '<div class="empty">Sin coincidencias</div>'; suggest.style.display='block';}catch(e){if(e.name!=='AbortError')suggest.style.display='none';}}
+    input.addEventListener('input', update); input.addEventListener('focus', update);
+    suggest.addEventListener('mousedown', e=>e.preventDefault());
+    suggest.addEventListener('click', e=>{const b=e.target.closest('button[data-name]'); if(!b)return; input.value=b.dataset.name||''; local(); suggest.style.display='none'; const ex=rows().find(x=>norm(x.name)===norm(input.value)); if(ex){ex.row.scrollIntoView({behavior:'smooth',block:'center'}); ex.row.style.outline='2px solid #c8a96a'; setTimeout(()=>ex.row.style.outline='',1300);}});
+  }
+  async function softNavigateStock(a){
+    const href=a.getAttribute('href'); if(!href) return false;
+    const current=document.querySelector(SECTION_SEL); if(!current) return false;
+    document.querySelectorAll('.stock-block-btn').forEach(b=>b.classList.remove('active'));
+    a.classList.add('active','loading');
+    current.classList.add('stock-soft-loading');
+    const yBefore = window.scrollY || 0;
+    try{
+      const res=await fetch(href, {headers:{'X-Requested-With':'fetch'}});
+      if(!res.ok) throw new Error('http '+res.status);
+      const html=await res.text();
+      const doc=new DOMParser().parseFromString(html,'text/html');
+      const next=doc.querySelector(SECTION_SEL);
+      if(!next) throw new Error('section missing');
+      current.innerHTML = next.innerHTML;
+      history.pushState({}, '', href);
+      setupStockLookup();
+      const nav=document.getElementById('stockNavBlocks') || document.querySelector(SECTION_SEL);
+      if(nav){ nav.scrollIntoView({behavior:'smooth', block:'start'}); }
+      setTimeout(()=>{ window.scrollTo({top: Math.max(0, Math.min(window.scrollY, yBefore+120)), behavior:'auto'}); }, 20);
+      return true;
+    }catch(err){
+      window.location.href=href+'#stockNavBlocks';
+      return true;
+    }finally{
+      current.classList.remove('stock-soft-loading');
+      document.querySelectorAll('.stock-block-btn.loading').forEach(b=>b.classList.remove('loading'));
+    }
+  }
+  document.addEventListener('click', function(ev){
+    const a=ev.target.closest('a.stock-block-btn'); if(!a) return;
+    ev.preventDefault();
+    softNavigateStock(a);
+  }, true);
+  window.addEventListener('popstate', ()=>{ if(new URLSearchParams(location.search).get('page')==='stock') location.reload(); });
+  setupStockLookup();
+})();
+</script>

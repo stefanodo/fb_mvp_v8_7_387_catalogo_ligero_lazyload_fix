@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System MAC · Modificadores TPV</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:24px;color:#181818;background:#fff}
+    .head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:2px solid #222;padding-bottom:12px;margin-bottom:18px}
+    h1{margin:0;font-size:24px}.muted{color:#666}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.card{border:1px solid #ddd;border-radius:12px;padding:10px}.label{font-size:12px;color:#777}.value{font-size:20px;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{break-inside:avoid;border:1px solid #ddd;border-radius:14px;padding:14px;margin:14px 0}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid #e5e5e5;padding:6px;text-align:left;vertical-align:top}.num{text-align:right}.danger{color:#9b1c1c}.ok{color:#1d6b35}ul{margin:8px 0 0;padding-left:18px}@media print{body{margin:10mm}.no-print{display:none}.grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>Modificadores TPV · consumo realista</h1>
+      <div class="muted">Periodo {{ report.period or '-' }} · {{ selected_center_name }} · {{ BUILD_ID }}</div>
+    </div>
+    <button class="no-print" onclick="window.print()">Imprimir / PDF</button>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Modificadores vendidos</div><div class="value">{{ '%.1f'|format(report.total_modifier_qty or 0) }}</div></div>
+    <div class="card"><div class="label">Mapeados stock</div><div class="value">{{ report.mapped_count or 0 }}</div></div>
+    <div class="card"><div class="label">Sin mapear</div><div class="value">{{ report.unmapped_count or 0 }}</div></div>
+    <div class="card"><div class="label">Sin impacto stock</div><div class="value">{{ report.no_stock_count or 0 }}</div></div>
+  </div>
+
+  {% if not report.has_data %}
+    <div class="panel"><strong>Sin modificadores TPV normalizados.</strong><p class="muted">La capa está preparada. No se descuenta stock por modificadores hasta tener datos TPV mapeados.</p></div>
+  {% else %}
+  <div class="grid">
+    <div class="panel">
+      <h3>Modificadores más usados</h3>
+      <table><thead><tr><th>Plato</th><th>Modificador</th><th>Estado</th><th class="num">Ud.</th></tr></thead><tbody>
+      {% for x in report.top_modifiers %}<tr><td>{{ x.recipe_name }}</td><td>{{ x.modifier_name }}</td><td>{{ x.status }}</td><td class="num">{{ '%.1f'|format(x.qty_sold or 0) }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div class="panel">
+      <h3>Deltas de consumo</h3>
+      <table><thead><tr><th>Plato</th><th>Modificador</th><th>Artículo/Subreceta</th><th class="num">Delta</th></tr></thead><tbody>
+      {% for x in report.consumption_deltas %}<tr><td>{{ x.recipe_name }}</td><td>{{ x.modifier_name }}</td><td>{{ x.item_label }}</td><td class="num">{{ '%.2f'|format(x.qty_delta_base or 0) }} {{ x.unit_base }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Requieren mapeo</h3>
+    <table><thead><tr><th>Plato</th><th>Modificador TPV</th><th>Código normalizado</th><th class="num">Ud.</th></tr></thead><tbody>
+      {% for x in report.unmapped_modifiers %}<tr><td>{{ x.recipe_name }}</td><td>{{ x.modifier_name }}</td><td>{{ x.normalized_code }}</td><td class="num">{{ '%.1f'|format(x.qty_sold or 0) }}</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+  {% endif %}
+
+  <div class="panel"><h3>Evaluación</h3><ul>{% for r in report.recommendations %}<li>{{ r }}</li>{% endfor %}</ul></div>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{% set group_key_map = {
+  'Calientes':'caliente','Fríos':'frio','Frios':'frio','Postres':'postres','Salsas':'salsas','Guarniciones':'guarniciones','Bases':'bases','Masas':'masas','Pastelería':'pasteleria','Pasteleria':'pasteleria','Porcionados':'porcionados','Otros':'otros'
+} %}
+{% for grp in production_groups %}
+  {% set gkey = group_key_map.get(grp, (grp or 'otros')|lower) %}
+  {% set rows = production_recipe_groups[gkey] if production_recipe_groups is defined and production_recipe_groups[gkey] is defined else [] %}
+  <div class="prod-cat-panel {% if loop.first %}active{% endif %}" id="prodgrp_{{ loop.index0 }}">
+    <div class="prod-check-grid enhanced">
+      {% if rows and rows|length > 0 %}
+        {% for r in rows|sort(attribute='name') %}
+          <div class="prod-row" data-batch-row="{{r.id}}" data-group="{{grp}}">
+            <label class="checkline compact-check"><input type="checkbox" name="recipe_ids" value="{{r.id}}"><span class="checkline-text">{{r.name|upper}}</span></label>
+            <div class="prod-inline-controls">
+              <input type="number" step="0.001" min="0.001" value="1" data-batch-qty="{{r.id}}" placeholder="Cantidad">
+              <select data-batch-unit="{{r.id}}">
+                {% for unit in production_units %}<option value="{{unit}}" {% if unit=='lotes' %}selected{% endif %}>{{unit}}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="muted prod-class-note">{{ r.category or 'Producción' }}{% if r.subcategory %} · {{ r.subcategory }}{% endif %}</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="muted">No hay producciones reales clasificadas en {{ grp }}. Solo se muestran subrecetas, elaboraciones internas o recetas marcadas como producibles.</div>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}

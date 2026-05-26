@@ -1,0 +1,24 @@
+SYSTEM MAC · USO SIMPLE
+
+Versión: v8_7_385_manual_finanzas_ejecutivas_ceo
+
+Apertura:
+- Usa el acceso de System MAC incluido en la carpeta descomprimida.
+- Mantén abierta la ventana del servidor.
+- Abre la dirección local que muestre el sistema en el navegador.
+
+Bloques principales:
+- Inicio / Dashboard.
+- Finanzas Ejecutivas.
+- Stock.
+- Recetas.
+- Producciones.
+- Pedidos.
+- Albaranes/OCR.
+- Inventario.
+- Coctelería / Barra en Laboratorio.
+
+Manual financiero:
+- Lee MANUAL_FINANZAS_EJECUTIVAS_CEO.md.
+- Este bloque está orientado a CEO/CFO/dirección/contabilidad/inversor.
+- Objetivo: facilitar decisiones rápidas y estratégicas con datos objetivos.

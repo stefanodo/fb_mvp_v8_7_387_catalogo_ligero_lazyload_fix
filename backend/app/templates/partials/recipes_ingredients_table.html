@@ -1,0 +1,71 @@
+{% if not recipe_detail.ingredients %}
+  <div class="recipe-cost-warning no-ingredients-warning">
+    <strong>Faltan ingredientes.</strong> Añade ingredientes para calcular coste real, carga/ración y PVP. El sistema no debe interpretar 0,00 € como cálculo válido.
+  </div>
+{% endif %}
+<div class="table-wrap mt recipe-ingredients-table-wrap">
+  <table class="recipe-ingredients-table recipe-ingredients-table-v291" style="width:100%;table-layout:fixed;">
+    <thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Coste</th><th><div class="recipe-edit-head"><span class="head-qty">Cant.</span><span class="head-unit">Ud.</span><span class="head-waste">Merma %</span><span class="head-save">Guardar</span><span class="head-delete">Quitar</span></div></th></tr></thead>
+    <tbody>
+      {% for ing in recipe_detail.ingredients %}
+        {% set base = ing.unit %}
+        {% set iu = ing.input_unit if ing.input_unit else ing.unit %}
+        {% set uc = ing.unit_cost if ing.unit_cost is not none else 0 %}
+        {% set lc = ing.line_cost if ing.line_cost is not none else 0 %}
+        {% set disp = ing.display_qty if ing.display_qty is defined else ing.qty_net %}
+        {% set gross_disp = ing.display_gross if ing.display_gross is defined else ing.qty_gross %}
+        {% set net_disp = ing.display_net if ing.display_net is defined else ing.qty_net %}
+        <tr id="recipe-ing-{{ing.id}}" class="recipe-ing-row" data-recipe-line-row="1" data-unit-cost="{{uc}}" data-base-unit="{{base}}" data-vat-rate="{{ recipe_detail.calc.vat_rate if recipe_detail.calc else 10 }}">
+          <td class="recipe-ing-name-cell"><span class="recipe-ing-name">{{ing.item_name}}</span>{% if ing.is_subrecipe %} <span class="badge warn">SUB-RECETA</span>{% endif %}</td>
+          <td class="recipe-ing-qty-cell">
+            <div class="ing-primary"><span class="qty-label">Cantidad receta:</span> {{ disp|fmt_qty }} {{iu}}</div>
+            <div class="muted ing-meta">
+              Stock bruto: <span class="gross-val">{{ gross_disp|fmt_qty }}</span> {{iu}} · Neto receta: <span class="net-val">{{ net_disp|fmt_qty }}</span> {{iu}} · Merma: <span class="waste-val">{{ (ing.waste_pct_ing if ing.waste_pct_ing is not none else 0)|fmt_qty(2) }}</span>%
+            </div>
+          </td>
+          <td class="recipe-ing-cost-cell">
+            {% set base_l = (base or '')|lower %}
+            {% if base_l in ['g','gr'] %}{% set uc_disp = uc * 1000 %}{% set uc_unit = 'kg' %}
+            {% elif base_l == 'ml' %}{% set uc_disp = uc * 1000 %}{% set uc_unit = 'l' %}
+            {% else %}{% set uc_disp = uc %}{% set uc_unit = base %}{% endif %}
+            <div><b class="line-cost">{{ "%.2f"|format(lc) }}</b> € {% if uc==0 and lc<=0 %}<span class="badge warn compact-warn">Sin precio</span>{% endif %}</div>
+            <div class="muted"><span class="unit-cost">{{ "%.2f"|format(uc_disp) }}</span> €/{{uc_unit}} · {% if ing.unit_cost_source=='proveedor' %}Proveedor{% elif ing.unit_cost_source=='precio_actual' %}Precio actual{% elif lc>0 %}Coste receta{% else %}Sin precio{% endif %}</div>
+          </td>
+          <td class="recipe-ing-edit-cell">
+            <div class="recipe-edit-line recipe-edit-line-v291">
+              <form method="post" action="/recipe/{{recipe_detail.id}}/ingredient/{{ing.id}}/update_form" class="compact preserve-flow recipe-update-inline" data-flow-target="recipePanel" data-flow-row-id="recipe-ing-{{ing.id}}">
+                <div class="qtyline recipe-qtyline-v291">
+                  <input class="qty-value" type="number" step="0.001" name="qty_value" value="{{ disp|fmt_qty }}" required aria-label="Cantidad neta de receta">
+                  <select name="qty_unit" aria-label="Unidad">
+                    {% if ing.is_subrecipe %}
+                      {% if base in ['g','kg'] %}
+                        <option value="g" {% if iu=='g' %}selected{% endif %}>g</option>
+                        <option value="kg" {% if iu=='kg' %}selected{% endif %}>kg</option>
+                      {% elif base=='ud' %}
+                        <option value="ud" selected>ud</option>
+                      {% else %}
+                        <option value="{{iu or base}}" selected>{{iu or base}}</option>
+                      {% endif %}
+                    {% else %}
+                      {% if base in ['g','kg'] %}
+                        <option value="g" {% if iu=='g' %}selected{% endif %}>g</option>
+                        <option value="kg" {% if iu=='kg' %}selected{% endif %}>kg</option>
+                      {% else %}
+                        <option value="ud" {% if iu=='ud' %}selected{% endif %}>ud</option>
+                      {% endif %}
+                    {% endif %}
+                  </select>
+                  <input class="mini waste-field waste-pct" type="number" step="0.01" name="waste_pct" value="{{ (ing.waste_pct_ing if ing.waste_pct_ing is not none else 0)|fmt_qty(2) }}" aria-label="% merma ingrediente">
+                  <button type="submit" class="mini inline-save">Guardar</button>
+                </div>
+              </form>
+              <form method="post" action="/recipe/{{recipe_detail.id}}/ingredient/{{ing.id}}/delete_form" class="preserve-flow recipe-delete-inline" data-flow-target="recipePanel" data-flow-row-id="recipe-ing-{{ing.id}}">
+                <button class="mini danger recipe-delete-btn" type="submit">Quitar</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

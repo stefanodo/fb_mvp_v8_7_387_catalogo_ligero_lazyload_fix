@@ -1,0 +1,21 @@
+{% if production_detail and production_detail.recipe_breakdown %}
+<div class="panel mt">
+  <h4 style="margin:0 0 8px 0;">Producciones cargadas y sus ingredientes</h4>
+  <div class="muted" style="margin-bottom:10px;">Vista operativa para entender qué ingredientes pertenecen a cada producción, sin duplicar las líneas consolidadas de abajo.</div>
+  <div class="productions-breakdown-list">
+    {% for sec in production_detail.recipe_breakdown %}
+      <div class="productions-breakdown-card">
+        <div class="productions-breakdown-title"><strong>{{ sec.recipe_name }}</strong> <span class="badge">{{ sec.loads }} carga{% if sec.loads != 1 %}s{% endif %}</span></div>
+        <div class="productions-breakdown-lines">
+          {% for ln in sec.lines %}
+            <div class="productions-breakdown-line">
+              <span>{{ ln.item_name }}</span>
+              <span class="muted">{{ human_qty(ln.qty_input, ln.input_unit) }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}

@@ -1,0 +1,104 @@
+<div class="admin-tab" id="tab-precios" style="display:none;">
+    <div class="grid2">
+      <div class="panel panel-accent">
+        <h3>Registrar precio</h3>
+        <form id="supplierPriceForm">
+          <div class="row required admin-search-row"><label>Artículo</label>
+            <input id="priceItemSearch" placeholder="Escribe para buscar..." autocomplete="off">
+            <input type="hidden" name="item_id" id="priceItemId" value="">
+            <div id="priceItemSuggestions" class="suggestions smart-inline-results" style="display:none;"></div><div class="hint">Escribe para buscar y toca una sugerencia.</div>
+          </div>
+          <div class="row required"><label>Proveedor</label>
+            <select name="supplier_id" id="priceSupplier">{% for s in suppliers %}{% if s.name != "Proveedor pendiente OCR" %}<option value="{{s.id}}">{{s.name}}</option>{% endif %}{% endfor %}</select>
+          </div>
+          <div class="row required"><label>Precio</label><input id="priceInput" type="number" step="0.0001" name="price_per_purchase" value="0"></div>
+          <div class="row required"><label>Unidad compra</label>
+            <select name="purchase_unit" id="purchaseUnit">
+              <option value="kg">kg</option><option value="g">g</option><option value="manojo">manojo</option><option value="ud">ud</option>
+            </select>
+          </div>
+          <div class="row"><label>Factor a base</label>
+            <input id="purchaseFactor" type="number" step="0.0001" name="purchase_to_base_factor" value="1000">
+            <div class="hint">kg→g = 1000 · l→ml = 1000 · ud→ud = 1</div>
+          </div>
+          <div class="row"><label>Preferido</label><select name="is_preferred" id="isPreferredSel"><option value="0">No</option><option value="1">Sí</option></select></div>
+          <div class="row"><label>Local (opcional)</label>
+            <select name="center_id" id="priceCenter"><option value="0">General (todos)</option>{% for c in centers %}<option value="{{c.id}}">{{c.name}}</option>{% endfor %}</select>
+          </div>
+          <div class="actions">
+            <button type="submit" class="gold btn-section">Guardar precio</button>
+            <span class="msg" id="spMsg"></span>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h3>Comparativa proveedores</h3>
+        <p class="muted">Herramienta operativa para comparar precio por artículo/proveedor. El Dashboard avisa de subidas; aquí se revisa el detalle, proveedor habitual y precio actual.</p>
+        <div class="row admin-search-row"><input id="pricesFilter" placeholder="Buscar proveedor o artículo..." autocomplete="off" spellcheck="false"><div id="pricesFilterSuggestions" class="smart-inline-results" style="display:none"></div></div>
+        <div class="tablewrap" style="max-height:460px;">
+          <table class="table" id="pricesTable">
+            <thead><tr><th>Proveedor</th><th>Artículo</th><th>Precio</th><th>U. compra</th><th>Factor</th><th>Preferido</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+
+<script data-admin-price-help="1">
+(function(){
+  const table = document.getElementById('pricesTable');
+  const tbody = table ? table.querySelector('tbody') : null;
+  const filter = document.getElementById('pricesFilter');
+  const itemSearch = document.getElementById('priceItemSearch');
+  const itemHidden = document.getElementById('priceItemId');
+  const itemBox = document.getElementById('priceItemSuggestions');
+  const showAllBtnId = 'pricesLoadMoreBtn';
+  if(!table || !tbody) return;
+  const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  let offset=0, total=0, limit=80, loading=false;
+  function rowHtml(p){ return `<tr data-provider="${esc(p.supplier_name)}" data-article="${esc(p.item_name)}"><td>${esc(p.supplier_name)}</td><td>${esc(p.item_name)}</td><td>${Number(p.price_per_purchase||0).toFixed(4)}</td><td>${esc(p.purchase_unit||'')}</td><td>${esc(p.purchase_to_base_factor||'')}</td><td>${p.is_preferred?'Sí':'No'}</td></tr>`; }
+  function ensureMore(){
+    let btn=document.getElementById(showAllBtnId);
+    if(!btn){ btn=document.createElement('button'); btn.type='button'; btn.id=showAllBtnId; btn.className='mini ghost'; btn.textContent='Cargar más precios'; table.closest('.panel')?.appendChild(btn); btn.addEventListener('click',()=>load(false)); }
+    btn.style.display = offset < total ? '' : 'none';
+  }
+  async function load(reset){
+    if(loading) return; loading=true;
+    if(reset){ offset=0; tbody.innerHTML='<tr><td colspan="6" class="muted">Cargando comparativa...</td></tr>'; }
+    const q=String(filter?.value||'').trim();
+    try{
+      const res=await fetch(`/api/admin/supplier_prices_page?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`, {headers:{'Accept':'application/json'}});
+      const data=await res.json(); total=Number(data.total||0);
+      if(reset) tbody.innerHTML='';
+      if(data.prices && data.prices.length){ tbody.insertAdjacentHTML('beforeend', data.prices.map(rowHtml).join('')); offset += data.prices.length; }
+      if(!tbody.querySelector('tr')) tbody.innerHTML='<tr><td colspan="6" class="muted">Sin precios para ese filtro.</td></tr>';
+      ensureMore();
+    }catch(e){ tbody.innerHTML='<tr><td colspan="6" class="notice err">No se pudo cargar la comparativa.</td></tr>'; }
+    finally{ loading=false; }
+  }
+  let t=null;
+  if(filter) filter.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(()=>load(true), 250); });
+  async function renderItemSuggestions(){
+    if(!itemSearch || !itemHidden || !itemBox) return;
+    const q=String(itemSearch.value||'').trim(); itemHidden.value='';
+    if(!q){ itemBox.style.display='none'; itemBox.innerHTML=''; return; }
+    try{
+      const res=await fetch(`/api/items/search?q=${encodeURIComponent(q)}&limit=12`, {headers:{'Accept':'application/json'}});
+      const data=await res.json(); const items=data.items||[];
+      itemBox.innerHTML = items.length ? items.map(it=>`<button type="button" data-id="${it.id}" data-unit="${esc(it.unit)}" data-name="${esc(it.name)}"><span>${esc(it.name)}</span><small>${esc(it.unit||'')}</small></button>`).join('') : '<div class="search-empty">Sin coincidencias</div>';
+      itemBox.style.display='block';
+    }catch(e){ itemBox.style.display='none'; }
+  }
+  if(itemSearch && itemBox){
+    let st=null; itemSearch.addEventListener('input',()=>{ clearTimeout(st); st=setTimeout(renderItemSuggestions,180); }); itemSearch.addEventListener('focus', renderItemSuggestions);
+    itemBox.addEventListener('mousedown',e=>e.preventDefault());
+    itemBox.addEventListener('click',e=>{ const b=e.target.closest('button[data-id]'); if(!b) return; itemSearch.value=b.dataset.name||''; itemHidden.value=b.dataset.id||''; itemBox.style.display='none'; itemBox.innerHTML=''; });
+    document.addEventListener('click',e=>{ if(e.target!==itemSearch && !itemBox.contains(e.target)){ itemBox.style.display='none'; }});
+  }
+  load(true);
+})();
+</script>

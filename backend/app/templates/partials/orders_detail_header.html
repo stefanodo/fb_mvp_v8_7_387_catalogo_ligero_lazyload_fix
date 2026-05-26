@@ -1,0 +1,18 @@
+{% if order_detail %}
+  <div class="muted">Pedido <b>#{{order_detail.id}}</b> · {{order_detail.center_name}}</div>
+  <div class="mt">Estado: {% if order_detail.status=='CONFIRMED' %}<span class="badge ok">CONFIRMADO</span>{% elif order_detail.status=='ARCHIVED' %}<span class="badge">ARCHIVADO</span>{% else %}<span class="badge warn">BORRADOR</span>{% endif %}</div>
+  <div class="mt"><span class="muted">Responsable:</span> {{ order_detail.responsible_name or 'Sin responsable' }}</div>
+  {% if order_detail.note %}<div class="mt"><span class="muted">Nota:</span> {{order_detail.note}}</div>{% endif %}
+  {% set active_users = users|selectattr("is_active")|list %}{% set non_admin_users = active_users|rejectattr("name", "equalto", "ADMIN GENERAL")|list %}{% set eligible_users = non_admin_users if non_admin_users else active_users %}{% if order_detail.status=='DRAFT' and not order_detail.responsible_user_id %}<form method="post" action="/order/{{order_detail.id}}/responsible_form" class="compact mt preserve-flow" data-flow-target="orderDetailPanel"><div class="row"><label>Responsable</label><select name="responsible_user_id" required><option value="">Selecciona responsable…</option>{% for u in eligible_users %}<option value="{{u.id}}" {% if order_detail.responsible_user_id==u.id %}selected{% endif %}>{{u.name}}{% if u.role %} · {{u.role}}{% endif %}</option>{% endfor %}</select><button class="mini primary" type="submit">Guardar responsable</button></div></form>{% elif order_detail.status=='DRAFT' %}<div class="muted mt">El responsable ya quedó asignado al crear el pedido.</div>{% endif %}
+  <div class="actions mt">
+    <a class="btn" href="/order/{{order_detail.id}}/print" target="_blank">Imprimir (A4 / PDF)</a>
+    {% if order_detail.status=='CONFIRMED' %}
+      <form method="post" action="/order/{{order_detail.id}}/reopen_form" style="display:inline"><button class="btn" type="submit">Reabrir para editar</button></form>
+      <form method="post" action="/order/{{order_detail.id}}/archive_form" style="display:inline" onsubmit="return confirm('¿Archivar este pedido confirmado?');"><button class="btn" type="submit">Archivar confirmado</button></form>
+    {% elif order_detail.status=='ARCHIVED' %}
+      <form method="post" action="/order/{{order_detail.id}}/restore_form" style="display:inline"><button class="btn" type="submit">Restaurar archivado</button></form>
+    {% elif order_detail.status=='DRAFT' %}
+      <form method="post" action="/order/{{order_detail.id}}/delete_form" style="display:inline" onsubmit="return confirm('¿Borrar este pedido borrador?');"><button class="btn" type="submit">Borrar borrador</button></form>
+    {% endif %}
+  </div>
+{% endif %}

@@ -1,0 +1,47 @@
+<form method="post" action="/movement/create_form" id="stockMovementForm">
+  <div class="form-group">
+    <div class="form-group-title">¿Dónde?</div>
+    <div class="row required"><label>Local</label><select name="center_id" id="stockCenterSelect">{% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}</select></div>
+    <div class="row required"><label>Almacén</label><select name="warehouse_id" id="stockWarehouseSelect">{% for w in warehouses %}<option value="{{w.id}}" data-center-id="{{w.center_id}}">{{w.center_name}} · {{w.name}}</option>{% endfor %}</select></div>
+  </div>
+  <div class="form-group">
+    <div class="form-group-title">¿Qué y cuánto?</div>
+    <div class="row required"><label>Artículo</label>
+      <input type="text" class="mini smart-item" name="item_query" list="items_datalist" placeholder="Escribe (ej. patata, sal…)" /><input type="hidden" name="item_id" value="" data-smart-item-id="1" /><input type="hidden" name="stock_section" value="{{ stock_section or 'fresh' }}">
+      <div class="hint">Empieza a escribir y selecciona del listado del navegador.</div>
+    </div>
+    <div class="row required"><label>Tipo</label><select name="movement_type"><option value="ENTRADA">ENTRADA ↑</option><option value="SALIDA">SALIDA ↓</option></select></div>
+    <div class="row required"><label>Cantidad</label><div class="qtyline"><input type="number" name="qty_value" step="0.001" value="1"><select name="qty_unit" data-smart-unit="1"><option value="g">g</option><option value="kg">kg</option><option value="manojo">manojo</option><option value="ml">ml</option><option value="l">l</option><option value="ud">ud</option></select></div></div>
+    <div class="row"><label>Nota</label><input type="text" name="note" placeholder="Opcional"></div>
+  </div>
+  <div class="actions wrap actions-mobile-stack">
+    <button type="submit" name="after" value="stay" class="gold btn-section">Guardar y seguir</button>
+    <button type="submit" name="after" value="exit">Guardar y salir</button>
+  </div>
+</form>
+<script>
+(function(){
+  const centerSel = document.getElementById('stockCenterSelect');
+  const whSel = document.getElementById('stockWarehouseSelect');
+  if (!centerSel || !whSel) return;
+  const allOptions = Array.from(whSel.querySelectorAll('option')).map(function(opt){
+    return { value: opt.value, centerId: String(opt.dataset.centerId || ''), text: opt.textContent, selected: opt.selected };
+  });
+  function syncWarehouses(){
+    const centerId = String(centerSel.value || '');
+    const current = String(whSel.value || '');
+    const rows = allOptions.filter(function(opt){ return opt.centerId === centerId; });
+    whSel.innerHTML = '';
+    rows.forEach(function(opt, idx){
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.text;
+      if (opt.value === current || (!current && idx === 0)) el.selected = true;
+      whSel.appendChild(el);
+    });
+    if (!whSel.value && whSel.options.length) whSel.selectedIndex = 0;
+  }
+  centerSel.addEventListener('change', syncWarehouses);
+  syncWarehouses();
+})();
+</script>

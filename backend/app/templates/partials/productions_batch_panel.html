@@ -1,0 +1,15 @@
+<div class="subpanel mt production-batch-panel">
+  <h4>Producción guiada por partidas</h4>
+  <div class="muted">Usa categorías principales (Fríos, Calientes, Postres) y subcategorías operativas (Salsas, Guarniciones, Bases...). Fríos muestra también salsas/guarniciones/bases frías.</div>
+  <form method="post" action="/productions/batch_new_form" class="mt" id="productionBatchForm">
+    <input type="hidden" name="center_id" value="{{production_detail.center_id}}">
+    <input type="hidden" name="warehouse_id" value="{{production_detail.warehouse_id}}">
+    <input type="hidden" name="batch_payload" value="" id="productionBatchPayload">
+<input type="hidden" name="append_production_id" value="{{ production_detail.id if production_detail and production_detail.status == "DRAFT" else 0 }}">
+    {% include "partials/productions_batch_tabs.html" %}
+    {% include "partials/productions_batch_groups.html" %}
+    <div class="production-batch-controls mt">
+      <div class="actions"><button type="submit" class="gold">Crear borradores seleccionados</button></div>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,26 @@
+{% set _scope_global = (recipe_detail.scope_global or (recipe_detail.scope_global is none)) %}
+{% set _scope_center_values = recipe_detail.scope_centers.split(',') if recipe_detail.scope_centers else [] %}
+<div class="row full"><label>Alcance</label>
+  <div class="scope-box">
+    <label class="checkline"><input type="checkbox" name="scope_global" value="1" {% if _scope_global %}checked{% endif %} data-scope-global="1"><span class="checkline-text">Global (todos los restaurantes)</span></label>
+    <div class="scope-centers" data-scope-centers="1">
+      {% for c in centers %}
+        <label class="checkline {% if _scope_global %}is-disabled{% endif %}"><input type="checkbox" name="scope_centers" value="{{c.id}}" {% if (not _scope_global) and (c.id|string) in _scope_center_values %}checked{% endif %} {% if _scope_global %}disabled{% endif %}><span class="checkline-text">{{c.name}}</span></label>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<div class="row full"><label>Alérgenos UE (14)</label>
+  <div class="allergen-grid">
+    {% set current = (recipe_detail.allergens or '') %}
+    {% for a in allergens_ue %}
+      <label class="allergen-pill">
+        <input type="checkbox" name="allergens_list" value="{{a.name}}" {% if a.name in current %}checked{% endif %}>
+        <span class="a-ico">{{a.icon}}</span><span class="a-name">{{a.name}}</span>
+      </label>
+    {% endfor %}
+  </div>
+</div>
+<div class="row full"><label>Elaboración paso a paso</label>
+  <textarea name="prep_steps" rows="6" id="recipe_steps">{{recipe_detail.prep_steps}}</textarea>
+</div>

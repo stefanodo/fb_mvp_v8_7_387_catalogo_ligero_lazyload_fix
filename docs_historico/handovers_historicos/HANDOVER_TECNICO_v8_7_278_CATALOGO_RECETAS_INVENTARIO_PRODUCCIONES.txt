@@ -1,0 +1,11 @@
+System MAC v8_7_278
+
+Cambios:
+1. Catálogo: columnas sin solape, artículo más ancho, unidad/precio/merma compactos.
+2. Alta de artículo: kg como unidad por defecto y €/kg como precio recomendado para alimentos y líquidos.
+3. Recetas: CSS de tabla de ingredientes reajustado para evitar solapes de cantidad/unidad/merma/guardar/quitar.
+4. Producciones: carga de receta con búsqueda tolerante vía /api/recipes/search.
+5. _resolve_recipe_id ahora tolera códigos, datalist, acentos y errores leves.
+6. Inventario/Producciones: índice de búsqueda transversal por familia y recetas producibles sin stock como líneas esperadas.
+
+No se han tocado confirmaciones de stock ni movimientos.

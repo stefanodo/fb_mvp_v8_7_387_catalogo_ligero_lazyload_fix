@@ -1,0 +1,36 @@
+PROMPTS / REGLAS OPERATIVAS OCR POR PROVEEDOR
+
+Nota: en este sistema no se está usando un prompt LLM por proveedor. Lo que existe ahora son reglas/plantillas internas de extracción por bloques y casillas. Este archivo las resume en formato de prompt operativo para revisión y ajuste.
+
+[DISTRIBUCIONES IZQUIERDO DE HOSTELERÍA, S.L.]
+Bloque A: proveedor, fecha documento, fecha entrega, nº documento. Bloque B casilla 3 = artículo. Bloque C casilla 4 = cantidad, 5 = precio unitario, 6 = total bruto. Bloque D casilla 7 = descuento, 8 = tipo imp., 9 = total línea. No aceptar códigos, R1/R2/R3, importes o textos fiscales como artículo. Priorizar reconstrucción de fila comercial completa antes de poblar UI.
+
+[ANTONIO DE MIGUEL S.A.U.]
+Bloque A: proveedor, fecha, albarán. Bloque B casilla 1 = código y casilla 2 = descripción comercial. Bloque C casilla 3 = su pedido auxiliar, 4 = cantidad principal, 5 = precio. Bloque D casilla 6 = importe y casilla 7 = IVA. Tratar lote y caducidad como metadatos, no como nombre. Si cantidad × precio no cuadra con importe, mandar a revisión.
+
+[TIERRA Y MAR]
+Bloque A: proveedor, fecha, nº albarán. Bloque B casilla 1 = cantidad en kg y casilla 2 = artículo limpio manteniendo calibre o tamaño. Bloque C casilla 3 = precio. Bloque D casilla 4 = importe neto. Forzar unidad kg cuando la línea venga en kg. No aceptar importes absurdos tipo 1000. Si falta precio o importe o no cuadra cantidad × precio, mandar a revisión.
+
+[LA HUERTA HERMANOS NIETO, S.L.]
+Bloque A: proveedor, fecha, nº albarán. Bloque B = descripción artículo. Bloque C = bultos, bruto, tara y cantidad comercial neta. Bloque D = precio e importe. Bloque E = IVA y totales. Para hierbas y aromáticas validadas, no forzar kilos si el formato comercial correcto es manojo o unidad. Excluir cliente, fiscalidad y textos logísticos como artículo.
+
+[NEGRINI S.L.]
+Bloque A: proveedor, fecha, nº albarán. Bloque B casilla 2 = descripción artículo. Bloque C casilla 4 = cantidad kg y casilla 9 = precio neto. Bloque D casilla 10 = importe y casilla 11 = IVA. Mantener formato comercial útil del artículo y validar IVA al 10% cuando corresponda.
+
+[POLLERÍAS HERRERO & Cª, S.L.]
+Bloque A: proveedor, fecha, nº albarán. Bloque B casilla 5 = artículo. Bloque C casilla 4 = cantidad. Bloque D casilla 6 = precio. Bloque E casilla 7 = IVA y casilla 8 = importe. No mezclar cabecera ni texto accesorio con nombre de producto.
+
+[CENTRAL DE CARNES MADRID NORTE, S.A.]
+Bloque A: proveedor, fecha, nº albarán. Bloque B = descripción artículo. Bloque C = cantidad en kg y precio. Bloque D = importe e IVA. Excluir “CAJA PLASTICO PLEGABLE” porque es contenedor retornable no cobrado. Reconstruir líneas por ventanas cercanas si OCR fragmenta columnas.
+
+[PESCADERÍA PALACIO, C.B.]
+Bloque A: proveedor, fecha, nº albarán. Bloque B casilla 2 = artículo completo. Bloque C casilla 3 = cajas auxiliares y casilla 4 = cantidad principal, casilla 5 = precio. Bloque D casilla 6 = importe. Mantener tamaños, calibres y formatos del pescado en el nombre comercial.
+
+[MAMMAFIORE MADRID, S.L.]
+Bloque A: proveedor, fecha, nº albarán. Bloque B = descripción artículo. Bloque C usar primero “Unidad” con “Precio venta” y “% Dto.”. Si no cuadra, revisar si la base correcta es Kg. Bloque D = importe e IVA. Priorizar cantidad comercial, precio, descuento e IVA para coste final.
+
+[BEEF ON FOOD]
+Bloque A: proveedor, fecha, nº albarán. Bloque B = descripción artículo. Bloque C = cantidad y precio. Bloque D = importe e IVA. Mantener nombre comercial íntegro con cortes, formatos o denominaciones cárnicas.
+
+[GARIMORI]
+Bloque A: proveedor, fecha, nº albarán. Bloque B = descripción artículo. Bloque C = cantidad y precio. Bloque D = importe e IVA. Aplicar criterio conservador: si no se puede cerrar la fila comercial completa, mandar a revisión.

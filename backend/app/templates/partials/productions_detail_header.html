@@ -1,0 +1,5 @@
+<div class="muted">Producción <b>#{{production_detail.id}}</b> · {{production_detail.center_name}} · {{production_detail.warehouse_name}} · <span class="badge">{{production_detail.production_group or 'Otros'}}</span></div>
+<div class="mt production-detail-head-row">
+  <div>Estado: {% if production_detail.status=='CONFIRMED' %}<span class="badge ok">CONFIRMADA</span>{% else %}<span class="badge warn">BORRADOR</span>{% endif %}</div>
+  {% include "partials/productions_detail_actions.html" %}
+</div>

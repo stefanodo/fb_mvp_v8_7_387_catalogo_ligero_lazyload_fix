@@ -1,0 +1,89 @@
+HANDOVER TÉCNICO v8_7_281 · RUNTIME / STOCK CERO / RECETAS MANO DE OBRA
+
+Fecha: 2026-05-18
+Base: v8_7_280 checkpoint operativo pre OCR/voz
+
+OBJETIVO
+- Corregir errores vistos en Mac: runtime activo confuso, IA/env no claramente visible, stock con datos antiguos, solapes visuales en Catálogo/Recetas y ausencia visible de mano de obra en Recetas.
+- Dejar pedidos, producciones y stock operativo a cero en la base incluida.
+- Incluir comando seguro para aplicar el mismo cero a la base real de Documents/F&B_MAC_RUNTIME/fb_mvp_v8.db.
+
+CAMBIOS APLICADOS
+1) Base incluida a cero operativo
+- Se limpiaron movements, orders, order_lines, productions, production_lines en:
+  backend/runtime/fb_mvp_v8.db
+  backend/runtime/fb_copy.db
+  app/backend/runtime/fb_mvp_v8.db
+  app/backend/runtime/fb_copy.db
+- Catálogo, recetas, proveedores, albaranes y mermas no se borran.
+
+2) Nuevo comando de mantenimiento
+- PONER_STOCK_PEDIDOS_PRODUCCIONES_A_CERO.command
+- Pide confirmación exacta: CERO.
+- Crea backup antes de tocar cada base.
+- Limpia base incluida y base real de Mac:
+  ~/Documents/F&B_MAC_RUNTIME/fb_mvp_v8.db
+- Verifica counts finales de movements/orders/productions.
+
+3) Arranque más transparente
+- INICIAR_F&B_MVP.command ahora muestra:
+  Base datos activa: ~/Documents/F&B_MAC_RUNTIME/fb_mvp_v8.db
+  movements/orders/productions actuales si existe la base
+  IA operativa y modelos cargados
+- app.main imprime SYSTEM_MAC_RUNTIME_DB y SYSTEM_MAC_UPLOADS_DIR al startup.
+
+4) Recetas: mano de obra activa y visible
+- Añadidos campos en recipes:
+  prep_time_min
+  cook_time_min
+  rest_time_min
+  labor_people
+  labor_hourly_cost
+- Añadida sección visual en ficha de receta:
+  Tiempo de producción y mano de obra
+- Fórmula activa:
+  coste_mano_obra = (prep + cocción + reposo) / 60 × personas × €/h
+- La mano de obra NO modifica food cost.
+- recipe_with_calc expone:
+  production_time_total_min
+  labor_cost_total
+  labor_cost_per_portion
+  operating_cost_total
+  operating_cost_per_portion
+- Impresión de receta con costes incluye bloque de tiempo/mano de obra y separa food cost de coste operativo.
+
+5) Catálogo: corrección visual de solapes
+- CSS de tabla de artículos ajustado con table-layout fijo.
+- Artículo más ancho; unidad, merma y acciones más controladas.
+- Precio y selector de unidad de precio en grid interno para evitar solapamiento.
+- Botones Guardar/Quitar con ancho mínimo.
+
+6) Líquidos por peso
+- Se elimina rama visual €/ml/€/l en catálogo.
+- Para unidad g/kg se muestra €/kg o €/g.
+- Directriz preservada: líquidos alimentarios se gestionan por kg/g.
+
+VALIDACIÓN HECHA
+- py_compile de core.py, main.py y routers/recetas.py: OK.
+- compileall backend/app y app/backend/app: OK.
+- FastAPI import: OK.
+- TestClient páginas:
+  /?page=recetas
+  /?page=admin
+  /?page=stock
+  respondieron 200.
+- Prueba temporal de crear receta con mano de obra:
+  prep 30 + cocción 20 + reposo 10; personas 2; 12 €/h → labor_cost_total 24.00 €.
+- Impresión de receta temporal con modo costs: OK, contiene bloque Mano de obra.
+
+NO TOCADO
+- OCR.
+- Voz.
+- Lógica documental avanzada de albaranes/pedidos definida conceptualmente, no implementada en este hotfix.
+- Integración IA de lectura de recetas pendiente para siguiente bloque.
+
+USO RECOMENDADO EN MAC
+1) Descomprimir ZIP.
+2) Ejecutar PONER_STOCK_PEDIDOS_PRODUCCIONES_A_CERO.command si se quiere limpiar también la base real ya existente del Mac.
+3) Ejecutar REINICIAR_LIMPIO.command o DESBLOQUEAR_y_INICIAR.command.
+4) Confirmar en Terminal que muestra la base activa y movements/orders/productions en 0.

@@ -1,0 +1,3 @@
+Si macOS bloquea un .command descargado, prueba primero DESBLOQUEAR_y_INICIAR.command.
+En este paquete los .command van con permiso de ejecución activado.
+Si aun así macOS lo bloquea por seguridad, abre con clic derecho > Abrir una sola vez.

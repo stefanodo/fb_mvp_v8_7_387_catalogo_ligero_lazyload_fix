@@ -1,0 +1,41 @@
+System MAC · v8_7_272_CONFIG_IA_OPENAI
+
+Objetivo:
+- Dejar la IA de Operativa rápida configurable sin tocar código.
+- Activar OpenAI como motor principal de interpretación y transcripción cuando el usuario añada su clave.
+- Mantener fallback local si no hay clave o falla la conexión.
+
+Cambios:
+1) Nuevo CONFIGURAR_IA_OPENAI.command
+- Pide OPENAI_API_KEY sin mostrarla en pantalla.
+- Crea .env en la carpeta raíz del sistema.
+- Copia .env también a backend/.env.
+- Activa:
+  OPERATIVA_AI_MODE=openai
+  OPERATIVA_STT_MODE=openai
+  OPERATIVA_AI_MODEL=gpt-4o-mini
+  OPERATIVA_STT_MODEL=gpt-4o-mini-transcribe
+
+2) Launcher actualizado
+- INICIAR_F&B_MVP.command y app/INICIAR_F&B_MVP.command cargan automáticamente .env.
+- Si detecta OPENAI_API_KEY, activa IA y STT OpenAI por defecto.
+- Si no hay clave, mantiene modo local sin romper la app.
+- Muestra estado de IA al arrancar.
+
+3) Servicio operativo blindado
+- operational_quick_service.py carga .env sin depender de python-dotenv.
+- Funciona aunque se lance el backend manualmente.
+
+4) Documentación
+- .env.example en raíz, backend, app y app/backend.
+- LEEME_CONFIGURAR_IA_OPENAI.txt.
+
+Validaciones:
+- bash -n launchers/config: OK.
+- compileall backend/app y app/backend/app: OK.
+- import FastAPI: OK.
+- interpretación local sin clave: OK.
+
+Limitación real:
+- No se incluye una clave API real en el ZIP. El usuario debe pegar su propia OPENAI_API_KEY.
+- La IA crea propuestas pendientes; no cierra pedidos, no confirma producciones ni descuenta stock automáticamente.

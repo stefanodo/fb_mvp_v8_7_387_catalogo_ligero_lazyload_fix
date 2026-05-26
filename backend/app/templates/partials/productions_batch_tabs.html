@@ -1,0 +1,5 @@
+<div class="production-cat-tabs" data-production-tabs="1">
+  {% for grp in production_groups %}
+    <button type="button" class="prod-cat-btn {% if loop.first %}active{% endif %}" data-prod-target="prodgrp_{{ loop.index0 }}">{{ grp }}</button>
+  {% endfor %}
+</div>

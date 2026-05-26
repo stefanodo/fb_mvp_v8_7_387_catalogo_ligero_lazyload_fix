@@ -1,0 +1,221 @@
+{% if order_detail and order_detail.status=='DRAFT' and order_detail.responsible_user_id %}
+<div class="order-workbench" id="orderWorkbench">
+  <div class="order-workbench-head">
+    <div>
+      <h4 id="orderAutoTools">Pedido rápido</h4>
+      <div class="muted">Elige proveedor si quieres ver solo sus artículos. Si queda sin asignar, se muestra por bloque.</div>
+    </div>
+    <div class="order-mode-badge" id="orderModeBadge">Modo por bloque</div>
+  </div>
+
+  <div class="order-supplier-filter-row">
+    <label for="orderSupplierMode">Proveedor objetivo</label>
+    <select id="orderSupplierMode" name="supplier_id" form="orderManualForm">
+      <option value="">(Sin asignar / todos por bloque)</option>
+      {% for s in suppliers %}{% if s.name != "Proveedor pendiente OCR" %}<option value="{{s.id}}">{{s.name}}</option>{% endif %}{% endfor %}
+    </select>
+  </div>
+
+  <div class="order-auto-mini-row" style="margin-top:8px">
+    <form method="post" action="/order/{{order_detail.id}}/add_suggestions_form" class="preserve-flow order-auto-form" data-flow-target="orderWorkbench" style="display:inline">
+      <input type="hidden" name="supplier_id" value="">
+      <button type="submit" class="gold order-mini-btn" title="Sugerencias stock">Sug. stk</button>
+    </form>
+    <form method="post" action="/order/{{order_detail.id}}/add_production_needs_form" class="preserve-flow order-auto-form" data-flow-target="orderWorkbench" style="display:inline">
+      <input type="hidden" name="supplier_id" value="">
+      <button type="submit" class="btn order-mini-btn" title="Faltantes producciones">Prod.</button>
+    </form>
+    <form method="post" action="/order/{{order_detail.id}}/add_block_to_max_form" class="preserve-flow order-auto-form" data-flow-target="orderWorkbench" style="display:inline">
+      <input type="hidden" name="supplier_id" value=""><input type="hidden" name="block_key" value="fresh">
+      <button type="submit" class="btn order-mini-btn" title="Máximo Frescos">Max F</button>
+    </form>
+    <form method="post" action="/order/{{order_detail.id}}/add_block_to_max_form" class="preserve-flow order-auto-form" data-flow-target="orderWorkbench" style="display:inline">
+      <input type="hidden" name="supplier_id" value=""><input type="hidden" name="block_key" value="frozen">
+      <button type="submit" class="btn order-mini-btn" title="Máximo Congelados">Max C</button>
+    </form>
+    <form method="post" action="/order/{{order_detail.id}}/add_block_to_max_form" class="preserve-flow order-auto-form" data-flow-target="orderWorkbench" style="display:inline">
+      <input type="hidden" name="supplier_id" value=""><input type="hidden" name="block_key" value="dry">
+      <button type="submit" class="btn order-mini-btn" title="Máximo Secos">Max S</button>
+    </form>
+    <form method="post" action="/order/{{order_detail.id}}/add_block_to_max_form" class="preserve-flow order-auto-form" data-flow-target="orderWorkbench" style="display:inline">
+      <input type="hidden" name="supplier_id" value=""><input type="hidden" name="block_key" value="clean">
+      <button type="submit" class="btn order-mini-btn" title="Máximo Limpieza">Max L</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<h4 class="mt" id="orderAddLine">Lista manual</h4>
+{% if order_detail and order_detail.status=='DRAFT' and order_detail.responsible_user_id %}
+<form id="orderManualForm" method="post" action="/order/{{order_detail.id}}/add_block_lines_form" class="preserve-flow order-mobile-light order-manual-form" data-flow-target="orderAddLine">
+  <div class="order-manual-summary">
+    <div><b id="orderVisibleCount">0</b><span>visibles</span></div>
+    <div><b id="orderProviderLabel">Todos</b><span>proveedor</span></div>
+    <div><b id="orderBlockLabel">Frescos</b><span>bloque</span></div>
+  </div>
+  <div class="row"><label>Bloque</label>
+    <div class="order-block-picker" data-order-manual-list-picker="1">
+      <label class="order-block-chip"><input type="radio" name="block_key" value="fresh" checked><span>Frescos</span></label>
+      <label class="order-block-chip"><input type="radio" name="block_key" value="frozen"><span>Congelados</span></label>
+      <label class="order-block-chip"><input type="radio" name="block_key" value="dry"><span>Secos</span></label>
+      <label class="order-block-chip"><input type="radio" name="block_key" value="clean"><span>Limpieza</span></label>
+      <label class="order-block-chip"><input type="radio" name="block_key" value="free"><span>Libres</span></label>
+      <label class="order-block-chip"><input type="radio" name="block_key" value="prod"><span>Producciones</span></label>
+    </div>
+  </div>
+  <div class="muted" id="orderSupplierHelp">Con proveedor seleccionado verás sus insumos vinculados. Si todavía no tiene artículos vinculados, se muestra el bloque para poder asignarlos a ese proveedor.</div>
+  <div class="notice warn order-provider-fallback-note" id="orderProviderFallbackNote" style="display:none"><span class="notice-icon">!</span><span class="notice-text">Este proveedor no tiene artículos vinculados en este filtro. Se muestran artículos del bloque para asignarlos al proveedor objetivo al añadir cantidades.</span></div>
+
+  <div class="order-manual-block-list" data-order-block-list="fresh">
+    <div class="order-block-picker" data-order-fresh-category-picker="1" style="margin-top:10px">
+      <label class="order-block-chip"><input type="radio" name="fresh_group_filter" value="all" checked><span>Todos</span></label>
+      <label class="order-block-chip"><input type="radio" name="fresh_group_filter" value="verduras"><span>Verduras</span></label>
+      <label class="order-block-chip"><input type="radio" name="fresh_group_filter" value="pescados"><span>Pescados</span></label>
+      <label class="order-block-chip"><input type="radio" name="fresh_group_filter" value="carnes"><span>Carnes</span></label>
+      <label class="order-block-chip"><input type="radio" name="fresh_group_filter" value="huevos"><span>Huevos</span></label>
+      <label class="order-block-chip"><input type="radio" name="fresh_group_filter" value="lacteos"><span>Lácteos</span></label>
+    </div>
+    {% set rows = order_detail.manual_block_items['fresh'] if order_detail.manual_block_items and order_detail.manual_block_items['fresh'] is defined else [] %}
+    <div class="order-card-list" style="margin-top:10px;">
+      {% if rows and rows|length > 0 %}
+        {% for it in rows %}
+        <div class="order-manual-card" data-fresh-category-row="{{ it.category or 'verduras' }}" data-pref-supplier="{{ it.preferred_supplier_id or '' }}">
+          <div class="order-card-main"><span class="order-card-cat">{{ {'verduras':'Verd.', 'pescados':'Pesc.', 'carnes':'Carn.', 'huevos':'Huev.', 'lacteos':'Láct.'}.get(it.category or '', 'Fres.') }}</span><b>{{it.name}}</b></div>
+          <div class="order-card-supplier">{{ it.preferred_supplier_name or 'Sin proveedor' }}</div>
+          <div class="order-card-inputs"><input type="number" step="0.001" name="qty_{{it.id}}" placeholder="0"><select name="unit_{{it.id}}">{% for u in it.unit_choices %}<option value="{{u}}" {% if u == it.default_input_unit %}selected{% endif %}>{{u}}</option>{% endfor %}</select></div>
+        </div>
+        {% endfor %}
+      {% else %}<div class="muted">No hay artículos visibles en este bloque.</div>{% endif %}
+    </div>
+  </div>
+
+  {% for block_key, block_title in [('frozen','Congelados'),('dry','Secos'),('clean','Limpieza'),('free','Libres')] %}
+  {% set rows = order_detail.manual_block_items[block_key] if order_detail.manual_block_items and order_detail.manual_block_items[block_key] is defined else [] %}
+  <div class="order-manual-block-list" data-order-block-list="{{block_key}}" style="display:none">
+    <div class="order-card-list" style="margin-top:10px;">
+      {% if rows and rows|length > 0 %}
+        {% for it in rows %}
+        <div class="order-manual-card" data-pref-supplier="{{ it.preferred_supplier_id or '' }}">
+          <div class="order-card-main"><b>{{it.name}}</b></div>
+          <div class="order-card-supplier">{{ it.preferred_supplier_name or 'Sin proveedor' }}</div>
+          <div class="order-card-inputs"><input type="number" step="0.001" name="qty_{{it.id}}" placeholder="0"><select name="unit_{{it.id}}">{% for u in it.unit_choices %}<option value="{{u}}" {% if u == it.default_input_unit %}selected{% endif %}>{{u}}</option>{% endfor %}</select></div>
+        </div>
+        {% endfor %}
+      {% else %}<div class="muted">No hay artículos visibles en este bloque.</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+
+  <div class="order-free-idea-panel" data-order-free-note-panel="1" style="display:none">
+    <h4>Ideas / pedido libre en revisión</h4>
+    <div class="muted">Escribe una idea creativa o necesidad excepcional. No afecta stock, pedidos reales ni producciones hasta revisarla.</div>
+    <form method="post" action="/order/{{order_detail.id}}/free_note_form" class="preserve-flow" data-flow-target="orderAddLine">
+      <textarea name="text" rows="3" placeholder="Ej.: Mañana quiero hacer una lubina con aceitunas, patatas y salsa verde"></textarea>
+      <div class="order-card-inputs" style="margin-top:8px;grid-template-columns:1fr 180px">
+        <input name="target_date" placeholder="Fecha objetivo opcional">
+        <button type="submit" class="btn">Guardar idea</button>
+      </div>
+    </form>
+  </div>
+  {% set prod_rows = order_detail.manual_prod_rows if order_detail.manual_prod_rows is defined else [] %}
+  <div class="order-manual-block-list" data-order-block-list="prod" style="display:none">
+    <div class="order-prod-filter order-block-picker" style="margin-top:10px">
+      {% for key,label in [('all','Todas'),('caliente','Calientes'),('frio','Fríos'),('postres','Postres'),('salsas','Salsas'),('guarniciones','Guarniciones'),('bases','Bases'),('masas','Masas'),('pasteleria','Pastelería'),('porcionados','Porcionados'),('otros','Otros')] %}
+        <label class="order-block-chip"><input type="radio" name="prod_group_filter" value="{{key}}" {% if key=='all' %}checked{% endif %}><span>{{label}}</span></label>
+      {% endfor %}
+    </div>
+    <div class="muted" style="margin-top:8px">Producciones reales por rubro. No se muestran platos finales, fotos importadas ni ingredientes sueltos.</div>
+    <div class="order-card-list" style="margin-top:10px;">
+      {% if prod_rows and prod_rows|length > 0 %}
+        {% for it in prod_rows %}
+        {% set row_key = it.item_id ~ '__' ~ it.warehouse_id %}
+        {% set fams = it.prod_families if it.prod_families is defined else [it.category or 'otros'] %}
+        <div class="order-manual-card" data-prod-group-row="{{ fams|join(' ') }}" data-pref-supplier="{{ it.preferred_supplier_id or '' }}">
+          <div class="order-card-main"><span class="order-card-cat">{{ (fams[0] if fams else 'otros')|replace('_',' ')|title }}</span><b>{{ it.name }}</b></div>
+          <div class="order-card-supplier">{{ it.preferred_supplier_name or 'Sin proveedor' }}</div>
+          <div class="order-prod-meta">{% if it.required_qty and it.required_qty > 0 %}Necesita {{ human_qty(it.required_qty, it.unit) }} · Stock {{ human_qty(it.stock_qty, it.unit) }} · Falta {% if (it.shortage_qty or 0) > 0 %}<b>{{ human_qty(it.shortage_qty, it.unit) }}</b>{% else %}OK{% endif %}{% else %}Producción disponible para pedir/preparar manualmente{% endif %}</div>
+          <div class="order-card-inputs"><input type="hidden" name="wh_{{ row_key }}" value="{{ it.warehouse_id }}"><input type="number" step="0.001" name="qty_{{ row_key }}" placeholder="0"><select name="unit_{{ row_key }}"><option value="{{ it.unit }}">{{ it.unit }}</option><option value="lotes">lotes</option><option value="raciones">raciones</option></select></div>
+        </div>
+        {% endfor %}
+      {% else %}<div class="muted">No hay producciones reales disponibles. Marca recetas/subrecetas como producibles o vincula produced_item_id.</div>{% endif %}
+    </div>
+  </div>
+  <div class="actions order-sticky-actions"><button type="submit" class="gold">✅ Añadir cantidades escritas</button></div>
+</form>
+<script>
+(function(){
+  const form = document.getElementById('orderManualForm');
+  const supplierSelect = document.getElementById('orderSupplierMode');
+  const modeBadge = document.getElementById('orderModeBadge');
+  if(!form) return;
+  const picker = form.querySelector('[data-order-manual-list-picker="1"]');
+  const sections = Array.from(form.querySelectorAll('[data-order-block-list]'));
+  const freshPicker = form.querySelector('[data-order-fresh-category-picker="1"]');
+  const visibleCount = document.getElementById('orderVisibleCount');
+  const providerLabel = document.getElementById('orderProviderLabel');
+  const blockLabel = document.getElementById('orderBlockLabel');
+  const blockNames = {fresh:'Frescos', frozen:'Congelados', dry:'Secos', clean:'Limpieza', free:'Libres', prod:'Producciones'};
+  const freeIdeaPanel = form.querySelector('[data-order-free-note-panel="1"]');
+  const prodPicker = form.querySelector('.order-prod-filter');
+  function selectedBlock(){ const c = picker ? picker.querySelector('input[name="block_key"]:checked') : null; return c ? c.value : 'fresh'; }
+  function selectedFresh(){ const c = freshPicker ? freshPicker.querySelector('input[name="fresh_group_filter"]:checked') : null; return c ? c.value : 'all'; }
+  function selectedSupplier(){ return supplierSelect ? String(supplierSelect.value || '') : ''; }
+  function syncHiddenSupplier(){ document.querySelectorAll('.order-auto-form input[name="supplier_id"]').forEach(i => { i.value = selectedSupplier(); }); }
+  function baseVisible(card, block){
+    if(block === 'fresh'){
+      const group = selectedFresh();
+      const rowCat = card.getAttribute('data-fresh-category-row') || 'verduras';
+      if(group !== 'all' && group !== rowCat) return false;
+    }
+    return true;
+  }
+  function supplierMatches(card){
+    const sid = selectedSupplier();
+    if(!sid) return true;
+    return String(card.getAttribute('data-pref-supplier') || '') === sid;
+  }
+  function sync(){
+    const block = selectedBlock();
+    const sid = selectedSupplier();
+    const prodGroup = prodPicker ? (prodPicker.querySelector('input[name="prod_group_filter"]:checked')||{}).value || 'all' : 'all';
+    let count = 0;
+    let fallbackMode = false;
+    const selectedText = supplierSelect && supplierSelect.selectedOptions[0] ? supplierSelect.selectedOptions[0].textContent.trim() : 'Todos';
+    sections.forEach(sec => {
+      const active = sec.getAttribute('data-order-block-list') === block;
+      sec.style.display = active ? '' : 'none';
+      if(!active) return;
+      const cards = Array.from(sec.querySelectorAll('.order-manual-card'));
+      const baseCards = cards.filter(card => baseVisible(card, block));
+      const exactCards = sid ? baseCards.filter(card => supplierMatches(card)) : baseCards;
+      fallbackMode = !!sid && exactCards.length === 0 && baseCards.length > 0;
+      cards.forEach(card => {
+        let prodOk = true;
+        if(block === 'prod' && prodGroup !== 'all'){
+          const vals = String(card.getAttribute('data-prod-group-row') || '');
+          prodOk = vals.indexOf(prodGroup) >= 0;
+        }
+        const show = prodOk && (fallbackMode ? baseVisible(card, block) : (baseVisible(card, block) && (!sid || supplierMatches(card))));
+        card.style.display = show ? '' : 'none';
+        card.classList.toggle('order-supplier-fallback-card', !!(show && fallbackMode));
+        if(show) count++;
+      });
+    });
+    const fallbackNote = document.getElementById('orderProviderFallbackNote');
+    if(fallbackNote) fallbackNote.style.display = fallbackMode ? '' : 'none';
+    if(freeIdeaPanel) freeIdeaPanel.style.display = block === 'free' ? '' : 'none';
+    if(providerLabel) providerLabel.textContent = sid ? selectedText : 'Todos';
+    if(blockLabel) blockLabel.textContent = blockNames[block] || block;
+    if(visibleCount) visibleCount.textContent = String(count);
+    if(modeBadge) modeBadge.textContent = sid ? (fallbackMode ? 'Proveedor objetivo · asignación' : 'Modo proveedor') : 'Modo por bloque';
+    syncHiddenSupplier();
+  }
+  if(picker) picker.addEventListener('change', sync);
+  if(freshPicker) freshPicker.addEventListener('change', sync);
+  if(supplierSelect) supplierSelect.addEventListener('change', sync);
+  if(prodPicker) prodPicker.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% elif order_detail and order_detail.status=='DRAFT' %}<div class="notice warn mt"><span class="notice-icon">!</span><span class="notice-text">Selecciona responsable arriba antes de añadir líneas.</span></div>{% elif order_detail %}<div class="muted">El pedido está confirmado. Si necesitas cambiarlo, pulsa <b>Reabrir para editar</b>.</div>{% endif %}

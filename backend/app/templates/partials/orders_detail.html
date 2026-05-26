@@ -1,0 +1,18 @@
+<div class="panel orders-v361-detail" id="orderDetailPanel">
+  <h3>📄 Detalle</h3>
+  {% if order_detail %}
+    {% include "partials/orders_detail_header.html" %}
+    {% include "partials/orders_detail_add_forms.html" %}
+    {% include "partials/orders_detail_lines.html" %}
+    {% include "partials/orders_detail_preconfirm.html" %}
+    {% if request.query_params.get('ok') %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Guardado.</span></div>{% endif %}
+    {% if request.query_params.get('ord_msg') == 'responsible_required' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">Selecciona responsable antes de editar este borrador.</span></div>{% endif %}
+    {% if request.query_params.get('err') %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">Acción no válida. Revisa estado/campos.</span></div>{% endif %}
+  {% else %}
+    <div class="orders-v361-detail-empty">
+      <div class="orders-v361-empty-icon">📋</div>
+      <b>Selecciona un pedido para ver su detalle</b>
+      <span>o crea un nuevo pedido para comenzar.</span>
+    </div>
+  {% endif %}
+</div>

@@ -1,0 +1,23 @@
+LIMPIEZA APLICADA — borradores de producción y pedidos
+
+Base usada: fb_mvp_v8_7_205_inventario_almacen_chips.zip
+
+Cambios aplicados en backend/runtime/fb_mvp_v8.db:
+- pedidos DRAFT eliminados: 2
+- líneas de pedidos DRAFT eliminadas: 1
+- producciones DRAFT eliminadas: 0
+- líneas de producciones DRAFT eliminadas: 0
+
+Verificación de enlace catálogo/stock:
+- items totales: 176
+- movimientos totales: 2
+- order_lines sin order: 0
+- order_lines sin item: 0
+- production_lines sin production: 0
+- production_lines sin item: 0
+- movements sin item: 0
+
+Resultado:
+- borradores de pedidos y producciones limpiados para arrancar casi de cero
+- catálogo y stock verificados a nivel de integridad referencial básica
+- no se han borrado artículos del catálogo ni movimientos reales de stock

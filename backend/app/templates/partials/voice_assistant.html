@@ -1,0 +1,109 @@
+<!-- OÍDO ALFI · asistente operativo movible · audio OpenAI / dictado teclado / acciones seguras -->
+<div id="macVoiceAssistant" class="mac-voice-assistant" data-center-id="{{selected_center_id}}" aria-live="polite">
+  <button id="macVoiceFab" class="mac-voice-fab" type="button" aria-expanded="false" aria-controls="macVoicePanel" title="OÍDO ALFI · mover arrastrando">
+    <span class="mac-voice-drag-handle" aria-hidden="true">⋮⋮</span>
+    🎧<span>OÍDO ALFI</span>
+  </button>
+  <div id="macVoicePanel" class="mac-voice-panel" hidden>
+    <div class="mac-voice-head">
+      <div>
+        <b>OÍDO ALFI</b>
+        <div class="mac-voice-sub">IA central: voz, lectura documental, consultas y propuestas seguras.</div>
+      </div>
+      <button id="macVoiceClose" class="mac-voice-close" type="button" aria-label="Cerrar OÍDO ALFI">×</button>
+    </div>
+
+    <div id="macVoiceStatus" class="mac-voice-status">Graba o escribe: “leer albarán”, “apunta merma”, “crear pedido”, “receta por foto”, “¿hay salmón en stock?”.</div>
+
+    <div class="mac-voice-mode-tabs" role="tablist" aria-label="Áreas de OÍDO ALFI">
+      <button type="button" class="is-active" data-alfi-tab="operar">Operar</button>
+      <button type="button" data-alfi-tab="consultar">Consultar</button>
+      <button type="button" data-alfi-tab="proveedores">Proveedores</button>
+      <button type="button" data-alfi-tab="ia">IA / Docs</button>
+      <button type="button" data-alfi-tab="ideas">Ideas</button>
+    </div>
+
+    <div class="mac-voice-controls">
+      <button id="macVoiceListen" class="gold" type="button">🎙️ Grabar voz</button>
+      <button id="macVoiceStop" type="button" hidden>Parar y enviar</button>
+      <label class="mac-voice-speak-toggle"><input id="macVoiceSpeak" type="checkbox" checked> responder por voz</label>
+    </div>
+
+    <form id="macVoiceCommandForm" class="mac-voice-form">
+      <textarea id="macVoiceCommand" rows="2" autocomplete="off" placeholder="Escribe o dicta aquí: producción de pico de gallo / merma de tomate 4 kg / faltan puerros / ¿de qué proveedor es bacalao?"></textarea>
+      <button type="submit">Ejecutar</button>
+    </form>
+
+    <div class="mac-voice-tab is-active" data-alfi-panel="operar">
+      <div class="mac-voice-quick">
+        <button type="button" data-voice-command="crear pedido">Nuevo pedido</button>
+        <button type="button" data-voice-command="abrir pedidos">Pedidos</button>
+        <button type="button" data-voice-command="registrar merma por voz">Merma voz</button>
+        <button type="button" data-voice-command="registrar merma por foto">Merma foto</button>
+        <a class="mac-voice-link" href="/?page=operativa&center_id={{selected_center_id}}">Pantalla OÍDO ALFI</a>
+        <button type="button" data-voice-command="crear producción">Nueva producción</button>
+        <button type="button" data-voice-command="abrir producciones">Producciones</button>
+        <button type="button" data-voice-command="abrir stock">Stock</button>
+        <button type="button" data-voice-command="abrir inventario">Inventario</button>
+      </div>
+    </div>
+
+    <div class="mac-voice-tab" data-alfi-panel="consultar" hidden>
+      <div class="mac-voice-quick">
+        <button type="button" data-voice-command="hay stock">Consultar stock</button>
+        <button type="button" data-voice-command="qué hay que pedir">Qué pedir</button>
+        <button type="button" data-voice-command="margen recetas">Margen recetas</button>
+        <button type="button" data-voice-command="ventas platos">Ventas platos</button>
+        <button type="button" data-voice-command="control de mermas">Control mermas</button>
+        <button type="button" data-voice-command="dashboard dirección">Dashboard</button>
+      </div>
+      <p class="mac-voice-note">Las consultas avanzadas se abrirán en la pantalla correcta; la respuesta exacta dependerá de los datos cargados.</p>
+    </div>
+
+
+    <div id="macVoiceAnswer" class="mac-voice-answer" hidden></div>
+
+    <div class="mac-voice-tab" data-alfi-panel="proveedores" hidden>
+      <div class="mac-voice-quick">
+        <button type="button" data-voice-command="teléfono de proveedor">Teléfono proveedor</button>
+        <button type="button" data-voice-command="email de proveedor">Email proveedor</button>
+        <button type="button" data-voice-command="días de reparto de proveedor">Días reparto</button>
+        <button type="button" data-voice-command="mínimo de proveedor">Mínimo pedido</button>
+        <button type="button" data-voice-command="de qué proveedor es insumo">Proveedor de insumo</button>
+        <button type="button" data-voice-command="proveedor alternativo más barato">Proveedor alternativo</button>
+      </div>
+      <p class="mac-voice-note">Ejemplos: “teléfono de Negrini”, “mínimo de La Huerta”, “¿de qué proveedor es salmón?”, “¿quién vende aguacate?”. Lee datos cargados en Catálogo/Precios; no cambia proveedor automáticamente.</p>
+    </div>
+
+    <div class="mac-voice-tab" data-alfi-panel="ia" hidden>
+      <div class="mac-voice-quick">
+        <a class="mac-voice-link" href="/ai-system/ui">Centro IA</a>
+        <a class="mac-voice-link" href="/recipe-ai/ui">IA Recetas</a>
+        <a class="mac-voice-link" href="/recipe-ai/ui/import-text">Receta por texto</a>
+        <a class="mac-voice-link" href="/recipe-ai/ui/import-image">Receta por foto</a>
+        <a class="mac-voice-link" href="/recipe-ai/ui/import-voice">Receta por voz</a>
+        <a class="mac-voice-link" href="/recipe-ai/ui/drafts">Borradores IA</a>
+        <a class="mac-voice-link" href="/?page=albaranes&center_id={{selected_center_id}}">Leer albarán/factura</a>
+      </div>
+      <p class="mac-voice-note">La IA crea lecturas y borradores revisables. Voz: en ordenador graba y transcribe con OpenAI; en iPhone/Safari usa este botón si el navegador permite micrófono o dicta con el micrófono del teclado en el campo. No valida stock, facturas, albaranes ni recetas maestras sin humano.</p>
+    </div>
+
+    <div class="mac-voice-tab" data-alfi-panel="ideas" hidden>
+      <ul class="mac-voice-ideas">
+        <li>“OÍDO ALFI, añade 4 kg de cebolla al pedido de mañana”.</li>
+        <li>“Registra merma: 2 kg salsa tomate, mal estado, responsable Juan”.</li>
+        <li>“Crea producción de pico de gallo para 20 raciones”.</li>
+        <li>“Importa una receta nueva por foto”.</li>
+        <li>“¿Hay salmón en cámara?” / “¿Qué tengo bajo mínimo?”.</li>
+        <li>“¿De qué proveedor es salmón?” / “Teléfono de Negrini” / “Mínimo de La Huerta”.</li>
+        <li>“¿Qué proveedor subió más este mes?” / “¿Qué plato perdió margen?”.</li>
+      </ul>
+    </div>
+
+    <details class="mac-voice-help">
+      <summary>Alcance y seguridad</summary>
+      <div>OÍDO ALFI puede consultar datos reales, abrir pantallas, leer documentos y crear propuestas pendientes. No confirma stock, pedidos, producciones, albaranes, facturas ni recetas maestras sin revisión humana.</div>
+      <div>Cuando no pueda confirmar un dato, abre la pantalla adecuada y deja el aviso. La voz directa usa grabación de audio y transcripción OpenAI si hay clave activa; si Safari/iPhone bloquea el micrófono, usa el micrófono del teclado en el campo de texto.</div>
+    </details>
+  </div>
+</div>

@@ -1,0 +1,43 @@
+      <div class="panel">
+        <h3>🧾 Albaranes</h3>
+        <div class="actions wrap" style="margin:8px 0 12px; gap:8px; align-items:center;">
+          <form method="post" action="/receipts/cleanup_photos_form" style="margin:0;display:inline-block;">
+            <input type="hidden" name="center_id" value="{{selected_center_id}}">
+            <button type="submit" class="mini">Limpiar fotos antiguas</button>
+          </form>
+          <form method="post" action="/receipts/clear_pending_form" style="margin:0;display:inline-block;" onsubmit="return confirm('Borrar todos los pendientes de prueba de este centro?');">
+            <input type="hidden" name="center_id" value="{{selected_center_id}}">
+            <button type="submit" class="mini">Borrar pendientes</button>
+          </form>
+          <span class="muted" style="margin-left:8px">(retención fotos: fin de mes + 2 meses)</span>
+        </div>
+        {% if request.query_params.get('cleared_pending') %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Pendientes borrados: {{ request.query_params.get('cleared_pending') }}</span></div>{% endif %}
+        <div class="actions wrap mt">
+          {% if show_archived_receipts %}
+            <a class="btn" href="/?page=albaranes&center_id={{selected_center_id}}">Ver activos</a>
+          {% else %}
+            <a class="btn" href="/?page=albaranes&center_id={{selected_center_id}}&show_archived_receipts=1">Ver archivados</a>
+          {% endif %}
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Estado</th><th>Local</th><th>Almacén</th><th>Proveedor</th><th>Fecha</th><th>Nº</th><th></th></tr></thead>
+            <tbody>
+            {% for r in receipts %}
+              <tr>
+                <td>#{{r.id}}</td>
+                <td>
+                  {% if r.status=='PENDING' %}<span class="badge warn">Pendiente</span>
+                  {% elif r.status=='CONFIRMED' %}<span class="badge ok">Confirmado</span>
+                  {% elif r.status=='ARCHIVED' %}<span class="badge">Archivado</span>
+                  {% else %}<span class="badge">{{r.status}}</span>{% endif %}
+                </td>
+                <td>{{r.center_name}}</td><td>{{r.warehouse_name}}</td><td>{{r.supplier_name}}</td>
+                <td>{{r.doc_date or ''}}</td><td>{{r.doc_number or ''}}</td>
+                <td><a class="mini" href="/?page=albaranes&center_id={{selected_center_id}}&aid={{r.id}}">Abrir</a></td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>

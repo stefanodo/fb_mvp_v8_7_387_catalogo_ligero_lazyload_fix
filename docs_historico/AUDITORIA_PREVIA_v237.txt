@@ -1,0 +1,15 @@
+AUDITORIA PREVIA v237
+
+Base usada: v236 desempaquetada y revisada en árbol vivo.
+
+Cambios verificados en esta actualización:
+- Stock: anchors robustos por sección real en movimiento/carga inicial.
+- Inventario: validación local/almacén en crear sesión, actualizar sesión y línea libre.
+- Producciones: helper único de redirect de detalle; validación local/almacén en creación normal y batch.
+
+Comprobaciones previas hechas:
+- revisión de routers de Stock, Inventario y Producciones en backend/app y app/backend/app
+- compilación Python de los archivos tocados
+- no se tocó Albaranes
+
+Riesgo asumido: bajo. Son cambios de integridad y redirección, no de cálculo contable.

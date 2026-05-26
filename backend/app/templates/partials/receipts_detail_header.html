@@ -1,0 +1,5 @@
+<h3>Albarán #{{receipt_detail.id}} · {{ status_label(receipt_detail.status) }}</h3>
+<div class="muted">{{receipt_detail.center_name}} · {{receipt_detail.warehouse_name}} · <b>{{receipt_detail.supplier_name}}</b>{% if receipt_detail.supplier_name=="Proveedor pendiente OCR" %} <span class="badge warn">pendiente</span>{% endif %}</div>
+<div class="muted">Nº: {{ receipt_detail.doc_number or (receipt_detail.ocr.doc_number_raw if receipt_detail.ocr else '-') or '-' }} · Fecha: {{ fmt_dt(receipt_detail.doc_date or (receipt_detail.ocr.doc_date_raw if receipt_detail.ocr else None)) or '-' }}</div>
+{% if request.query_params.get('reset_ok') == '1' %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Albarán reiniciado y movimientos asociados borrados.</span></div>{% endif %}
+{% if request.query_params.get('validated_ok') == '1' %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Albarán validado e impactado en stock.</span></div>{% endif %}

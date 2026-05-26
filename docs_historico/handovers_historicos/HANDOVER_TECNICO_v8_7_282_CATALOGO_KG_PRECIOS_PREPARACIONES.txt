@@ -1,0 +1,68 @@
+System MAC · Handover técnico v8_7_282
+Catálogo kg / precios estimados / preparaciones
+
+Motivo:
+- En Catálogo seguían apareciendo artículos alimentarios en g cuando la operativa definida usa kg como unidad principal.
+- Persistían precios 0,00 en artículos.
+- Algunas preparaciones/subrecetas debían separarse de insumos, incluyendo casos tipo AGUACHILES cuando existan en la base real del usuario.
+- Había solapes visuales en Catálogo al mostrar precio, merma y botones.
+
+Cambios aplicados:
+1) Base incluida normalizada:
+   - 176 artículos revisados.
+   - 0 artículos con precio <= 0.
+   - 166 artículos en kg.
+   - 10 artículos en ud.
+   - Preparaciones reales separadas: FONDO OSCURO, FONDO BLANCO, DEMI-GLACE, CALDO/STOCK LÍQUIDO, SALSA BASE COCINA CENTRAL.
+   - Condimentos comprados tipo SALSA SOJA, SALSA INGLESA, KETCHUP, MAYONESA, ALIOLI, SALSA CHIPOTLE quedan como INSUMO salvo que el usuario los convierta manualmente a PREPARACION.
+
+2) Nuevo comando:
+   NORMALIZAR_CATALOGO_UNIDADES_PRECIOS_PREPARACIONES.command
+
+   Actúa sobre:
+   - backend/runtime/fb_mvp_v8.db
+   - backend/runtime/fb_copy.db
+   - ~/Documents/F&B_MAC_RUNTIME/fb_mvp_v8.db si existe
+
+   Pide confirmación escrita NORMALIZAR y crea backup antes.
+
+3) Script técnico:
+   tools/normalizar_catalogo_unidades_precios_preparaciones.py
+
+4) Nuevos campos en items:
+   - item_type
+   - price_status
+   - price_source
+   - price_confidence
+   - price_reference_year
+   - price_operational_unit
+   - price_operational_value
+   - price_notes
+
+5) Admin / Catálogo:
+   - Añadida columna Tipo: INSUMO / PREPARACION.
+   - Añadida columna Estado de precio.
+   - Unidad por defecto al crear artículo: kg.
+   - CSS ajustado para evitar solapes con más columnas.
+
+6) Reglas de precio:
+   - Los precios se marcan como PRECIO_ESTIMADO salvo que se validen por albarán/proveedor/manual confirmado en fases posteriores.
+   - No queda 0,00 silencioso en artículos.
+
+7) Reglas de unidad:
+   - Alimentos y líquidos: kg.
+   - Recetas pueden usar g y el sistema convierte contra kg.
+   - ud se conserva para huevos, cajas, papel, guantes, pan unitario y consumibles similares.
+
+Validación interna:
+- compileall backend/app: OK
+- compileall app/backend/app: OK
+- Import FastAPI: OK
+- GET /?page=admin&center_id=1: 200 OK
+- GET /?page=recetas&center_id=1: 200 OK
+- GET /?page=stock&center_id=1: 200 OK
+- DB incluida: 0 precios <= 0
+
+Notas:
+- Si el usuario ya tiene AGUACHILES en su base real, el comando lo clasificará como PREPARACION y unidad kg.
+- Si no existe, no se crea automáticamente: debe venir de receta/importación IA o alta manual.

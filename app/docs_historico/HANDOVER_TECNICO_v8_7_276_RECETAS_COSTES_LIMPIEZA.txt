@@ -1,0 +1,32 @@
+System MAC · v8_7_276
+
+Cambios incluidos:
+1) Recetas · alta de ingredientes
+- Formulario compacto en una sola línea: tipo, artículo/subreceta, cantidad, unidad, merma %, + Añadir.
+- Merma % queda junto a cantidad y unidad.
+- Tabla de ingredientes más alineada; edición de cantidad/unidad/merma en una línea compacta.
+
+2) Impresión de recetas
+- Añadidas columnas: Precio usado y Coste de ingrediente.
+- Aviso visible si hay ingredientes sin precio.
+- Resumen económico reorganizado: coste MP, coste con contingencia, raciones, coste por ración, PVP sugerido.
+
+3) Catálogo / precios de artículos
+- Guardado de artículos no deja al usuario en JSON si JavaScript no intercepta.
+- El formulario normal redirige al catálogo; JavaScript añade ajax=1 solo cuando usa fetch.
+- Precio se muestra como precio operativo €/kg o €/ud; precio base interno queda como dato secundario.
+
+4) Pedidos y producciones en blanco
+- Runtime incluido queda sin pedidos, líneas de pedido, producciones, líneas de producción ni cola operativa.
+- Añadido comando: LIMPIAR_PEDIDOS_Y_PRODUCCIONES.command.
+- No toca stock, recetas, artículos, albaranes, mermas ni inventario.
+
+5) Auditoría de fórmulas
+- Añadido AUDITORIA_FORMULAS_COSTEO_v8_7_276.txt.
+- Conclusión: coste por bruto real, normalización de precios, subrecetas proporcionales y confirmación de producción están alineados con las especificaciones principales.
+
+Validación pendiente sugerida en uso real:
+- Abrir receta con varios ingredientes y comprobar visual de una línea.
+- Imprimir receta con costes y comprobar coste por ingrediente.
+- Guardar precio de artículo desde Catálogo y verificar que no aparece JSON.
+- Ejecutar comando de limpieza si se desea empezar otra vez desde cero.

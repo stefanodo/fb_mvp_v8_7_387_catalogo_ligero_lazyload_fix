@@ -1,0 +1,187 @@
+<section id="finanzas" class="executive-finance-page">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Dirección · CEO / CFO / Inversor</p>
+      <h2>Finanzas ejecutivas · rendimiento del capital</h2>
+      <p class="muted">Cuenta de resultados operativa diaria por local. Beneficio, EBITDA, capital invertido, deuda y causa probable de desviaciones.</p>
+    </div>
+    <div class="tag">Acceso restringido · no operativo cocina/sala</div>
+  </div>
+
+  <div class="panel finance-filter-panel">
+    <form method="get" action="/" class="finance-filter-grid">
+      <input type="hidden" name="page" value="finanzas">
+      <input type="hidden" name="center_id" value="{{ selected_center_id or 0 }}">
+      <label>Desde<input type="date" name="direction_start" value="{{ executive_finance.start_date or direction_start or '' }}"></label>
+      <label>Hasta<input type="date" name="direction_end" value="{{ executive_finance.end_date or direction_end or '' }}"></label>
+      <label>Capital propio €<input type="number" step="0.01" name="own_capital" value="{{ '%.2f'|format(executive_finance.assumptions.own_capital or 0) }}"></label>
+      <label>Capital financiado €<input type="number" step="0.01" name="financed_capital" value="{{ '%.2f'|format(executive_finance.assumptions.financed_capital or 0) }}"></label>
+      <label>Interés anual<input type="number" step="0.001" name="interest_rate" value="{{ '%.3f'|format(executive_finance.assumptions.interest_rate or 0.05) }}"></label>
+      <label>Pasivo laboral €<input type="number" step="0.01" name="labor_liability" value="{{ '%.2f'|format(executive_finance.assumptions.labor_liability or 0) }}"></label>
+      <label>Coste personal diario €<input type="number" step="0.01" name="labor_cost_daily" value="{{ '%.2f'|format(executive_finance.assumptions.labor_cost_daily or 0) }}"></label>
+      <label>Gasto fijo diario €<input type="number" step="0.01" name="fixed_opex_daily" value="{{ '%.2f'|format(executive_finance.assumptions.fixed_opex_daily or 0) }}"></label>
+      <label>Caja disponible €<input type="number" step="0.01" name="cash_available" value="{{ '%.2f'|format(executive_finance.assumptions.cash_available or 0) }}"></label>
+      <div class="finance-filter-actions"><button class="gold" type="submit">Calcular</button></div>
+    </form>
+    <p class="muted">Interés por defecto: 5% anual. Si ves todos los locales, las hipótesis se reparten proporcionalmente hasta integrar configuración financiera por local.</p>
+  </div>
+
+  {% set p = executive_finance.portfolio %}
+
+  <div class="panel ceo-brief-panel">
+    <div class="section-head compact">
+      <div>
+        <h3>KPIs CEO · decisión rápida y largo plazo</h3>
+        <p class="muted">Lectura ejecutiva para todos los locales: rentabilidad, capital, liquidez, prime cost y riesgo laboral.</p>
+      </div>
+      <div class="tag">{{ executive_finance.portfolio_recommendation }}</div>
+    </div>
+    <div class="ceo-kpi-grid">
+      {% for k in executive_finance.ceo_kpis.quick %}
+      <div class="ceo-kpi-card">
+        <div class="label">{{ k.label }}</div>
+        <div class="value">
+          {% if k.type == 'money' %}{{ fmt_price(k.value or 0) }} €
+          {% elif k.type == 'pct' %}{{ '%.1f'|format(k.value or 0) }}%
+          {% elif k.type == 'days' %}{{ '%.0f'|format(k.value or 0) }} días
+          {% else %}{{ k.value }}{% endif %}
+        </div>
+        <div class="hint">{{ k.hint }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="ceo-kpi-grid strategic">
+      {% for k in executive_finance.ceo_kpis.strategic %}
+      <div class="ceo-kpi-card compact">
+        <div class="label">{{ k.label }}</div>
+        <div class="value">
+          {% if k.type == 'money' %}{{ fmt_price(k.value or 0) }} €
+          {% elif k.type == 'pct' %}{{ '%.1f'|format(k.value or 0) }}%
+          {% else %}{{ k.value }}{% endif %}
+        </div>
+        <div class="hint">{{ k.hint }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="cards finance-kpi-cards">
+    <div class="card"><div class="label">Ventas periodo</div><div class="value">{{ fmt_price(p.sales or 0) }} €</div></div>
+    <div class="card"><div class="label">Beneficio bruto</div><div class="value">{{ fmt_price(p.gross_profit or 0) }} €</div></div>
+    <div class="card warn"><div class="label">EBITDA operativo/día</div><div class="value">{{ fmt_price(p.ebitda_daily or 0) }} €</div></div>
+    <div class="card"><div class="label">Resultado neto/día</div><div class="value">{{ fmt_price(p.net_result_daily or 0) }} €</div></div>
+    <div class="card"><div class="label">ROIC anualizado</div><div class="value">{{ '%.1f'|format(p.roic_annualized_pct or 0) }}%</div></div>
+    <div class="card danger"><div class="label">Necesidad caja 30d</div><div class="value">{{ fmt_price(p.cash_need_30 or 0) }} €</div></div>
+  </div>
+
+  <div class="dashboard-grid-2">
+    <div class="panel">
+      <h3>Ranking por rendimiento del capital</h3>
+      <table class="mini-table finance-table">
+        <thead><tr><th>Local</th><th>Ventas</th><th>EBITDA/día</th><th>Neto/día</th><th>Capital</th><th>ROIC</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for r in executive_finance.ranked_by_roic %}
+          <tr class="finance-status-{{ r.status }}">
+            <td>{{ r.center_name }}</td>
+            <td class="num">{{ fmt_price(r.sales) }} €</td>
+            <td class="num">{{ fmt_price(r.ebitda_daily) }} €</td>
+            <td class="num">{{ fmt_price(r.net_result_daily) }} €</td>
+            <td class="num">{{ fmt_price(r.invested_capital) }} €</td>
+            <td class="num">{{ '%.1f'|format(r.roic_annualized_pct) }}%</td>
+            <td>{{ r.status|replace('_',' ') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>Ranking por beneficio absoluto</h3>
+      <table class="mini-table finance-table">
+        <thead><tr><th>Local</th><th>Beneficio bruto</th><th>Food cost</th><th>Prime cost</th><th>Personal</th><th>Pasivo laboral</th></tr></thead>
+        <tbody>
+          {% for r in executive_finance.ranked_by_ebitda %}
+          <tr>
+            <td>{{ r.center_name }}</td>
+            <td class="num">{{ fmt_price(r.gross_profit) }} €</td>
+            <td class="num">{{ '%.1f'|format(r.food_cost_pct) }}%</td>
+            <td class="num">{{ '%.1f'|format(r.prime_cost_pct) }}%</td>
+            <td class="num">{{ '%.1f'|format(r.labor_cost_pct) }}%</td>
+            <td class="num">{{ fmt_price(r.labor_liability) }} €</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-head compact"><div><h3>Causa raíz y acción ejecutiva</h3><p class="muted">Lectura: alerta → causa probable → impacto → recomendación. No modifica precios, recetas ni stock automáticamente.</p></div></div>
+    <div class="finance-diagnosis-grid">
+      {% for r in executive_finance.risk_rows %}
+      <div class="finance-diagnosis-card finance-status-{{ r.status }}">
+        <div class="finance-card-head"><strong>{{ r.center_name }}</strong><span>{{ r.status|replace('_',' ') }}</span></div>
+        <div class="finance-mini-metrics">
+          <span>ROIC {{ '%.1f'|format(r.roic_annualized_pct) }}%</span>
+          <span>EBITDA/d {{ fmt_price(r.ebitda_daily) }} €</span>
+          <span>Caja {{ '%.0f'|format(r.cash_coverage_days) }} días</span>
+        </div>
+        <ul>
+          {% for d in r.diagnosis %}<li>{{ d }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="section-head compact">
+      <div>
+        <h3>Matriz CEO por local</h3>
+        <p class="muted">Comparación directa: un local puede ganar más dinero absoluto y rendir peor sobre capital.</p>
+      </div>
+    </div>
+    <table class="mini-table finance-table ceo-decision-table">
+      <thead>
+        <tr>
+          <th>Local</th><th>Ventas</th><th>EBITDA/día</th><th>Neto/día</th><th>ROIC</th><th>Prime cost</th><th>Deuda/capital</th><th>Pasivo laboral</th><th>Caja</th><th>Decisión</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in executive_finance.risk_rows %}
+        <tr class="finance-status-{{ r.status }}">
+          <td>{{ r.center_name }}</td>
+          <td class="num">{{ fmt_price(r.sales) }} €</td>
+          <td class="num">{{ fmt_price(r.ebitda_daily) }} €</td>
+          <td class="num">{{ fmt_price(r.net_result_daily) }} €</td>
+          <td class="num">{{ '%.1f'|format(r.roic_annualized_pct) }}%</td>
+          <td class="num">{{ '%.1f'|format(r.prime_cost_pct) }}%</td>
+          <td class="num">{{ '%.1f'|format(r.debt_to_capital_pct) }}%</td>
+          <td class="num">{{ fmt_price(r.labor_liability) }} €</td>
+          <td class="num">{{ '%.0f'|format(r.cash_coverage_days) }} días</td>
+          <td>{{ r.decision }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel ceo-board-panel">
+    <h3>KPIs de comité</h3>
+    <div class="ceo-board-grid">
+      {% for k in executive_finance.ceo_kpis.board %}
+      <div class="ceo-board-card">
+        <div class="label">{{ k.label }}</div>
+        <div class="value">{{ k.value }}</div>
+        <div class="hint">{{ k.hint }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="panel finance-notes">
+    <h3>Notas de control</h3>
+    <ul>
+      {% for n in executive_finance.notes %}<li>{{ n }}</li>{% endfor %}
+    </ul>
+  </div>
+</section>

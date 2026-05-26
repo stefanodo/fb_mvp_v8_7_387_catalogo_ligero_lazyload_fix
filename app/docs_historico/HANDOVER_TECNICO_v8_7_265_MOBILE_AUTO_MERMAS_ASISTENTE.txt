@@ -1,0 +1,81 @@
+HANDOVER TÉCNICO — v8_7_265_mobile_auto_mermas_asistente
+
+Base de trabajo:
+- fb_mvp_v8_7_264_mermas_control_voz_foto_macfix.zip
+
+Objetivo aplicado:
+1) Facilitar acceso desde móvil sin que el usuario tenga que escribir IP manualmente.
+2) Rediseñar Mermas como asistente operativo con entrada rápida por voz/foto/manual.
+3) Permitir que una frase natural tipo “hay una merma de salsa de tomate...” cree una propuesta pendiente, buscando artículos y recetas/elaboraciones.
+4) Mantener validación humana antes de impactar stock.
+
+Cambios principales:
+
+A) Acceso móvil automático
+- Se actualizó INICIAR_F&B_MVP.command en raíz y en app/.
+- Arranque forzado en host 0.0.0.0 y puerto 8000.
+- Detección automática de IP local del Mac.
+- Se exportan FB_LAN_URL, FB_BONJOUR_URL, FB_SERVER_HOST y FB_SERVER_PORT.
+- Al arrancar, abre automáticamente /movil en Safari.
+- Se generan ABRIR_DESDE_MOVIL.html y ABRIR_DESDE_MOVIL.txt con el enlace LAN.
+- Se añade ruta /movil con pantalla de acceso móvil.
+- Se añade ruta /mobile_qr.png para mostrar QR si qrcode está disponible.
+- Se mantiene enlace Mac: http://127.0.0.1:8000.
+- El enlace móvil debe usarse desde iPhone/iPad en la misma red Wi-Fi.
+
+B) Mermas como asistente
+- Se reemplaza el layout de tres formularios paralelos por una pantalla tipo asistente:
+  - 🎙️ Decir merma por voz
+  - 📷 Registrar con foto
+  - ✍️ Escribir manual
+- Solo se muestra el panel elegido.
+- La foto se puede añadir opcionalmente en el flujo por voz.
+- La foto sigue siendo evidencia; sin IA visual externa configurada, no se inventa producto/cantidad.
+- Se mantiene registro pendiente antes de confirmación.
+- Se mantiene responsable, local, cantidad, unidad, motivo, notas y coste estimado.
+
+C) Voz para mermas
+- /waste/from_voice acepta ahora foto opcional y nota de foto.
+- El asistente flotante puede crear directamente una merma pendiente desde frases naturales.
+- Ejemplos soportados:
+  - “Hay una merma de salsa de tomate.”
+  - “Hay una merma de dos kilos de tomate por mal estado responsable Juan.”
+  - “Merma de 2 kg de salmón por caducidad.”
+- El parser de voz normaliza números hablados frecuentes: un/una/dos/tres/cuatro/cinco/seis/siete/ocho/nueve/diez antes de kg/g/ud/ración/litro.
+- Se mejoró el matching para evitar falsos positivos cortos, por ejemplo SAL dentro de SALSA.
+
+D) Validación humana y stock
+- Las mermas creadas por voz/foto quedan en REVIEW.
+- No descuentan stock automáticamente.
+- Para impactar stock hay que abrir el registro, revisar datos y pulsar Confirmar merma.
+- La confirmación crea movimiento OUT y enlaza movement_id.
+- Si una receta/elaboración no tiene artículo producido vinculado, queda pendiente y debe revisarse manualmente.
+
+Archivos tocados:
+- INICIAR_F&B_MVP.command
+- app/INICIAR_F&B_MVP.command
+- backend/requirements.txt
+- backend/app/main.py
+- backend/app/core.py
+- backend/app/routers/mermas.py
+- backend/app/services/waste_service.py
+- backend/app/templates/sections/mermas.html
+- backend/app/static/css/waste.css
+- backend/app/static/js/waste.js
+- backend/app/static/js/voice_assistant.js
+
+Validación realizada:
+- compileall backend/app: OK.
+- Importación app.main: OK.
+- TestClient GET /: OK.
+- TestClient GET /?page=mermas&center_id=1: OK.
+- TestClient GET /?page=mermas_control&center_id=1: OK.
+- TestClient GET /movil: OK.
+- TestClient GET /mobile_qr.png: OK en entorno con qrcode.
+- POST /waste/from_voice con frase natural: OK; crea REVIEW con responsable detectado y sin confirmar stock.
+- Registro temporal de prueba eliminado.
+
+Limitaciones explícitas:
+- No se implementó IA visual real. La foto se guarda como evidencia y puede apoyar el matching mediante texto/nota/nombre de archivo.
+- El acceso móvil automático no puede abrir físicamente Safari en el iPhone desde el Mac. Se resuelve con pantalla /movil y QR/enlace automático, sin escribir IP manualmente.
+- La voz en iPhone puede depender de permisos y de restricciones del navegador en HTTP local. Por eso queda también el campo de texto como respaldo.

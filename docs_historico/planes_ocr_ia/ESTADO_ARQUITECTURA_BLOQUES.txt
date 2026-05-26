@@ -1,0 +1,52 @@
+SYSTEM MAC · ESTADO ARQUITECTURA POR BLOQUES · v8_7_277
+
+Resultado de revisión estructural:
+
+1. Backend
+   Ya existe separación por routers:
+   - admin
+   - albaranes
+   - inventario
+   - laboratorio
+   - mermas
+   - operativa
+   - pedidos
+   - producciones
+   - recetas
+   - stock
+
+   Ya existe separación por servicios:
+   - orders_service
+   - recipes_service / recipes_form_service
+   - productions_*_service
+   - waste_service
+   - stock_service / stock_queries_service
+   - operational_quick_service
+   - receipts_service
+   - units_service
+
+2. Frontend
+   Ya existe separación por CSS/JS de bloque:
+   - recipes.css / recetas.js
+   - orders.css / orders.js
+   - productions.css / producciones.js
+   - waste.css / waste.js
+   - operativa.css / operativa.js
+   - stock.css
+   - admin.css
+
+3. Riesgo detectado
+   La plantilla index.html sigue siendo el contenedor global. Esto no es grave si cada sección carga solo su bloque, pero no conviene seguir agregando lógica inline.
+
+4. Regla de siguientes cambios
+   - Nuevos cambios de recetas: static/js/recetas.js + static/css/recipes.css + routers/recetas.py + services/recipes_*.py.
+   - Nuevos cambios de pedidos: orders.js/css + routers/pedidos.py + orders_service.py.
+   - Nuevos cambios de mermas: waste.js/css + routers/mermas.py + waste_service.py.
+   - Nuevos cambios de operativa/voz: operativa.js/css + routers/operativa.py + operational_quick_service.py.
+   - Evitar tocar main.py salvo registro de router o estructura general.
+
+5. Carga ligera recomendada
+   - Catálogo: búsqueda por texto y resultados paginados; no cargar miles de artículos en móvil si no hay búsqueda.
+   - Recetas: ingredientes de la receta activa; no precargar todas las recetas completas.
+   - Operativa: solo colas pendientes + estado IA + búsqueda contextual bajo demanda.
+   - Mermas: registros recientes paginados; detalle bajo demanda.

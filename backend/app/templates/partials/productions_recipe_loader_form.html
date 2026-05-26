@@ -1,0 +1,15 @@
+<form method="post" action="/production/{{production_detail.id}}/load_recipe_form" class="compact preserve-flow" data-flow-target="productionDetailPanel">
+  <div class="row"><label>Receta o base</label>
+    <input type="text" class="mini production-recipe-search" name="recipe_query" list="production_recipes_datalist" placeholder="Escribe primero para buscar receta o base..." autocomplete="off" required>
+    <input type="hidden" name="recipe_id" value="" data-production-recipe-id="1">
+    <datalist id="production_recipes_datalist">{% for r in recipes|sort(attribute="name") %}<option value="{{r.code}} · {{r.name|upper}}" data-id="{{r.id}}"></option>{% endfor %}</datalist>
+  </div>
+  <div class="row"><label>Cantidad objetivo</label><input type="number" step="0.001" min="0.001" name="multiplier" value="1"></div>
+  <div class="row"><label>Unidad de producción requerida</label>
+    <select name="target_unit" required>
+      {% for unit in production_units %}<option value="{{unit}}" {% if unit=='lotes' %}selected{% endif %}>{{unit}}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="actions"><button type="submit" class="btn production-load-btn">Cargar ingredientes de receta</button></div>
+  <div class="hint">Primero escribe la receta o subreceta. Después indica cuánto quieres producir y en qué unidad final: raciones, porciones, unidades, kg, l o lotes.</div>
+</form>

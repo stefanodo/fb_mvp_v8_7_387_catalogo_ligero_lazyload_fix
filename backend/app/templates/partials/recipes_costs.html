@@ -1,0 +1,10 @@
+<div class="recipe-costs-grid full">
+  <div class="row recipe-mini"><label>Raciones (yield)</label><input type="number" step="0.01" name="yield_portions" value="{{recipe_detail.yield_portions}}" id="recipe_yield"></div>
+  <div class="row recipe-yield-combo"><label>Rend. lote</label><div class="inline-field"><input type="number" step="0.01" name="yield_final_qty" value="{{recipe_detail.yield_final_qty or ''}}" id="recipe_yield_final_qty" placeholder="Ej. 2500"><select name="yield_final_unit" id="recipe_yield_final_unit"><option value="g" {% if (recipe_detail.yield_final_unit or 'g')=='g' %}selected{% endif %}>g</option><option value="kg" {% if recipe_detail.yield_final_unit=='kg' %}selected{% endif %}>kg</option><option value="ud" {% if recipe_detail.yield_final_unit=='ud' %}selected{% endif %}>ud</option></select></div></div>
+  <div class="row recipe-mini"><label>Merma global del proceso %</label><input type="number" step="0.01" name="waste_pct" value="{{recipe_detail.waste_pct}}" id="recipe_waste"></div>
+  <div class="row recipe-mini"><label>Contingencia %</label><input type="number" step="0.01" name="contingency_pct" value="{{recipe_detail.contingency_pct}}" id="recipe_contingency"></div>
+  <div class="row recipe-mini"><label>Food cost obj. %</label><input type="number" step="0.01" name="target_food_cost_pct" value="{{recipe_detail.target_food_cost_pct}}" id="recipe_tfc"></div>
+  <div class="row recipe-mini"><label>Margen obj. %</label><input type="number" step="0.01" name="target_margin_pct" value="{{recipe_detail.target_margin_pct}}" id="recipe_tm"></div>
+  <div class="row recipe-mini"><label>Precio manual</label><input type="number" step="0.01" name="manual_price" value="{{recipe_detail.manual_price}}" id="recipe_price"></div>
+</div>
+

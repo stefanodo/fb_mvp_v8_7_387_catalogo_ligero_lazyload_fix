@@ -1,0 +1,23 @@
+System MAC · configurar IA para Operativa rápida
+
+Qué hace:
+- Activa IA real para interpretar dictados/textos de Operativa rápida.
+- Activa speech-to-text real para audio cuando el navegador permita grabar audio.
+- Mantiene reglas locales como respaldo si no hay clave o falla la conexión.
+
+Cómo configurarlo en Mac:
+1) Ejecuta CONFIGURAR_IA_OPENAI.command.
+2) Pega tu OPENAI_API_KEY cuando lo pida.
+3) Cierra y vuelve a abrir la app con DESBLOQUEAR_y_INICIAR.command.
+
+Variables que se guardan en .env:
+OPERATIVA_AI_MODE=openai
+OPERATIVA_STT_MODE=openai
+OPENAI_API_KEY=tu_clave
+OPERATIVA_AI_MODEL=gpt-4o-mini
+OPERATIVA_STT_MODEL=gpt-4o-mini-transcribe
+
+Importante:
+- La clave API no va incluida en el ZIP.
+- El archivo .env queda en tu Mac y no debe compartirse.
+- La IA crea propuestas pendientes; no cierra pedidos, no confirma producciones y no descuenta stock automáticamente.

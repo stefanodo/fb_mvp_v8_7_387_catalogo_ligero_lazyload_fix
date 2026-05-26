@@ -1,0 +1,79 @@
+<div class="row recipe-span-2"><label>Nombre</label><input name="name" value="{{recipe_detail.name|upper}}" required id="recipe_name" style="text-transform:uppercase"></div>
+<div class="row"><label>Subcategoría operativa</label>
+  <select name="subcategory" id="recipe_subcategory">
+    {% for s in subcategories %}<option value="{{s}}" {% if recipe_detail.subcategory==s %}selected{% endif %}>{{s}}</option>{% endfor %}
+  </select>
+</div>
+<div class="row"><label>Categoría general</label>
+  <select name="category" id="recipe_category">
+    {% for c in categories %}<option value="{{c}}" {% if recipe_detail.category==c %}selected{% endif %}>{{c}}</option>{% endfor %}
+  </select>
+</div>
+<div class="row recipe-span-2"><label>Proveedor (para coste)</label>
+  <select name="cost_supplier_id" id="recipe_cost_supplier">
+    <option value="0" {% if not recipe_detail.cost_supplier_id %}selected{% endif %}>Precio actual (recomendado)</option>
+    {% for s in suppliers %}
+      {% if s.is_active %}
+        <option value="{{s.id}}" {% if recipe_detail.cost_supplier_id==s.id %}selected{% endif %}>{{s.name}}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+  <div class="muted" style="font-size:12px; margin-top:4px;">Si eliges proveedor, la receta usa su último precio por artículo (si existe). Si falta, usa precio actual.</div>
+</div>
+<div class="row recipe-mini recipe-span-2"><label>Tipo</label><select name="is_subrecipe" id="recipe_type"><option value="0" {% if not recipe_detail.is_subrecipe %}selected{% endif %}>RECETA FINAL</option><option value="1" {% if recipe_detail.is_subrecipe %}selected{% endif %}>SUB-RECETA</option></select><div class="muted" style="font-size:12px;margin-top:4px;">Usar rendimiento real en g/kg o ud.</div></div>
+<div class="recipe-labor-card recipe-span-2 full" id="recipeLaborCard">
+  {% set c = recipe_detail.calc or {} %}
+  <div class="recipe-labor-title">⏱ Tiempo de producción y mano de obra <span>actualización automática</span></div>
+  <div class="recipe-labor-grid labor-unified-grid">
+    <div class="row recipe-mini"><label>Prep. min</label><input type="number" step="1" min="0" name="prep_time_min" id="labor_prep_min" value="{{recipe_detail.prep_time_min or 0}}"></div>
+    <div class="row recipe-mini"><label>Cocción min</label><input type="number" step="1" min="0" name="cook_time_min" id="labor_cook_min" value="{{recipe_detail.cook_time_min or 0}}"></div>
+    <div class="row recipe-mini"><label>Reposo min</label><input type="number" step="1" min="0" name="rest_time_min" id="labor_rest_min" value="{{recipe_detail.rest_time_min or 0}}"></div>
+    <div class="row recipe-mini"><label>Personas</label><input type="number" step="0.1" min="0" name="labor_people" id="labor_people" value="{{recipe_detail.labor_people or 0}}"></div>
+    <div class="row recipe-mini"><label>€/h mano obra</label><input type="number" step="0.01" min="0" name="labor_hourly_cost" id="labor_hourly_cost" value="{{recipe_detail.labor_hourly_cost or 0}}"></div>
+    <div class="labor-live-box">
+      <span>Total tiempo: <b id="labor_total_min">{{ fmt_num(c.production_time_total_min or 0,0) }}</b> min</span>
+      <span>Coste MO total: <b id="labor_cost_total">{{ fmt_price(c.labor_cost_total or 0) }}</b> €</span>
+      <span>MO/ración: <b id="labor_cost_per_portion">{{ fmt_price(c.labor_cost_per_portion or 0) }}</b> €</span>
+      <span>Coste operativo/ración: <b id="labor_operating_per_portion">{{ fmt_price(c.operating_cost_per_portion or 0) }}</b> €</span>
+    </div>
+  </div>
+  <div class="muted" style="font-size:12px;margin-top:6px;">Fórmula activa: (prep+cocción+reposo)/60 × personas × €/h. Se calcula en pantalla al cambiar cualquier variable; no cambia el food cost.</div>
+</div>
+
+<details class="recipe-indirect-card recipe-indirect-details recipe-span-2 full" id="recipeIndirectCard">
+  {% set c = recipe_detail.calc or {} %}
+  <summary class="recipe-indirect-summary">
+    <span class="recipe-indirect-summary-title">🏢 Costes indirectos y salarios</span>
+    <span class="recipe-indirect-summary-pill">Estructura <b id="indirect_total_pct_summary">{{ fmt_num(c.indirect_total_pct or 0,2) }}</b>%</span>
+    <span class="recipe-indirect-summary-pill">Carga/ración <b id="indirect_load_per_portion_summary">{{ fmt_price(c.indirect_load_per_portion or 0) }}</b> €</span>
+    <span class="recipe-indirect-summary-action">Ver / editar</span>
+  </summary>
+  <div class="recipe-indirect-body">
+    <div class="recipe-indirect-note">Introduce importes mensuales o de referencia. El sistema los normaliza a neto si vienen con IVA y muestra solo el porcentaje sobre ventas netas.</div>
+    <div class="recipe-indirect-grid">
+    <div class="row recipe-mini indirect-base"><label>Ventas netas base €</label><input type="number" step="0.01" min="0" name="indirect_sales_base" id="indirect_sales_base" value="{{recipe_detail.indirect_sales_base or 0}}"></div>
+    <div class="row recipe-mini"><label>Alquiler €</label><input type="number" step="0.01" min="0" name="indirect_rent_amount" id="indirect_rent_amount" value="{{recipe_detail.indirect_rent_amount or 0}}"></div>
+    <div class="row recipe-mini"><label>IVA alquiler</label><select name="indirect_rent_tax_mode" id="indirect_rent_tax_mode"><option value="ex_vat" {% if (recipe_detail.indirect_rent_tax_mode or 'ex_vat')=='ex_vat' %}selected{% endif %}>sin IVA</option><option value="inc_vat" {% if recipe_detail.indirect_rent_tax_mode=='inc_vat' %}selected{% endif %}>con IVA</option></select></div>
+    <div class="row recipe-mini"><label>Servicios/gestión €</label><input type="number" step="0.01" min="0" name="indirect_services_amount" id="indirect_services_amount" value="{{recipe_detail.indirect_services_amount or 0}}"></div>
+    <div class="row recipe-mini"><label>IVA serv.</label><select name="indirect_services_tax_mode" id="indirect_services_tax_mode"><option value="ex_vat" {% if (recipe_detail.indirect_services_tax_mode or 'ex_vat')=='ex_vat' %}selected{% endif %}>sin IVA</option><option value="inc_vat" {% if recipe_detail.indirect_services_tax_mode=='inc_vat' %}selected{% endif %}>con IVA</option></select></div>
+    <div class="row recipe-mini"><label>Admin/software €</label><input type="number" step="0.01" min="0" name="indirect_admin_amount" id="indirect_admin_amount" value="{{recipe_detail.indirect_admin_amount or 0}}"></div>
+    <div class="row recipe-mini"><label>IVA admin</label><select name="indirect_admin_tax_mode" id="indirect_admin_tax_mode"><option value="ex_vat" {% if (recipe_detail.indirect_admin_tax_mode or 'ex_vat')=='ex_vat' %}selected{% endif %}>sin IVA</option><option value="inc_vat" {% if recipe_detail.indirect_admin_tax_mode=='inc_vat' %}selected{% endif %}>con IVA</option></select></div>
+    <div class="row recipe-mini"><label>Publicidad €</label><input type="number" step="0.01" min="0" name="indirect_marketing_amount" id="indirect_marketing_amount" value="{{recipe_detail.indirect_marketing_amount or 0}}"></div>
+    <div class="row recipe-mini"><label>IVA publ.</label><select name="indirect_marketing_tax_mode" id="indirect_marketing_tax_mode"><option value="ex_vat" {% if (recipe_detail.indirect_marketing_tax_mode or 'ex_vat')=='ex_vat' %}selected{% endif %}>sin IVA</option><option value="inc_vat" {% if recipe_detail.indirect_marketing_tax_mode=='inc_vat' %}selected{% endif %}>con IVA</option></select></div>
+    <div class="row recipe-mini"><label>Otros/impuestos op. €</label><input type="number" step="0.01" min="0" name="indirect_other_amount" id="indirect_other_amount" value="{{recipe_detail.indirect_other_amount or 0}}"></div>
+    <div class="row recipe-mini"><label>IVA otros</label><select name="indirect_other_tax_mode" id="indirect_other_tax_mode"><option value="ex_vat" {% if (recipe_detail.indirect_other_tax_mode or 'ex_vat')=='ex_vat' %}selected{% endif %}>sin IVA</option><option value="inc_vat" {% if recipe_detail.indirect_other_tax_mode=='inc_vat' %}selected{% endif %}>con IVA</option></select></div>
+    <div class="row recipe-mini"><label>Salarios €</label><input type="number" step="0.01" min="0" name="salary_cost_amount" id="salary_cost_amount" value="{{recipe_detail.salary_cost_amount or 0}}"></div>
+    <div class="indirect-live-box">
+      <span>Alquiler <b id="indirect_rent_pct">{{ fmt_num(c.indirect_rent_pct or 0,2) }}</b>%</span>
+      <span>Servicios <b id="indirect_services_pct">{{ fmt_num(c.indirect_services_pct or 0,2) }}</b>%</span>
+      <span>Admin <b id="indirect_admin_pct">{{ fmt_num(c.indirect_admin_pct or 0,2) }}</b>%</span>
+      <span>Publicidad <b id="indirect_marketing_pct">{{ fmt_num(c.indirect_marketing_pct or 0,2) }}</b>%</span>
+      <span>Otros <b id="indirect_other_pct">{{ fmt_num(c.indirect_other_pct or 0,2) }}</b>%</span>
+      <span>Salarios <b id="salary_cost_pct">{{ fmt_num(c.salary_cost_pct or 0,2) }}</b>%</span>
+      <span class="total">Total estructura <b id="indirect_total_pct">{{ fmt_num(c.indirect_total_pct or 0,2) }}</b>%</span>
+      <span class="total">Carga/ración <b id="indirect_load_per_portion">{{ fmt_price(c.indirect_load_per_portion or 0) }}</b> €</span>
+    </div>
+  </div>
+  </div>
+</details>
+

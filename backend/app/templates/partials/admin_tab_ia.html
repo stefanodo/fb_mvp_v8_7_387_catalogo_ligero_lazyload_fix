@@ -1,0 +1,121 @@
+<div class="admin-tab" id="tab-ia" style="display:none;">
+  <div class="panel ai-admin-panel">
+    <h3>🤖 IA / Voz</h3>
+    <p class="muted">Configura OpenAI para comprensión y Deepgram para voz. Pega cada clave una sola vez; no se muestra completa y queda guardada localmente en el Mac.</p>
+
+    <div class="ai-status-grid">
+      <div class="ai-status-card {% if ai_status and ai_status.configured %}ok{% else %}warn{% endif %}">
+        <small>Estado</small>
+        <strong>{{ ai_status.status_label if ai_status else 'LOCAL / SIN IA EXTERNA' }}</strong>
+        <span>{{ ai_status.warning if ai_status else 'Estado no disponible.' }}</span>
+      </div>
+      <div class="ai-status-card">
+        <small>Texto / OÍDO ALFI</small>
+        <strong>{{ ai_status.ai_mode if ai_status else 'local' }}</strong>
+        <span>{{ ai_status.ai_model if ai_status else 'local' }}</span>
+      </div>
+      <div class="ai-status-card">
+        <small>Voz / transcripción</small>
+        <strong>{{ ai_status.stt_mode if ai_status else 'local' }}</strong>
+        <span>{{ ai_status.stt_model if ai_status else 'local' }}</span>
+      </div>
+      <div class="ai-status-card">
+        <small>OpenAI</small>
+        <strong>{% if ai_status and ai_status.openai_key_loaded %}Cargada {{ai_status.key_hint}}{% else %}No cargada{% endif %}</strong>
+        <span>Comprensión, recetas IA, albaranes IA y fallback.</span>
+      </div>
+      <div class="ai-status-card">
+        <small>Deepgram</small>
+        <strong>{% if ai_status and ai_status.deepgram_key_loaded %}Cargada {{ai_status.deepgram_key_hint}}{% else %}No cargada{% endif %}</strong>
+        <span>Motor principal recomendado para voz.</span>
+      </div>
+    </div>
+
+    <details class="ai-config-details" {% if not ai_status or not ai_status.has_key %}open{% endif %}>
+      <summary>Configurar OpenAI desde aquí</summary>
+      <form method="post" action="/api/admin/openai_key/save" class="ai-key-form" autocomplete="off">
+        <label>OPENAI_API_KEY</label>
+        <div class="ai-key-row">
+          <input type="password" name="openai_api_key" placeholder="sk-..." autocomplete="new-password" required>
+          <button type="submit" class="gold">Guardar y activar</button>
+        </div>
+        <p class="muted small">Se activa al momento para esta sesión y también queda guardada para los próximos arranques. No se guarda en la base de datos.</p>
+      </form>
+      {% if ai_status and ai_status.has_key %}
+      <form method="post" action="/api/admin/openai_key/delete" onsubmit="return confirm('¿Quitar la clave OpenAI local de este sistema?');" class="ai-key-delete-form">
+        <button type="submit" class="btn danger-soft">Quitar clave local</button>
+      </form>
+      {% endif %}
+    </details>
+
+    <details class="ai-config-details" {% if not ai_status or not ai_status.deepgram_key_loaded %}open{% endif %}>
+      <summary>Configurar Deepgram para voz</summary>
+      <form method="post" action="/api/admin/deepgram_key/save" class="ai-key-form" autocomplete="off">
+        <label>DEEPGRAM_API_KEY</label>
+        <div class="ai-key-row">
+          <input type="password" name="deepgram_api_key" placeholder="Pega aquí la clave Deepgram" autocomplete="new-password" required>
+          <select name="stt_language" title="Idioma voz">
+            <option value="es" selected>Español</option>
+            <option value="fr">Francés</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Portugués</option>
+            <option value="en">Inglés</option>
+            <option value="multi">Multilingüe</option>
+          </select>
+          <button type="submit" class="gold">Guardar voz</button>
+        </div>
+        <p class="muted small">Para España deja idioma Español. Más adelante podrá configurarse por empresa/local. Deepgram queda como motor principal de transcripción; OpenAI sigue como comprensión/fallback.</p>
+      </form>
+    </details>
+
+    <div class="ai-admin-note">
+      <strong>Uso previsto:</strong>
+      <span>OÍDO ALFI, lectura de recetas por foto/texto y voz pueden usar esta configuración. Las operaciones críticas siguen necesitando revisión humana.</span>
+    </div>
+
+    <div class="actions mt wrap">
+      <button type="button" class="gold" id="testIaBtn" data-test-url="/api/admin/probar_openai">Probar OpenAI</button>
+      <button type="button" class="btn" id="testDeepgramBtn" data-test-url="/api/admin/probar_deepgram">Probar Deepgram voz</button>
+      <a class="btn" href="/?page=laboratorio&center_id={{selected_center_id}}">Abrir Laboratorio</a>
+      <a class="btn" href="/recipe-ai/ui">Abrir IA Recetas</a>
+      <a class="btn" href="/?page=operativa&center_id={{selected_center_id}}">Abrir Operativa</a>
+    </div>
+    <div id="testIaResult" class="ai-test-result" hidden></div>
+  </div>
+  <script>
+  (function(){
+    if(location.hash === '#tab-ia' && window.switchAdminTab){
+      const b = Array.from(document.querySelectorAll('.subnav-btn')).find(x => (x.getAttribute('onclick')||'').includes('tab-ia'));
+      if(b) setTimeout(()=>window.switchAdminTab(b, 'tab-ia'), 50);
+    }
+    const box = document.getElementById('testIaResult');
+    function esc(v){return String(v||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));}
+    async function runAdminIaTest(btn){
+      if(!btn || !box) return;
+      const original = btn.textContent;
+      const url = btn.dataset.testUrl || '/api/admin/probar_openai';
+      btn.disabled = true; btn.textContent = 'Probando…'; box.hidden = false; box.className = 'ai-test-result'; box.innerHTML = 'Comprobando conexión real…';
+      try{
+        const res = await fetch(url, {method:'POST', headers:{'Accept':'application/json'}});
+        const data = await res.json();
+        const provider = data.provider || (url.includes('deepgram') ? 'deepgram' : 'openai');
+        const title = data.ok ? (provider === 'deepgram' ? 'Deepgram voz conectado' : 'OpenAI conectado') : (provider === 'deepgram' ? 'Deepgram no conecta' : 'OpenAI no conecta');
+        box.className = 'ai-test-result ' + (data.ok ? 'ok' : 'warn');
+        box.innerHTML = '<strong>'+esc(title)+'</strong>'
+          + '<br><b>Proveedor:</b> '+esc(provider)
+          + (data.model ? '<br><b>Modelo:</b> '+esc(data.model) : '')
+          + (data.language ? '<br><b>Idioma:</b> '+esc(data.language) : '')
+          + '<br>'+esc(data.message || '')
+          + (data.code ? '<br><small>Código: '+esc(data.code)+'</small>' : '')
+          + (data.detail ? '<details><summary>Detalle técnico</summary><pre>'+esc(data.detail)+'</pre></details>' : '');
+      }catch(e){
+        box.className = 'ai-test-result warn'; box.innerHTML = '<strong>Error</strong><br>No se pudo hacer la prueba. Revisa internet del Mac o reinicia System MAC.';
+      }finally{
+        btn.disabled = false; btn.textContent = original;
+      }
+    }
+    document.getElementById('testIaBtn')?.addEventListener('click', function(){ runAdminIaTest(this); });
+    document.getElementById('testDeepgramBtn')?.addEventListener('click', function(){ runAdminIaTest(this); });
+  })();
+  </script>
+</div>

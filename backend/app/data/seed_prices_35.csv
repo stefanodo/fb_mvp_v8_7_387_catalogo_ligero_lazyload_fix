@@ -1,0 +1,62 @@
+item_name,base_unit,ref_price,ref_unit,ref_level,ipc_uplift_pct_applied,suggested_unit_price_eur_per_base_unit,ref_date,source
+Acelga,g,1.16,kg,MAYORISTA,2.3,0.001187,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Aguacate Hass,g,5.99,kg,RETAIL_IMPORT,0,0.005990,2026-03,Carrefour España 2026 retail
+Algas nori,g,160.71,kg,RETAIL_IMPORT,0,0.160710,2026-03,Carrefour España 2026 retail
+Anchoa,g,4.59,kg,MAYORISTA,2.3,0.004696,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Arepa de maíz amarillo,g,6.33,kg,RETAIL_IMPORT,0,0.006330,2026-03,Carrefour España 2026 retail
+Arepa de maíz blanco,g,6.78,kg,RETAIL_IMPORT,0,0.006780,2026-03,Carrefour España 2026 retail
+Arroz thai,g,2.69,kg,RETAIL_IMPORT,0,0.002690,2026-03,Carrefour España 2026 retail
+Bacalao,g,3.0,kg,ORIGEN,2.3,0.003069,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Bacon,g,1.29,kg,ORIGEN,2.3,0.00132,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Calabacín,g,3.08,kg,MAYORISTA,2.3,0.003151,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Carne picada vacuno,g,7.49,kg,ORIGEN,2.3,0.007662,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Cebolla,g,0.61,kg,MAYORISTA,2.3,0.000624,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Cerdo lomo,g,1.29,kg,ORIGEN,2.3,0.00132,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Chorizo,g,1.29,kg,ORIGEN,2.3,0.00132,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Cilantro,g,15.90,kg,RETAIL_IMPORT,0,0.015900,2026-03,Carrefour España 2026 retail
+Costilla cerdo,g,1.29,kg,ORIGEN,2.3,0.00132,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Entrecot,g,7.49,kg,ORIGEN,2.3,0.007662,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Fideos udon,g,12.73,kg,RETAIL_IMPORT,0,0.012730,2026-03,Carrefour España 2026 retail
+Frijol negro,g,2.50,kg,RETAIL_IMPORT,0,0.002500,2026-03,Carrefour España 2026 retail
+Frijol rojo pequeño,g,6.18,kg,RETAIL_IMPORT,0,0.006180,2026-03,Carrefour España 2026 retail
+Harina de maíz precocida,g,2.45,kg,RETAIL_IMPORT,0,0.002450,2026-03,Carrefour España 2026 retail
+Huesos de ternera,g,7.49,kg,ORIGEN,2.3,0.007662,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Huevos,ud,1.95,docena,ORIGEN,2.3,0.166237,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Jalapeño en rodajas,g,15.94,kg,RETAIL_IMPORT,0,0.015940,2026-03,Carrefour España 2026 retail
+Jarabe de arce,g,37.16,kg,RETAIL_IMPORT,0,0.037160,2026-03,Carrefour España 2026 retail
+Jengibre fresco,g,7.95,kg,RETAIL_IMPORT,0,0.007950,2026-03,Carrefour España 2026 retail
+Judía verde,g,4.31,kg,MAYORISTA,2.3,0.004409,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Lechuga iceberg,g,0.73,kg,MAYORISTA,2.3,0.000747,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Lechuga romana,g,0.73,kg,MAYORISTA,2.3,0.000747,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Limón,g,1.51,kg,MAYORISTA,2.3,0.001545,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Manzana,g,1.41,kg,MAYORISTA,2.3,0.001442,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Maíz dulce,g,3.93,kg,RETAIL_IMPORT,0,0.003930,2026-03,Carrefour España 2026 retail
+Mejillón,g,2.16,kg,MAYORISTA,2.3,0.00221,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Merluza,g,16.28,kg,MAYORISTA,2.3,0.016654,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Morcilla,g,1.29,kg,ORIGEN,2.3,0.00132,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Naranja,g,1.16,kg,MAYORISTA,2.3,0.001187,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Panko,g,23.25,kg,RETAIL_IMPORT,0,0.023250,2026-03,Carrefour España 2026 retail
+Pasta de wasabi,g,52.33,kg,RETAIL_IMPORT,0,0.052330,2026-03,Carrefour España 2026 retail
+Patata,g,0.48,kg,MAYORISTA,2.3,0.000491,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Pera,g,1.98,kg,MAYORISTA,2.3,0.002026,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Pimiento verde,g,2.32,kg,MAYORISTA,2.3,0.002373,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Plátano,g,1.36,kg,MAYORISTA,2.3,0.001391,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Plátano macho,g,2.85,kg,RETAIL_IMPORT,0,0.002850,2026-03,Carrefour España 2026 retail
+Plátano maduro congelado,g,12.06,kg,RETAIL_IMPORT,0,0.012060,2026-03,Carrefour España 2026 retail
+Pollo muslo,g,2.22,kg,ORIGEN,2.3,0.002271,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Pollo pechuga,g,2.22,kg,ORIGEN,2.3,0.002271,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio origen"
+Queso cheddar rallado,g,21.43,kg,RETAIL_IMPORT,0,0.021430,2026-03,Carrefour España 2026 retail
+Quinoa blanca,g,5.37,kg,RETAIL_IMPORT,0,0.005370,2026-03,Carrefour España 2026 retail
+Ramen noodles,g,10.76,kg,RETAIL_IMPORT,0,0.010760,2026-03,Carrefour España 2026 retail
+Salmón,g,9.7,kg,MAYORISTA,2.3,0.009923,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Salsa chipotle,g,20.94,kg,RETAIL_IMPORT,0,0.020940,2026-03,Carrefour España 2026 retail
+Salsa de ají picante,g,9.95,kg,RETAIL_IMPORT,0,0.009950,2026-03,Carrefour España 2026 retail
+Tomate cherry,g,1.72,kg,MAYORISTA,2.3,0.00176,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Tomate concentrado,g,1.72,kg,MAYORISTA,2.3,0.00176,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Tomate pera,g,1.72,kg,MAYORISTA,2.3,0.00176,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Tomate rama,g,1.72,kg,MAYORISTA,2.3,0.00176,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Tomate triturado lata,g,1.72,kg,MAYORISTA,2.3,0.00176,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"
+Tortilla de trigo,g,5.62,kg,RETAIL_IMPORT,0,0.005620,2026-03,Carrefour España 2026 retail
+Yuca,g,3.29,kg,RETAIL_IMPORT,0,0.003290,2026-03,Carrefour España 2026 retail
+Yuca congelada,g,4.10,kg,RETAIL_IMPORT,0,0.004100,2026-03,Carrefour España 2026 retail
+Zanahoria,g,0.68,kg,MAYORISTA,2.3,0.000696,2026 (semana 3),"Mercasa precios origen–mayorista (2026, semana 3) - precio mayorista"

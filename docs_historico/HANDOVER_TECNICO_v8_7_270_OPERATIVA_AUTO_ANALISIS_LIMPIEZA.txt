@@ -1,0 +1,62 @@
+System MAC · v8_7_270 · Operativa rápida — análisis automático del dictado
+
+Base de trabajo:
+- Continuación directa de v8_7_269_operativa_ui_voz_ia_responsive_macfix.
+
+Objetivo aplicado:
+- Al terminar de dictar o pulsar “Detener y analizar”, el sistema interpreta automáticamente el texto.
+- Si la confianza es alta y hay responsable + cantidad + producto, crea automáticamente la propuesta pendiente y limpia el campo.
+- Si falta dato o la confianza es baja/media, no guarda automáticamente: muestra interpretación para revisión humana.
+
+Cambios principales:
+1) Frontend Operativa
+- Botón único dinámico:
+  - “Dictar / grabar”
+  - “Detener y analizar” mientras escucha/graba.
+- Eliminado botón “Interpretar” como acción principal.
+- Al parar el dictado: interpretación automática.
+- En iPhone con micrófono del teclado: al cerrar/salir del campo se analiza automáticamente.
+- Tras guardado correcto: el campo de dictado se vacía automáticamente.
+- Si la propuesta se guarda, se muestra destino:
+  - Carrito de pedidos.
+  - Cola de producciones.
+  - Mermas pendientes.
+- Ejemplos largos quedan plegados en “Ver ejemplos rápidos” para reducir ruido visual.
+
+2) Backend/API
+- Nuevo endpoint POST /api/operativa/create para crear propuesta desde JS sin depender de submit tradicional.
+- Mantiene /operativa/from_voice por compatibilidad.
+
+3) Comprensión local mejorada
+- Correcciones conservadoras para dictados deformados en iPhone/Safari:
+  - “Saint/San Pedro...” al inicio → “Soy Pedro...”
+  - “arega/arrega” → “agrega”
+  - “san auria/sanahoria/sanauria” → “zanahoria”
+  - “calabasa/calabassa” → “calabaza”
+  - limpieza de basura frecuente tipo “are you in”, “mastrado”.
+- Limpieza de artículo reforzada para detectar productos claros aunque el texto venga contaminado.
+
+4) Seguridad operativa
+- Nada confirma pedidos, producciones ni mermas finales.
+- Solo crea propuestas pendientes en:
+  - carrito compartido,
+  - cola de producciones,
+  - mermas pendientes.
+- No descuenta stock automáticamente.
+- Baja confianza/falta de cantidad/falta de responsable → revisión humana.
+
+Pruebas realizadas:
+- Compilación Python: OK.
+- Importación FastAPI: OK.
+- GET Operativa: OK.
+- GET /api/operativa/interpret: OK.
+- POST /api/operativa/create: OK.
+- Limpieza de registro temporal de prueba: OK.
+- Frase deformada probada:
+  “Saint Pedro Arega Tres kilos Emilio de San auria ... Tres kilos de Calabasa...”
+  Resultado esperado local:
+  Pedido · Pedro · Zanahoria 3 kg · Calabaza 3 kg.
+
+Pendiente recomendado:
+- Conectar STT real con OPENAI_API_KEY para que el audio no dependa del dictado del navegador.
+- Añadir cálculo de suficiencia: stock actual + carrito pendiente + producciones pendientes + mínimos.

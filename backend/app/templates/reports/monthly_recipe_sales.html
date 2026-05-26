@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>System MAC · Ranking mensual de ventas de platos</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:24px;color:#181818;background:#fff}
+    .head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:2px solid #222;padding-bottom:12px;margin-bottom:18px}
+    h1{margin:0;font-size:24px}.muted{color:#666}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.card{border:1px solid #ddd;border-radius:12px;padding:10px}.label{font-size:12px;color:#777}.value{font-size:20px;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{break-inside:avoid;border:1px solid #ddd;border-radius:14px;padding:14px;margin:14px 0}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border-bottom:1px solid #e5e5e5;padding:6px;text-align:left;vertical-align:top}.num{text-align:right}.danger{color:#9b1c1c}.ok{color:#1d6b35}ul{margin:8px 0 0;padding-left:18px}@media print{body{margin:10mm}.no-print{display:none}.grid{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+  <div class="head">
+    <div>
+      <h1>Ranking mensual de ventas de platos</h1>
+      <div class="muted">Periodo {{ report.period or '-' }} · {{ selected_center_name }} · {{ BUILD_ID }}</div>
+    </div>
+    <button class="no-print" onclick="window.print()">Imprimir / PDF</button>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="label">Unidades vendidas</div><div class="value">{{ '%.1f'|format(report.total_qty or 0) }}</div></div>
+    <div class="card"><div class="label">Venta neta</div><div class="value">{{ fmt_price(report.total_net_sales or 0) }} €</div></div>
+    <div class="card"><div class="label">Coste receta</div><div class="value">{{ fmt_price(report.total_food_cost or 0) }} €</div></div>
+    <div class="card"><div class="label">Margen bruto</div><div class="value">{{ fmt_price(report.gross_margin_value or 0) }} € · {{ '%.1f'|format(report.gross_margin_pct or 0) }}%</div></div>
+  </div>
+
+  {% if not report.has_data %}
+    <div class="panel"><strong>Sin ventas TPV normalizadas para el periodo.</strong><p class="muted">El apartado está preparado para verificarlo cuando sea necesario, pero no inventa ventas ni ranking.</p></div>
+  {% else %}
+  <div class="grid">
+    <div class="panel">
+      <h3>Ranking por unidades</h3>
+      <table><thead><tr><th>Plato</th><th>Canal</th><th class="num">Ud.</th><th class="num">Venta neta</th><th class="num">Margen</th></tr></thead><tbody>
+      {% for x in report.top_by_units[:15] %}<tr><td>{{ x.recipe_name }}</td><td>{{ x.channel }}</td><td class="num">{{ '%.1f'|format(x.qty_sold or 0) }}</td><td class="num">{{ fmt_price(x.net_sales or 0) }} €</td><td class="num">{{ '%.1f'|format(x.gross_margin_pct or 0) }}%</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div class="panel">
+      <h3>Ranking por venta neta</h3>
+      <table><thead><tr><th>Plato</th><th>Canal</th><th class="num">Venta</th><th class="num">Coste</th><th class="num">Margen €</th></tr></thead><tbody>
+      {% for x in report.top_by_sales[:15] %}<tr><td>{{ x.recipe_name }}</td><td>{{ x.channel }}</td><td class="num">{{ fmt_price(x.net_sales or 0) }} €</td><td class="num">{{ fmt_price(x.food_cost_total or 0) }} €</td><td class="num">{{ fmt_price(x.gross_margin_value or 0) }} €</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Riesgo de margen</h3>
+    <table><thead><tr><th>Plato</th><th>Estado</th><th class="num">Food cost</th><th class="num">Margen</th><th>Acción recomendada</th></tr></thead><tbody>
+      {% for x in report.top_margin_risk[:15] %}<tr><td>{{ x.recipe_name }}</td><td>{% if x.missing_recipe_link %}SIN VÍNCULO{% else %}REVISAR{% endif %}</td><td class="num danger">{{ '%.1f'|format(x.food_cost_pct or 0) }}%</td><td class="num">{{ '%.1f'|format(x.gross_margin_pct or 0) }}%</td><td>{{ x.recommended_action }}</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+  <div class="grid">
+    <div class="panel"><h3>Por canal</h3><table><thead><tr><th>Canal</th><th class="num">Ud.</th><th class="num">Venta</th><th class="num">Margen</th></tr></thead><tbody>{% for g in report.by_channel %}<tr><td>{{ g.name }}</td><td class="num">{{ '%.1f'|format(g.qty_sold or 0) }}</td><td class="num">{{ fmt_price(g.net_sales or 0) }} €</td><td class="num">{{ '%.1f'|format(g.gross_margin_pct or 0) }}%</td></tr>{% endfor %}</tbody></table></div>
+    <div class="panel"><h3>Por tipo de negocio</h3><table><thead><tr><th>Tipo</th><th class="num">Ud.</th><th class="num">Venta</th><th class="num">Margen</th></tr></thead><tbody>{% for g in report.by_business_type %}<tr><td>{{ g.name }}</td><td class="num">{{ '%.1f'|format(g.qty_sold or 0) }}</td><td class="num">{{ fmt_price(g.net_sales or 0) }} €</td><td class="num">{{ '%.1f'|format(g.gross_margin_pct or 0) }}%</td></tr>{% endfor %}</tbody></table></div>
+  </div>
+  {% endif %}
+
+
+  <div class="panel">
+    <h3>Modificadores TPV · consumo realista</h3>
+    <p class="muted">La receta base no cambia. Los modificadores se tratan como deltas: sumar, restar, sustituir o ignorar si no afectan stock.</p>
+    <div class="cards">
+      <div class="card"><div class="label">Mods vendidos</div><div class="value">{{ '%.1f'|format((report.modifier_dashboard.total_modifier_qty if report.modifier_dashboard else 0) or 0) }}</div></div>
+      <div class="card"><div class="label">Mapeados</div><div class="value">{{ (report.modifier_dashboard.mapped_count if report.modifier_dashboard else 0) or 0 }}</div></div>
+      <div class="card"><div class="label">Sin mapear</div><div class="value">{{ (report.modifier_dashboard.unmapped_count if report.modifier_dashboard else 0) or 0 }}</div></div>
+      <div class="card"><div class="label">Sin impacto</div><div class="value">{{ (report.modifier_dashboard.no_stock_count if report.modifier_dashboard else 0) or 0 }}</div></div>
+    </div>
+    {% if report.modifier_dashboard and report.modifier_dashboard.has_data %}
+      <table><thead><tr><th>Plato</th><th>Modificador</th><th>Estado</th><th class="num">Ud.</th></tr></thead><tbody>
+      {% for x in report.modifier_dashboard.top_modifiers[:15] %}<tr><td>{{ x.recipe_name }}</td><td>{{ x.modifier_name }}</td><td>{{ x.status }}</td><td class="num">{{ '%.1f'|format(x.qty_sold or 0) }}</td></tr>{% endfor %}
+      </tbody></table>
+    {% else %}
+      <p class="muted">Sin modificadores TPV normalizados para este periodo.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel"><h3>Evaluación</h3><ul>{% for r in report.recommendations %}<li>{{ r }}</li>{% endfor %}</ul></div>
+  <div class="panel"><h3>Mejoras opcionales preparadas</h3><ul>{% for r in report.optional_improvements %}<li><strong>{{ r.name }}:</strong> {{ r.value }}</li>{% endfor %}</ul></div>
+</body>
+</html>

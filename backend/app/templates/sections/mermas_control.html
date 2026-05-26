@@ -1,0 +1,85 @@
+<section class="section waste-control-section" id="wasteControlBlock">
+  <div class="section-head waste-head">
+    <div>
+      <h1>📊 Control de Mermas</h1>
+      <p class="muted">Analítica económica y operativa: dinero perdido, responsables, motivos, familias y productos críticos.</p>
+    </div>
+    <div class="waste-head-actions">
+      <a class="btn" href="/?page=mermas&center_id={{selected_center_id}}">🗑️ Registrar mermas</a>
+      <form method="get" action="/" class="filter-row">
+        <input type="hidden" name="page" value="mermas_control"><input type="hidden" name="center_id" value="{{selected_center_id}}">
+        <select name="waste_days" onchange="this.form.submit()">
+          <option value="7" {% if waste_days==7 %}selected{% endif %}>7 días</option>
+          <option value="30" {% if waste_days==30 %}selected{% endif %}>30 días</option>
+          <option value="90" {% if waste_days==90 %}selected{% endif %}>90 días</option>
+          <option value="365" {% if waste_days==365 %}selected{% endif %}>365 días</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <div class="kpi-grid waste-kpis">
+    <div class="kpi-card loss-main"><div class="kpi-label">Dinero perdido confirmado</div><div class="kpi-value">{{'%.2f'|format(waste_control.total_loss or 0)}} €</div><div class="kpi-note">Mermas confirmadas · {{waste_control.days}} días</div></div>
+    <div class="kpi-card"><div class="kpi-label">Pérdida pendiente potencial</div><div class="kpi-value">{{'%.2f'|format(waste_control.potential_loss or 0)}} €</div><div class="kpi-note">Borradores y pendientes por revisar</div></div>
+    <div class="kpi-card"><div class="kpi-label">Registros confirmados</div><div class="kpi-value">{{waste_control.confirmed_records}}</div><div class="kpi-note">Total registros: {{waste_control.total_records}}</div></div>
+    <div class="kpi-card"><div class="kpi-label">Media por merma</div><div class="kpi-value">{{'%.2f'|format(waste_control.avg_loss or 0)}} €</div><div class="kpi-note">Coste medio confirmado</div></div>
+  </div>
+
+  <div class="control-grid">
+    <div class="card control-card">
+      <h2>Productos con más pérdida</h2>
+      <div class="analytics-list">
+        {% for r in waste_control.top_items %}
+        <div class="analytics-row"><span>{{r.label}}</span><strong>{{'%.2f'|format(r.loss or 0)}} €</strong><small>{{r.count}} reg.</small></div>
+        {% else %}<div class="empty">Sin mermas confirmadas.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="card control-card">
+      <h2>Motivos principales</h2>
+      <div class="analytics-list">
+        {% for r in waste_control.by_reason %}
+        <div class="analytics-row"><span>{{r.label}}</span><strong>{{'%.2f'|format(r.loss or 0)}} €</strong><small>{{r.count}} reg.</small></div>
+        {% else %}<div class="empty">Sin datos.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="card control-card">
+      <h2>Responsables / registro</h2>
+      <div class="analytics-list">
+        {% for r in waste_control.by_responsible %}
+        <div class="analytics-row"><span>{{r.label}}</span><strong>{{'%.2f'|format(r.loss or 0)}} €</strong><small>{{r.count}} reg.</small></div>
+        {% else %}<div class="empty">Sin datos.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="card control-card">
+      <h2>Familias afectadas</h2>
+      <div class="analytics-list">
+        {% for r in waste_control.by_family %}
+        <div class="analytics-row"><span>{{r.label}}</span><strong>{{'%.2f'|format(r.loss or 0)}} €</strong><small>{{r.count}} reg.</small></div>
+        {% else %}<div class="empty">Sin datos.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card control-card full">
+    <h2>Lectura operativa recomendada</h2>
+    <div class="insight-grid">
+      <div><strong>Compras</strong><p>Si se repite “mal estado” en un producto/proveedor, revisar recepción, rotación y condiciones de entrega.</p></div>
+      <div><strong>Producción</strong><p>Si domina “sobrante no reutilizable”, revisar previsión diaria, batch size y producciones por partida.</p></div>
+      <div><strong>Manipulación</strong><p>Si dominan roturas, quemados o errores, revisar formación, mise en place y supervisión del turno.</p></div>
+      <div><strong>Coste</strong><p>El importe destacado se calcula con el coste actual del artículo en el momento del registro.</p></div>
+    </div>
+  </div>
+
+  <div class="card control-card full">
+    <h2>Últimos registros incluidos</h2>
+    <div class="mini-table">
+      <div class="mini-head"><span>Fecha</span><span>Local</span><span>Producto</span><span>Motivo</span><span>Resp.</span><span>Coste</span></div>
+      {% for r in waste_control.recent %}
+      {% set _dt = (r.created_at|string).replace('T',' ').split(' ') %}
+      {% set _d = _dt[0] if _dt|length>0 else '' %}
+      {% set _h = (_dt[1][:5] if _dt|length>1 else '') %}
+      <div class="mini-row"><span class="date-time-stack">{% if _d %}<b>{{_d[8:10]}}/{{_d[5:7]}}/{{_d[0:4]}}</b>{% endif %}{% if _h %}<small>{{_h}}</small>{% endif %}</span><span>{{r.center_name or '-'}}</span><span>{{r.article_name or r.item_name_detected or 'Sin identificar'}}</span><span>{{r.reason or '-'}}</span><span>{{r.responsible_name or '-'}}</span><strong>{{'%.2f'|format(r.total_cost_snapshot or 0)}} €</strong></div>
+      {% else %}<div class="empty">Sin registros recientes.</div>{% endfor %}
+    </div>
+  </div>
+</section>

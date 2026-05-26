@@ -1,0 +1,9 @@
+<h4 class="mt" id="receiptLinesSection">Líneas</h4>
+<div class="table-wrap receipt-lines-table">
+  <table>
+    <thead><tr><th>Artículo</th><th>Cant.</th><th>Factor</th><th>Base</th><th></th></tr></thead>
+    <tbody>
+    {% for l in receipt_detail.lines %}<tr><td>{{l.item_name}}</td><td style="text-align:right">{{ ("%.3f"|format(l.qty_input)).replace(".000","").replace(".00","").replace(".0","") }} {{l.input_unit}}</td><td style="text-align:right">{{ ("%.3f"|format(l.factor)).replace(".000","").replace(".00","").replace(".0","") }}</td><td style="text-align:right">{{ ("%.3f"|format(l.qty_base)).replace(".000","").replace(".00","").replace(".0","") }} {{l.base_unit}}</td><td><form method="post" action="/receipt/{{receipt_detail.id}}/delete_line/{{l.id}}" style="display:inline" onsubmit="return confirm('{% if receipt_detail.status=='PENDING' %}¿Quitar esta línea del borrador?{% else %}¿Quitar esta línea del albarán confirmado y revertir su impacto en stock?{% endif %}');"><button class="mini line-delete-btn" type="submit">Quitar</button></form></td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>

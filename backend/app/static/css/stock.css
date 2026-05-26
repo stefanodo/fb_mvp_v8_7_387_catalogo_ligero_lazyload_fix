@@ -1,0 +1,74 @@
+/* Bloque Stock — acciones y stock de producciones */
+body[data-page="stock"] .stock-action-btn,
+body[data-page="stock"] .stock-mini-btn{
+  display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:10px;
+}
+body[data-page="stock"] .stock-action-btn{min-height:42px;padding:0 14px;}
+body[data-page="stock"] .stock-mini-btn{min-width:36px;min-height:32px;padding:0 10px;}
+body[data-page="stock"] .stock-table td:last-child{width:70px;text-align:center;}
+body[data-page="stock"] .stock-inline-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+body[data-page="stock"] .stock-search-row{margin:10px 0 6px 0;}
+body[data-page="stock"] .stock-inline-button-row.mt{margin-top:12px;}
+.stock-inline-button-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.stock-mini-form{display:inline-flex;margin:0;}
+.stock-mini-form button,.stock-inline-button-row button{cursor:pointer;}
+body[data-page="stock"] .stock-productions-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+body[data-page="stock"] .stock-productions-sub{font-size:12px;margin:4px 0 0;}
+body[data-page="stock"] .stock-productions-table td:nth-child(4),
+body[data-page="stock"] .stock-productions-table td:nth-child(5){white-space:nowrap;}
+@media (max-width: 900px){
+  body[data-page="stock"] .stock-productions-head{flex-direction:column;align-items:stretch;}
+}
+
+body[data-page="stock"] .stock-nav-blocks{margin-bottom:14px;}
+body[data-page="stock"] .stock-nav-title{font-weight:700;margin-bottom:10px;}
+body[data-page="stock"] .stock-nav-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;}
+body[data-page="stock"] .stock-block-btn{min-height:46px;justify-content:center;font-weight:700;}
+body[data-page="stock"] .stock-section-block{scroll-margin-top:88px;}
+body[data-page="stock"] .stock-placeholder-panel{scroll-margin-top:88px;}
+@media (max-width: 1100px){body[data-page="stock"] .stock-nav-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width: 640px){body[data-page="stock"] .stock-nav-grid{grid-template-columns:1fr;}}
+
+body[data-page="stock"] .stock-nav-grid-7{grid-template-columns:repeat(7,minmax(0,1fr));}
+body[data-page="stock"] .stock-placeholder-panel{padding:18px;}
+body[data-page="stock"] #stockCurrentAllPanel .panel{background:transparent;border:none;padding:0;}
+body[data-page="stock"] #stockCurrentAllPanel .stock-table-panel{margin-top:0;}
+@media (max-width: 1400px){body[data-page="stock"] .stock-nav-grid-7{grid-template-columns:repeat(4,minmax(0,1fr));}}
+@media (max-width: 900px){body[data-page="stock"] .stock-nav-grid-7{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (max-width: 640px){body[data-page="stock"] .stock-nav-grid-7{grid-template-columns:1fr;}}
+
+
+.stock-nav-grid-8{grid-template-columns:repeat(8,minmax(0,1fr));}
+@media (max-width: 1200px){.stock-nav-grid-8{grid-template-columns:repeat(4,minmax(0,1fr));}}
+@media (max-width: 720px){.stock-nav-grid-8{grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+body[data-page="stock"] .stock-lookup-row{position:relative;overflow:visible;}
+body[data-page="stock"] .stock-lookup-suggest{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:#0f141c;border:1px solid var(--line-2);border-radius:10px;max-height:260px;overflow:auto;box-shadow:0 12px 28px rgba(0,0,0,.35);}
+body[data-page="stock"] .stock-lookup-suggest button{display:flex;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);padding:10px 12px;cursor:pointer;justify-content:space-between;align-items:center;gap:10px;}
+body[data-page="stock"] .stock-lookup-suggest button:last-child{border-bottom:0;}
+body[data-page="stock"] .stock-lookup-suggest button:hover{background:rgba(255,255,255,.05);}
+body[data-page="stock"] .stock-lookup-suggest small{opacity:.72;font-size:11px;}
+body[data-page="stock"] .stock-row-hidden{display:none !important;}
+
+body[data-page="stock"] .stock-lookup-row{display:block;}
+body[data-page="stock"] .stock-lookup-row input#stockLookup{width:100%;}
+body[data-page="stock"] .stock-search-hidden{display:none !important;}
+body[data-page="stock"] .stock-search-clear{display:inline-flex;margin-top:8px;}
+body[data-page="stock"] .stock-search-clear-hidden{display:none !important;}
+body[data-page="stock"] .stock-lookup-suggest{margin-top:8px;position:relative;left:auto;right:auto;top:auto;}
+body[data-page="stock"] .stock-lookup-suggest .empty{padding:10px 12px;opacity:.72;font-size:12px;}
+
+/* v8_7_332 · Stock móvil más compacto y sin salto visual agresivo */
+body[data-page="stock"] #stockNavBlocks{scroll-margin-top:110px;}
+body[data-page="stock"] .stock-operational-note{font-size:12px!important;line-height:1.35!important;opacity:.78;margin-top:10px;}
+@media(max-width:760px){
+  body[data-page="stock"] .stock-nav-grid-8{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;}
+  body[data-page="stock"] .stock-block-btn{min-height:42px!important;padding:9px!important;font-size:14px!important;}
+  body[data-page="stock"] .stock-operational-note{max-height:0;overflow:hidden;margin:0!important;}
+}
+
+/* v8_7_334 · Stock sin flash visible */
+body[data-page="stock"] section#stock{transition:opacity .12s ease, transform .12s ease;}
+body[data-page="stock"] section#stock.stock-soft-loading{opacity:.78;transform:translateY(1px);}
+body[data-page="stock"] .stock-block-btn.loading{border-color:rgba(241,190,90,.8)!important;color:#f7d47b!important;}
+body[data-page="stock"] .stock-block-btn.active{border-color:rgba(241,190,90,.65)!important;background:rgba(201,153,54,.12)!important;color:#f6d27b!important;}

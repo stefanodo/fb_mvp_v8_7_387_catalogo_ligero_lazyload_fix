@@ -1,0 +1,12 @@
+<div class="panel production-detail-panel" id="productionDetailPanel">
+  <h3>Detalle</h3>
+  {% if production_detail %}
+    {% include "partials/productions_detail_header.html" %}
+    {% include "partials/productions_detail_note.html" %}
+    {% include "partials/productions_loaders.html" %}
+    {% include "partials/productions_recipe_breakdown.html" %}
+    {% include "partials/productions_lines.html" %}
+  {% else %}
+    {% include "partials/productions_empty.html" %}
+  {% endif %}
+</div>

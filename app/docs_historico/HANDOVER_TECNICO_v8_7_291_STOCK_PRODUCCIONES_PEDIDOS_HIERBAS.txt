@@ -1,0 +1,13 @@
+System MAC · v8_7_291_stock_producciones_pedidos_hierbas_fix_macfix
+
+Correcciones incluidas:
+1) Stock > Producciones: muestra elaborados confirmados y también incidencias si una producción confirmada no tiene entrada de elaborado vinculada.
+2) Producciones desde receta: prioriza recipes.produced_item_id para crear la entrada de elaborado; si falta, cae al nombre de receta.
+3) Confirmar producción: si hay salidas OUT pero falta entrada IN, intenta crear una entrada de elaborado a partir de la receta citada en la nota.
+4) Hierbas frescas: ALBAHACA, CILANTRO, CEBOLLINO, MENTA, PEREJIL, HIERBABUENA, ENELDO, ROMERO, TOMILLO y CEBOLLETA pasan a unidad manojo.
+5) AGUACHILES/AGUACHILE: se clasifica como PREPARACIÓN y no se muestra como insumo de compra manual.
+6) Min/max heredado: se mantiene corrección de valores tipo 20000 g -> 20 kg.
+7) Pedidos: se mantiene bloqueo de creación automática; borrar borrador no debe crear otro pedido nuevo.
+8) Se añade comando CORREGIR_HIERBAS_Y_PREPARACIONES.command para aplicar la normalización a la base real de runtime.
+
+No tocado: OCR, voz, albaranes.

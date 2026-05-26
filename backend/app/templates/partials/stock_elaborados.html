@@ -1,0 +1,63 @@
+<div class="panel mt panel-accent" id="elaboradosPanel">
+  <div class="stock-productions-head">
+    <div>
+      <h3 style="margin:0;">🍳 Stock de producciones</h3>
+      <p class="muted stock-productions-sub">Elaborados confirmados que ya han entrado a stock de producción.</p>
+    </div>
+    <div class="stock-inline-button-row">
+      <form method="get" action="/">
+        <input type="hidden" name="page" value="producciones">
+        <input type="hidden" name="center_id" value="{{selected_center_id}}">
+        <button class="btn stock-action-btn" type="submit">Ir a Producciones</button>
+      </form>
+      <button class="mini stock-mini-btn" type="button" onclick="loadElaborados()">Actualizar</button>
+    </div>
+  </div>
+  <div id="elaboradosContent">
+    {% if production_stocks and production_stocks|length > 0 %}
+      <div class="table-wrap">
+        <table class="stock-table stock-productions-table">
+          <thead>
+            <tr><th>Local</th><th>Almacén</th><th>Elaborado</th><th>Stock</th><th>Porciones</th><th>Últ. producción</th><th></th></tr>
+          </thead>
+          <tbody>
+          {% for e in production_stocks %}
+            <tr>
+              <td>{{e.center_name}}</td>
+              <td>{{e.warehouse_name}}</td>
+              <td>
+                <strong>{{e.item_name}}</strong>
+                {% if e.recipe_name %}<div class="muted" style="font-size:12px;">Receta: {{e.recipe_name}}</div>{% endif %}{% if e.issue %}<div class="badge warn" style="margin-top:4px;">{{ e.issue }}</div>{% endif %}
+              </td>
+              <td><strong>{{ human_qty(e.stock_qty, e.unit) }}</strong></td>
+              <td>
+                {% if e.porciones_disponibles is not none %}
+                  <strong>{{ e.porciones_disponibles|round(1) }}</strong> raciones
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="muted" style="font-size:12px;">
+                {% if e.last_prod_note %}<div>{{ e.last_prod_note }}</div>{% endif %}
+                <div>{{ fmt_dt(e.last_production_at) or '—' }}</div>
+              </td>
+              <td>
+                {% if e.last_prod_id %}
+                <form method="get" action="/" class="stock-mini-form">
+                  <input type="hidden" name="page" value="producciones">
+                  <input type="hidden" name="center_id" value="{{e.center_id}}">
+                  <input type="hidden" name="pid" value="{{e.last_prod_id}}">
+                  <button class="mini stock-mini-btn" type="submit">Abrir</button>
+                </form>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="muted" style="padding:12px 0;font-size:13px;">No hay stock de producciones todavía. Cuando confirmes elaborados aparecerán aquí.</div>
+    {% endif %}
+  </div>
+</div>

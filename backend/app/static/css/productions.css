@@ -1,0 +1,29 @@
+.production-sidebar,.production-detail-panel{min-width:0;}
+.production-history-table td,.production-history-table th{vertical-align:top;}
+.production-inline-note,.production-inline-state{display:flex;gap:8px;align-items:center;}
+
+.production-detail-head-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.production-note-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.production-note-form input{flex:1 1 280px;}
+
+.smart-suggest-list{display:none;margin-top:6px;border:1px solid var(--line-2);border-radius:10px;background:#0f141c;max-height:220px;overflow:auto;}
+.smart-suggest-item{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);color:var(--text);padding:9px 12px;cursor:pointer;}
+.smart-suggest-item:last-child{border-bottom:0;}
+.smart-suggest-item:hover{background:rgba(255,255,255,.05);}
+
+/* v8_7_283 · Producciones móvil: filtros horizontales y tabla legible */
+body[data-page="producciones"] .production-history-card > .actions.wrap{display:flex;overflow-x:auto;flex-wrap:nowrap !important;gap:8px;padding-bottom:8px;-webkit-overflow-scrolling:touch;}
+body[data-page="producciones"] .production-history-card > .actions.wrap .mini{flex:0 0 auto;min-height:42px;padding:0 14px;border-radius:999px;}
+@media (max-width:760px){
+  body[data-page="producciones"] .production-history-wrap{overflow:visible !important;}
+  body[data-page="producciones"] .production-history-table{display:block;width:100%;min-width:0;}
+  body[data-page="producciones"] .production-history-table thead{display:none;}
+  body[data-page="producciones"] .production-history-table tbody{display:grid;gap:10px;}
+  body[data-page="producciones"] .production-history-table tr{display:grid;grid-template-columns:1fr auto;gap:8px 12px;border:1px solid rgba(255,255,255,.10);border-radius:16px;background:rgba(255,255,255,.035);padding:14px;}
+  body[data-page="producciones"] .production-history-table td{display:block;border:0 !important;padding:0 !important;}
+  body[data-page="producciones"] .production-history-table td:nth-child(1){font-size:16px;line-height:1.35;}
+  body[data-page="producciones"] .production-history-table td:nth-child(2){grid-column:1;}
+  body[data-page="producciones"] .production-history-table td:nth-child(3){grid-column:1;font-size:13px;opacity:.78;}
+  body[data-page="producciones"] .production-history-table td:nth-child(4){grid-column:2;grid-row:1 / span 3;align-self:center;}
+  body[data-page="producciones"] .production-history-table .mini{min-height:44px;min-width:82px;border-radius:12px;}
+}

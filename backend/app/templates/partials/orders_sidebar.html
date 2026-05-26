@@ -1,0 +1,64 @@
+<div class="orders-v361-shell">
+  <div class="orders-v361-titlebar">
+    <div>
+      <h2>🛒 Pedidos</h2>
+      <p>Gestiona y consulta los pedidos del restaurante.</p>
+    </div>
+  </div>
+
+  <form method="post" action="/order/new_form" class="orders-v361-create scroll-safe-submit" data-scroll-safe-submit="1">
+    {% if request.query_params.get('ord_msg') == 'responsible_required' %}
+      <div class="notice err orders-v361-notice"><span class="notice-icon">✕</span><span class="notice-text">Selecciona responsable antes de crear o editar un pedido.</span></div>
+    {% endif %}
+    <div class="orders-v361-field"><label>Local</label>
+      <select name="center_id" required>
+        {% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}
+      </select>
+    </div>
+    {% set active_users = users|selectattr("is_active")|list %}
+    {% set non_admin_users = active_users|rejectattr("name", "equalto", "ADMIN GENERAL")|list %}
+    {% set eligible_users = non_admin_users if non_admin_users else active_users %}
+    <div class="orders-v361-field"><label>Responsable</label>
+      <select name="responsible_user_id" required>
+        <option value="">Selecciona responsable…</option>
+        {% for u in eligible_users %}<option value="{{u.id}}">{{u.name}}{% if u.role %} · {{u.role}}{% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="orders-v361-field"><label>Nota</label><input name="note" placeholder="Opcional"></div>
+    <div class="orders-v361-action"><button class="primary orders-v361-new" type="submit" data-critical-submit="new-order">＋ Nuevo pedido</button></div>
+  </form>
+
+  <div class="orders-v361-history">
+    <div class="orders-v361-history-head">
+      <div>
+        <h3>↺ Historial de pedidos</h3>
+        <p>Consulta tus pedidos recientes.</p>
+      </div>
+      <a class="btn orders-v361-archived" href="/?page=pedidos&center_id={{selected_center_id}}{% if show_archived_orders %}{% if order_detail %}&oid={{order_detail.id}}{% endif %}{% else %}&show_archived_orders=1{% if order_detail %}&oid={{order_detail.id}}{% endif %}{% endif %}">{% if show_archived_orders %}Ver activos{% else %}Ver archivados{% endif %}</a>
+    </div>
+
+    <div class="orders-v361-table" role="table" aria-label="Historial de pedidos">
+      <div class="orders-v361-row orders-v361-row-head" role="row">
+        <span>ID</span><span>Local</span><span>Responsable</span><span>Nota</span><span>Fecha</span><span>Estado</span><span>Acciones</span>
+      </div>
+      {% for o in orders[:8] %}
+        <div class="orders-v361-row" role="row">
+          <span class="orders-v361-id">#{{o.id}}</span>
+          <span>{{o.center_name}}</span>
+          <span>{{ o.responsible_name or 'Sin responsable' }}</span>
+          <span>{{ o.note or '–' }}</span>
+          <span>{{ o.created_at or '–' }}</span>
+          <span>{% if o.status=='CONFIRMED' %}<b class="badge ok">CONFIRMADO</b>{% elif o.status=='ARCHIVED' %}<b class="badge">ARCHIVADO</b>{% else %}<b class="badge warn">BORRADOR</b>{% endif %}</span>
+          <span class="orders-v361-actions">
+            <a class="mini" href="/?page=pedidos&center_id={{selected_center_id}}&oid={{o.id}}">Abrir</a>
+            {% if o.status=='DRAFT' %}
+              <form method="post" action="/order/{{o.id}}/delete_form" onsubmit="return confirm('¿Borrar este pedido borrador?');"><button class="mini" type="submit">Borrar</button></form>
+            {% endif %}
+          </span>
+        </div>
+      {% else %}
+        <div class="orders-v361-empty">No hay pedidos en este filtro.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,10 @@
+<div class="recipe-summary-layout mt"{% if recipe_detail.calc %} id="recipeCalc" data-cost-adjusted="{{ recipe_detail.calc.cost_adjusted }}" data-cost-per="{{ recipe_detail.calc.cost_per_portion }}" data-vat-rate="{{ recipe_detail.calc.vat_rate }}"{% endif %}>
+  <div class="recipe-metrics-stack recipe-metrics-grid">
+    <div class="metric-pill"><span class="metric-label">Coste (con contingencia)</span><span class="metric-value" id="calc_cost_adj">{{ "%.2f"|format(recipe_detail.calc.cost_adjusted if recipe_detail.calc else 0) }} €</span></div>
+    <div class="metric-pill"><span class="metric-label">Coste/ración</span><span class="metric-value" id="calc_cost_per">{{ "%.2f"|format(recipe_detail.calc.cost_per_portion if recipe_detail.calc else 0) }} €</span></div>
+    <div class="metric-pill"><span class="metric-label">PVP (sin IVA)</span><span class="metric-value" id="calc_price_ex">{{ "%.2f"|format(recipe_detail.calc.price_ex_vat if recipe_detail.calc else 0) }} €</span></div>
+    <div class="metric-pill"><span class="metric-label">IVA 10%</span><span class="metric-value" id="calc_price_vat">{{ "%.2f"|format(recipe_detail.calc.price_vat if recipe_detail.calc else 0) }} €</span></div>
+    <div class="metric-pill metric-pill-wide"><span class="metric-label">PVP (con IVA)</span><span class="metric-value" id="calc_price_inc">{{ "%.2f"|format(recipe_detail.calc.price_inc_vat if recipe_detail.calc else 0) }} €</span></div>
+  </div>
+  {% include "partials/recipes_photo.html" %}
+</div>

@@ -1,0 +1,63 @@
+System MAC · v8_7_273 · Admin Probar IA + Operativa segura
+
+Cambios aplicados:
+
+1) Admin/Catálogo · nueva pantalla “🤖 Probar IA”
+- Nueva pestaña en Catálogo/Admin para ver estado de IA.
+- Muestra si OpenAI está activa o si está en modo local.
+- Muestra modo texto, modo voz, modelos y si hay clave cargada sin exponerla.
+- Botón “Probar IA ahora” con diagnóstico:
+  - OK conectado.
+  - NO_KEY si no hay OPENAI_API_KEY.
+  - 401 si clave inválida/revocada/mal pegada.
+  - 429 si no hay cuota/saldo/facturación.
+  - 404 si el modelo no está disponible.
+
+2) Operativa rápida · estado visible de IA
+- La tarjeta de dictado muestra claramente si está en OPENAI ACTIVA o LOCAL / SIN IA EXTERNA.
+- Si está en local, aparece aviso claro: comprensión limitada por reglas locales.
+- Link directo a Catálogo → Probar IA.
+
+3) Pedidos por voz · bloqueo de artículos inexistentes
+- Si el usuario dicta un pedido de un artículo que no existe en catálogo/stock, no se guarda como línea normal.
+- Ejemplo: “pescado de roca” si no está creado, devuelve ARTICLE_NOT_FOUND.
+- Mensaje: primero debe crearse como artículo para poder pedirlo.
+
+4) Alta rápida de artículo desde Operativa
+- Cuando falta un artículo, Operativa muestra un formulario:
+  - Nombre artículo
+  - Cantidad
+  - Unidad
+  - Crear artículo y añadir al carrito
+- Crea el artículo en catálogo/stock y lo añade al carrito como propuesta pendiente.
+- Clasificación inicial automática básica:
+  - pescado/salmón/merluza/atún/lubina/dorada/bacalao/roca → PESCADOS, cámara, kg
+  - verduras comunes → VERDURAS, cámara, kg
+  - carnes comunes → CARNES, cámara, kg
+  - resto → SIN_CLASIFICAR, cocina, kg
+- Se debe revisar después proveedor/precio en Catálogo.
+
+5) Seguridad operativa
+- La IA y el dictado solo crean propuestas pendientes.
+- No cierra pedidos.
+- No confirma producciones.
+- No descuenta stock.
+- Pedido solo puede entrar como artículo real de catálogo/stock, no como receta.
+
+Validación realizada:
+- Compilación backend/app: OK.
+- Compilación app/backend/app: OK.
+- Importación FastAPI: OK.
+- Admin: OK.
+- Operativa: OK.
+- /api/admin/ia_status: OK.
+- /api/admin/probar_ia sin clave: devuelve NO_KEY correctamente.
+- “Soy Pedro agrega 1 kilo de pescado de roca al pedido”: bloqueado como ARTICLE_NOT_FOUND.
+- Alta rápida de artículo test: crea artículo y línea; test eliminado después.
+
+Uso:
+1) Ejecutar CONFIGURAR_IA_OPENAI.command y pegar clave nueva.
+2) Reiniciar con DESBLOQUEAR_y_INICIAR.command.
+3) Entrar en Catálogo → Probar IA.
+4) Pulsar “Probar IA ahora”.
+5) Si aparece OPENAI ACTIVA, probar Operativa rápida.

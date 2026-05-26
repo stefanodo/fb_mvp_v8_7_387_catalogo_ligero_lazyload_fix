@@ -1,0 +1,52 @@
+System MAC · v8_7_267 · Operativa rápida con voz live
+
+Cambios principales:
+1) Nuevo bloque visible: ⚡ Operativa rápida.
+- Se añade al menú desktop y móvil.
+- Pantalla diseñada para uso rápido desde móvil.
+- No sustituye Pedidos, Producciones ni Mermas; actúa como entrada rápida previa.
+
+2) Dictado con texto en directo.
+- Si el navegador permite Web Speech API, el textarea muestra texto parcial mientras se dicta.
+- Se usa interimResults=true y continuous=true para ver lo que se está diciendo.
+- Si iPhone/Safari no expone voz web, el sistema no bloquea: enfoca el campo e indica usar el micrófono del teclado iOS.
+
+3) Carrito compartido de pedidos.
+- Una frase tipo “Agrega 2 kilos de zanahoria al pedido” crea línea pendiente.
+- Si otra persona dicta “Agrega medio kilo de zanahoria al pedido”, se consolida en la misma línea si coincide local + artículo + unidad + estado pendiente.
+- Se guardan aportes internos por persona en operational_queue_contributions.
+- La línea consolidada muestra total y aportes.
+
+4) Cola compartida de producciones.
+- Una frase tipo “Quiero producir 12 raciones de lasaña de verduras” crea una propuesta pendiente.
+- Si se repite misma producción/unidad/local, se consolida.
+- No descuenta stock ni confirma producción.
+
+5) Mermas desde Operativa rápida.
+- Las frases de merma se guardan como propuestas rápidas pendientes dentro de Operativa.
+- Para foto/evidencia y validación completa se mantiene el bloque Mermas.
+
+6) Seguridad operativa.
+- Nada impacta stock automáticamente.
+- Nada crea pedido cerrado automáticamente.
+- Nada confirma producción automáticamente.
+- Las líneas pueden editarse, validarse o anularse.
+
+Archivos principales añadidos/modificados:
+- backend/app/services/operational_quick_service.py
+- backend/app/routers/operativa.py
+- backend/app/templates/sections/operativa.html
+- backend/app/templates/partials/operativa_line.html
+- backend/app/static/js/operativa.js
+- backend/app/static/css/operativa.css
+- backend/app/main.py
+- backend/app/templates/index.html
+
+Validación realizada:
+- Compilación Python OK.
+- Importación FastAPI OK.
+- Smoke test páginas OK: inicio, operativa, pedidos, producciones, mermas.
+- Prueba de consolidación simulada OK: zanahoria 2 kg + 0,5 kg queda en una línea consolidada.
+
+Limitación consciente:
+- La lógica de suficiencia stock + pedido pendiente + producción pendiente queda como siguiente fase. Esta versión consolida aportes y evita duplicados simples, pero aún no calcula si “ya es suficiente” contra stock/min/max/producciones reales.

@@ -1,0 +1,11 @@
+<div class="recipe-code-line muted">Código: <b>{{recipe_detail.code}}</b></div>
+<div class="recipe-time-chips">
+  {% set r_created = (recipe_detail.created_at or '')|string %}
+  {% set r_updated = (recipe_detail.updated_at or recipe_detail.created_at or '')|string %}
+  {% set c_date = (r_created[8:10] ~ '/' ~ r_created[5:7] ~ '/' ~ r_created[0:4]) if r_created|length >= 10 else '--/--/----' %}
+  {% set u_date = (r_updated[8:10] ~ '/' ~ r_updated[5:7] ~ '/' ~ r_updated[0:4]) if r_updated|length >= 10 else '--/--/----' %}
+  <span class="recipe-time-chip">Creada: {{ c_date }}</span>
+  <span class="recipe-time-chip recipe-time-chip-muted">Hora: {{ r_created[11:16] if r_created|length >= 16 else '--:--' }}</span>
+  <span class="recipe-time-chip">Modificada: {{ u_date }}</span>
+  <span class="recipe-time-chip recipe-time-chip-muted">Hora: {{ r_updated[11:16] if r_updated|length >= 16 else '--:--' }}</span>
+</div>

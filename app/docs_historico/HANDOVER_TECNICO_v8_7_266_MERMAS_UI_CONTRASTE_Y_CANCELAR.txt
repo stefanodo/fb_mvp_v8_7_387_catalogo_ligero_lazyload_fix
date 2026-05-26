@@ -1,0 +1,34 @@
+System MAC · HOTFIX v8_7_266
+
+Cambios aplicados:
+1) Mermas · voz en iPhone
+- Se elimina el alert bloqueante cuando el navegador no expone SpeechRecognition.
+- Nuevo comportamiento: se muestra mensaje de apoyo no bloqueante y se invita a usar el micrófono del teclado de iPhone dentro del textarea.
+- Se mantiene reconocimiento directo si el navegador lo permite.
+
+2) Mermas · visibilidad/contraste
+- Se mejora contraste general de textos, placeholders, etiquetas, tarjetas y chips.
+- Se refuerzan bordes y fondos para lectura clara en modo oscuro del sistema.
+- Se mejora contraste de la zona de edición/validación.
+
+3) Mermas · anular merma
+- Botón “Anular merma” más visible.
+- Estado visible si la merma ya está anulada o confirmada.
+- Acciones visibles en bloque de botones más claro.
+
+4) Riesgo controlado
+- No se modifica lógica de stock ni confirmación.
+- No se toca recetas, pedidos, producciones ni OCR.
+- El cambio es principalmente de UX/CSS/JS del bloque Mermas.
+
+Pendiente propuesto para siguiente bloque:
+A) Pedido por voz con carrito borrador
+- dictado/texto natural → parser simple → líneas de pedido borrador
+- revisión humana → validación final del pedido
+
+B) Producción por voz con cola pendiente
+- dictado de receta + cantidad
+- cálculo de necesidades
+- detección de faltantes
+- botón “agregar faltantes a pedido”
+- confirmación humana antes de descontar stock

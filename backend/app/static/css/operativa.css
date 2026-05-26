@@ -1,0 +1,368 @@
+.operativa-section{padding-bottom:90px;color:#1d1a17}.operativa-hero{display:grid;grid-template-columns:1fr minmax(220px,300px);gap:16px;align-items:center;margin:8px 0 16px}.op-kicker{display:inline-flex;background:#201913;color:#f2c45b;border-radius:999px;padding:6px 10px;font-weight:900;font-size:.78rem;letter-spacing:.06em;text-transform:uppercase}.operativa-hero h1{margin:8px 0 6px;font-size:2rem}.operativa-hero p{color:#51493f;margin:0;max-width:760px}.op-status-card{background:#fff3e4;border:1px solid #d9b873;border-radius:20px;padding:16px;text-align:right}.op-status-card span{display:block;font-weight:900;color:#5d4520;text-transform:uppercase;font-size:.78rem}.op-status-card strong{font-size:2.2rem;display:block}.op-status-card small{color:#5f5448}.op-warning{background:#fff6dc;border:1px solid #d9ad54;color:#5f3f0e;border-radius:16px;padding:12px;margin:10px 0;font-weight:800}.op-card{background:#fffdf9;border:1px solid #d7c8b1;border-radius:22px;padding:16px;margin:14px 0;box-shadow:0 12px 30px rgba(35,24,10,.07)}.op-card h2{margin:0 0 8px;color:#17130f}.op-muted{color:#51493f;margin:0 0 10px;line-height:1.45}.op-dictation-card{border-color:#c59a42;background:linear-gradient(135deg,#fffaf0,#fffefb)}.op-form{display:flex;flex-direction:column;gap:9px}.op-form label{font-weight:900;color:#282018}.op-form input,.op-form textarea{width:100%;border:1px solid #c8b79c;border-radius:13px;padding:12px;background:#fff;color:#1f1a14;font-size:1rem}.op-form textarea{min-height:120px}.op-actions{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:8px}.op-btn{border:1px solid #b9a37e;border-radius:14px;padding:13px 14px;background:#fff;font-weight:900;color:#17130f}.op-btn.dark{background:#15120f;color:#fff;border-color:#15120f}.op-btn.gold{background:#d5a634;color:#14100b;border-color:#d5a634}.op-help{background:#f7f1e7;border:1px solid #d6c5ab;border-radius:13px;padding:10px 12px;color:#5b5146;font-weight:800}.op-help.ok{background:#edf8eb;color:#245a2f;border-color:#9cc49a}.op-help.warn{background:#fff6df;color:#6d4a14;border-color:#e0b568}.op-live{background:#15120f;color:#fff;border-radius:14px;padding:13px 14px;line-height:1.45}.op-live strong{color:#f2c45b}.op-live em{color:#f4d890;font-style:normal}.op-examples{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.op-examples button{border:1px solid #dec98e;background:#fff9e9;border-radius:999px;padding:8px 12px;font-weight:900}.op-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.op-line{border:1px solid #ddd0bb;border-radius:17px;padding:12px;margin:10px 0;background:#fff;display:grid;grid-template-columns:1fr auto;gap:12px}.op-line-main strong{display:block;font-size:1.05rem;color:#14100b}.op-line-main span{display:inline-flex;margin:4px 0;background:#f7f1e7;border:1px solid #dac9ad;border-radius:999px;padding:5px 9px;color:#312a22;font-weight:800}.op-line-main p{margin:5px 0;color:#5b5146}.op-line details{margin-top:6px;color:#51493f}.op-line-actions{display:flex;flex-direction:column;gap:7px;min-width:150px}.op-line-actions form{margin:0}.op-line-actions button{width:100%;border-radius:12px;border:1px solid #c9b28b;background:#fff;padding:9px;font-weight:900}.op-line-actions button.ok{background:#edf8eb;color:#245a2f;border-color:#9cc49a}.op-line-actions button.cancel{background:#fff1ee;color:#8f2a1c;border-color:#d99a90}.op-mini-form{display:flex;gap:6px}.op-mini-form input{width:70px;border:1px solid #c8b79c;border-radius:10px;padding:8px}.op-link{display:inline-flex;margin-top:10px;background:#16120f;color:#fff;text-decoration:none;border-radius:14px;padding:10px 12px;font-weight:900}.op-empty{background:#f7f1e7;border:1px solid #d6c5ab;border-radius:14px;padding:12px;color:#5b5146;font-weight:800}
+@media(max-width:900px){.operativa-hero,.op-grid,.op-line{grid-template-columns:1fr}.op-status-card{text-align:left}.op-actions{grid-template-columns:1fr}.op-line-actions{min-width:0}.op-mini-form{display:grid;grid-template-columns:1fr 1fr}.op-mini-form input{width:100%}.operativa-hero h1{font-size:1.55rem}.op-card{border-radius:18px;padding:13px}.op-form textarea{min-height:150px}}
+
+/* v8_7_268 · Operativa más visual + paneles automáticos */
+.operativa-section .compact-hero{margin-top:0;gap:12px}.operativa-section .operativa-hero h1{font-size:1.85rem}.priority-card{border:2px solid #c99a2e!important;box-shadow:0 18px 46px rgba(130,89,18,.14)!important}.op-card-headline{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start}.op-ai-badge{background:#17130f;color:#f2c45b;border-radius:999px;padding:8px 12px;font-size:.78rem;font-weight:950;white-space:nowrap}.op-mode-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}.op-mode-tabs label{border:1px solid #d3bd8d;background:#fff;border-radius:16px;padding:11px 12px;font-weight:950;color:#21170d;text-align:center;cursor:pointer;box-shadow:0 6px 16px rgba(30,20,6,.05)}.op-mode-tabs label:has(input:checked){background:#17130f;color:#fff;border-color:#d5a634;box-shadow:0 10px 24px rgba(30,20,6,.16)}.op-mode-tabs input{position:absolute;opacity:0;pointer-events:none}.op-responsible-row{display:grid;grid-template-columns:1fr auto;gap:8px}.op-btn.mini{padding:10px 12px!important;white-space:nowrap}.op-btn.big{font-size:1.02rem;padding:15px 16px!important}.main-actions{grid-template-columns:1.1fr .8fr .9fr 1.2fr}.op-interpretation{border:1px solid #d2bd8d;background:#fff8e7;border-radius:16px;padding:12px 14px;color:#21170d}.op-interpretation .op-intent-head{display:flex;justify-content:space-between;gap:8px;align-items:center;border-bottom:1px solid #e7d7ad;padding-bottom:8px;margin-bottom:8px}.op-interpretation .op-intent-head strong{font-size:1.05rem}.op-interpretation .op-intent-head span{background:#17130f;color:#f2c45b;border-radius:999px;padding:5px 9px;font-weight:900;font-size:.82rem}.op-interpretation ul{margin:8px 0;padding-left:18px}.op-interpretation p{margin:5px 0}.op-clarify{margin-top:8px;background:#fff0de;border:1px solid #d99a52;color:#6a3c09;border-radius:12px;padding:9px 10px;font-weight:900}.op-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 14px}.op-shortcut{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;text-decoration:none;border:1px solid #d9ccb8;background:#fffdf8;border-radius:18px;padding:14px;color:#17130f;box-shadow:0 10px 24px rgba(25,16,5,.06)}.op-shortcut>span:first-child{font-size:2rem}.op-shortcut strong{display:block;font-size:1.05rem}.op-shortcut span:last-child{display:block;color:#5b5146;font-size:.87rem}.op-shortcut.order{border-left:6px solid #3b6fb6}.op-shortcut.production{border-left:6px solid #4e8d4a}.op-shortcut.waste{border-left:6px solid #a33a29}.op-panel-card{transition:box-shadow .18s ease, transform .18s ease, border-color .18s ease}.op-panel-card.active-panel{border-color:#d5a634!important;box-shadow:0 0 0 4px rgba(213,166,52,.20), 0 18px 42px rgba(65,43,10,.14)!important}.op-panel-order.active-panel{border-left:7px solid #3b6fb6!important}.op-panel-production.active-panel{border-left:7px solid #4e8d4a!important}.op-panel-waste.active-panel{border-left:7px solid #a33a29!important}.flash-panel{animation:opFlash 1.8s ease}@keyframes opFlash{0%{transform:translateY(-2px);box-shadow:0 0 0 8px rgba(213,166,52,.25)}100%{transform:translateY(0)}}.primary-link{font-size:.95rem;padding:12px 14px}.op-line{border-left:5px solid #d5a634}.op-line-badges{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.op-line-badges span{display:inline-flex!important;margin:0!important}.op-line-badges .qty-badge{background:#17130f!important;color:#fff!important;border-color:#17130f!important}.op-line-actions button.ok{background:#dff4dd!important;color:#185823!important;border-color:#8fc38d!important}.op-line-actions button.cancel{background:#ffe9e4!important;color:#8f2a1c!important;border-color:#d99a90!important}
+@media(max-width:900px){.op-card-headline{grid-template-columns:1fr}.op-ai-badge{justify-self:start}.op-mode-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.op-responsible-row{grid-template-columns:1fr}.main-actions{grid-template-columns:1fr}.op-shortcuts{grid-template-columns:1fr}.op-status-card strong{font-size:1.7rem}.operativa-section .operativa-hero h1{font-size:1.45rem}.op-interpretation .op-intent-head{align-items:flex-start;flex-direction:column}}
+
+/* v8_7_269 · UI operativa móvil más visual, sin duplicidad y con zonas claras */
+body[data-page="operativa"] .section-band{height:18px!important;}
+body[data-page="operativa"] .operativa-section .visual-hero{background:linear-gradient(135deg,rgba(10,10,10,.92),rgba(28,22,15,.78));border:1px solid rgba(213,166,52,.28);border-radius:24px;padding:18px;box-shadow:0 18px 42px rgba(0,0,0,.22);}
+body[data-page="operativa"] .op-hero-titlebox h1{color:#fff8e8!important;text-shadow:0 2px 12px rgba(0,0,0,.55);font-size:2.15rem!important;letter-spacing:-.02em;}
+body[data-page="operativa"] .op-hero-titlebox p{color:#e8ddca!important;font-size:1.03rem;line-height:1.45;}
+body[data-page="operativa"] .op-kicker{background:#d5a634!important;color:#14100b!important;border:1px solid #f2c45b!important;box-shadow:0 8px 22px rgba(213,166,52,.20);}
+body[data-page="operativa"] .op-status-card{background:#fffaf0!important;border:2px solid #d5a634!important;color:#1a140d!important;box-shadow:0 12px 28px rgba(213,166,52,.14);}
+body[data-page="operativa"] .priority-card{border-width:3px!important;background:#fffdf7!important;}
+body[data-page="operativa"] .op-card-headline h2{font-size:1.55rem;color:#14100b!important;}
+body[data-page="operativa"] .op-ai-badge{background:#2b2114;color:#ffd76b;border:1px solid #d5a634;}
+body[data-page="operativa"] .op-guided-examples{display:flex;flex-direction:column;gap:6px;background:#f7f1e7;border:1px solid #d6c5ab;border-radius:16px;padding:12px 14px;margin:12px 0;color:#30271e;font-weight:700;}
+body[data-page="operativa"] .op-guided-examples strong{color:#17130f;text-transform:uppercase;letter-spacing:.04em;font-size:.78rem;}
+body[data-page="operativa"] .op-guided-examples span{color:#4e4439;}
+body[data-page="operativa"] .op-mode-tabs{gap:10px;margin:14px 0 16px;}
+body[data-page="operativa"] .op-mode-tabs label{min-height:58px;display:flex;align-items:center;justify-content:center;font-size:1.02rem;border:2px solid #d2bd8d!important;background:#fff!important;color:#1b160f!important;}
+body[data-page="operativa"] .op-mode-tabs label:has(input:checked){background:#15120f!important;color:#fff!important;border-color:#d5a634!important;box-shadow:0 0 0 4px rgba(213,166,52,.20),0 12px 26px rgba(0,0,0,.16)!important;}
+body[data-page="operativa"] .op-form input,
+body[data-page="operativa"] .op-form textarea,
+body[data-page="operativa"] .op-form select{font-size:16px!important;min-height:48px;}
+body[data-page="operativa"] .op-form textarea{font-size:17px!important;line-height:1.45;}
+body[data-page="operativa"] .op-help{font-size:.96rem;line-height:1.4;}
+body[data-page="operativa"] .op-live{font-size:1rem;border:1px solid #d5a634;}
+body[data-page="operativa"] .op-interpretation{border-width:2px;background:#fff6df;}
+body[data-page="operativa"] .primary-voice{background:#0d0d0d!important;color:#fff!important;border:2px solid #d5a634!important;box-shadow:0 12px 26px rgba(0,0,0,.18);}
+body[data-page="operativa"] .primary-create{background:#d5a634!important;color:#100d08!important;border:2px solid #b88b22!important;box-shadow:0 12px 26px rgba(184,139,34,.18);}
+body[data-page="operativa"] .op-desktop-note{display:block;background:#f2ede4;border:1px solid #d8c8ad;color:#4c4238;border-radius:12px;padding:9px 11px;font-weight:800;font-size:.9rem;}
+body[data-page="operativa"] .op-shortcut{border-width:2px;background:#fffaf0;}
+body[data-page="operativa"] .op-shortcut:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(20,13,5,.10);}
+body[data-page="operativa"] .op-panel-card h2{font-size:1.35rem;}
+@media(max-width:900px){
+  body[data-page="operativa"] .container{padding-left:18px!important;padding-right:18px!important;}
+  body[data-page="operativa"] .operativa-section .visual-hero{padding:16px;border-radius:22px;margin-top:6px;}
+  body[data-page="operativa"] .op-hero-titlebox h1{font-size:1.72rem!important;margin-top:10px!important;color:#fff5df!important;}
+  body[data-page="operativa"] .op-hero-titlebox p{font-size:1.02rem!important;color:#eadfcd!important;}
+  body[data-page="operativa"] .op-status-card{padding:14px 16px;border-radius:18px;}
+  body[data-page="operativa"] .op-card-headline h2{font-size:1.42rem;}
+  body[data-page="operativa"] .op-mode-tabs{grid-template-columns:1fr 1fr!important;}
+  body[data-page="operativa"] .op-mode-tabs label{min-height:62px;font-size:1.04rem;border-radius:17px;}
+  body[data-page="operativa"] .op-guided-examples span{font-size:.95rem;}
+  body[data-page="operativa"] .op-actions .op-btn{min-height:54px;font-size:1.02rem;}
+  body[data-page="operativa"] .op-desktop-note{display:none;}
+  body[data-page="operativa"] .op-shortcut{min-height:72px;}
+}
+
+/* v8_7_270 · dictado automático y limpieza tras guardar */
+body[data-page="operativa"] .op-examples-collapsed{display:block!important;gap:0!important;padding:0!important;background:transparent!important;border:0!important;margin:8px 0 12px!important;}
+body[data-page="operativa"] .op-examples-collapsed summary{display:inline-flex;align-items:center;gap:6px;background:#f7f1e7;border:1px solid #d6c5ab;border-radius:999px;padding:8px 12px;color:#2b2114;font-weight:950;cursor:pointer;}
+body[data-page="operativa"] .op-examples-collapsed[open]{background:#f7f1e7!important;border:1px solid #d6c5ab!important;border-radius:16px!important;padding:12px 14px!important;}
+body[data-page="operativa"] .op-examples-collapsed[open] summary{margin-bottom:8px;}
+body[data-page="operativa"] .op-examples-collapsed span{display:block;margin:6px 0;color:#4e4439;font-weight:800;}
+body[data-page="operativa"] .main-actions{grid-template-columns:1.1fr .95fr 1.2fr!important;}
+body[data-page="operativa"] #opStopVoice{background:#fff7e4!important;border:2px solid #d5a634!important;color:#2b2114!important;}
+body[data-page="operativa"] .op-saved{background:#edf8eb;border:1px solid #9cc49a;color:#245a2f;border-radius:14px;padding:12px 14px;font-weight:950;}
+body[data-page="operativa"] .op-source{font-size:.85rem;color:#5f5448;}
+@media(max-width:900px){body[data-page="operativa"] .main-actions{grid-template-columns:1fr!important;} body[data-page="operativa"] .op-examples-collapsed summary{width:100%;justify-content:center;}}
+
+/* v8_7_271 · contraste y edición visible */
+body[data-page="operativa"] .op-card,
+body[data-page="operativa"] .op-panel-card{background:#fffdf7!important;color:#17130f!important;border-color:#d3b36c!important;}
+body[data-page="operativa"] .op-line{background:#fffefb!important;border:2px solid #dbc485!important;box-shadow:0 8px 22px rgba(38,26,10,.08)!important;}
+body[data-page="operativa"] .op-line-actions button{background:#fffaf0!important;color:#201711!important;border:2px solid #b99b60!important;opacity:1!important;filter:none!important;}
+body[data-page="operativa"] .op-line-actions button.ok{background:#dff4df!important;color:#164b20!important;border-color:#74ad78!important;}
+body[data-page="operativa"] .op-line-actions button.cancel{background:#fde7e3!important;color:#8a2116!important;border-color:#d17a6d!important;}
+body[data-page="operativa"] .op-mini-form{display:grid!important;grid-template-columns:1fr 1.1fr!important;gap:8px!important;align-items:stretch!important;}
+body[data-page="operativa"] .op-mini-form input{background:#111!important;color:#fff!important;border:2px solid #333!important;font-weight:900!important;min-height:48px!important;font-size:1.05rem!important;}
+body[data-page="operativa"] .op-mini-form button{min-height:48px!important;font-weight:950!important;}
+body[data-page="operativa"] .op-line-badges span{color:#2b2114!important;background:#f8edd8!important;border:1px solid #d7bd84!important;}
+body[data-page="operativa"] .op-line-badges .qty-badge{background:#111!important;color:#fff!important;border-color:#111!important;}
+body[data-page="operativa"] .op-intent-head{background:#111!important;color:#fff!important;border-radius:14px!important;padding:10px 12px!important;display:flex!important;justify-content:space-between!important;gap:10px!important;align-items:center!important;}
+body[data-page="operativa"] .op-intent-head span{background:#d5a634!important;color:#15120f!important;border-radius:999px!important;padding:5px 9px!important;font-weight:950!important;}
+body[data-page="operativa"] .op-corrected{background:#fff8e8;border:1px solid #d6bd7d;border-radius:12px;padding:8px 10px;color:#2b2114;font-weight:800;}
+body[data-page="operativa"] .op-alt{margin-top:8px;background:#f7f1e7;border:1px solid #d6c5ab;border-radius:12px;padding:8px;}
+body[data-page="operativa"] .op-alt summary{font-weight:950;color:#5b3a05;cursor:pointer;}
+body[data-page="operativa"] .op-alt span{display:block;margin:4px 0;color:#2c261e;}
+body[data-page="operativa"] .op-clarify{background:#fff1d1!important;color:#5c3600!important;border:1px solid #d5a634!important;border-radius:12px!important;padding:9px 10px!important;font-weight:950!important;}
+@media(max-width:900px){
+  body[data-page="operativa"] .op-mini-form{grid-template-columns:1fr!important;}
+  body[data-page="operativa"] .op-line-actions button{min-height:52px!important;font-size:1.02rem!important;}
+}
+
+/* v8_7_273 · Estado IA y alta de artículo desde operativa */
+body[data-page="operativa"] .op-ai-badge{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:3px!important;line-height:1.2!important;}
+body[data-page="operativa"] .op-ai-badge strong{font-size:.86rem;text-transform:uppercase;letter-spacing:.04em;}
+body[data-page="operativa"] .op-ai-badge span{font-size:.78rem;opacity:.88;}
+body[data-page="operativa"] .op-ai-badge a{color:#ffd76b;text-decoration:underline;font-weight:950;font-size:.82rem;}
+body[data-page="operativa"] .op-ai-badge.is-on{background:#17351e!important;color:#eaffea!important;border-color:#75ad78!important;}
+body[data-page="operativa"] .op-ai-badge.is-local{background:#4f3510!important;color:#fff1c1!important;border-color:#d5a634!important;}
+body[data-page="operativa"] .ai-warning{background:#fff1d1!important;border-color:#d5a634!important;color:#5c3600!important;font-weight:950;}
+body[data-page="operativa"] .op-not-found{background:#fff1d1;border:2px solid #d5a634;color:#2b2114;border-radius:16px;padding:14px;margin-top:10px;}
+body[data-page="operativa"] .op-not-found strong{display:block;font-size:1.05rem;margin-bottom:6px;color:#5c3600;}
+body[data-page="operativa"] .op-create-article-form{display:grid;grid-template-columns:1.4fr .7fr .7fr;gap:9px;margin-top:12px;align-items:end;}
+body[data-page="operativa"] .op-create-article-form label{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;font-weight:950;color:#6a5430;}
+body[data-page="operativa"] .op-create-article-form input,body[data-page="operativa"] .op-create-article-form select{min-height:48px;border:1px solid #cdb77d;border-radius:12px;padding:10px 12px;font-size:16px;background:#fff;color:#15120f;}
+body[data-page="operativa"] .op-create-article-form button{grid-column:1 / -1;min-height:52px;}
+@media(max-width:900px){body[data-page="operativa"] .op-create-article-form{grid-template-columns:1fr;}body[data-page="operativa"] .op-ai-badge{width:100%;}}
+
+/* v8_7_326 · Operativa compacta y coherente con System MAC */
+body[data-page="operativa"] .panel,body[data-page="operativa"] .op-panel,body[data-page="operativa"] .quick-panel{background:rgba(17,24,39,.88)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.10)!important;}
+body[data-page="operativa"] .card,body[data-page="operativa"] .op-card,body[data-page="operativa"] .queue-card{background:rgba(255,255,255,.055)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.10)!important;}
+body[data-page="operativa"] .op-card{padding:14px!important;border-radius:18px!important;}
+body[data-page="operativa"] .cards{gap:10px!important;}
+body[data-page="operativa"] .value{font-size:24px!important;}
+body[data-page="operativa"] .hero,body[data-page="operativa"] .operativa-hero{padding:16px!important;}
+body[data-page="operativa"] input,body[data-page="operativa"] textarea,body[data-page="operativa"] select{background:#0c121d!important;color:#f4f6fb!important;border-color:rgba(255,255,255,.14)!important;}
+
+/* v8_7_328 · Operativa: menos blanco y más coherente con System MAC */
+.op-card,.module-soft-card,.operativa-card,.quick-card{background:linear-gradient(180deg,#141b26,#101722)!important;color:#eef2f7!important;border-color:rgba(255,255,255,.11)!important;box-shadow:none!important;}
+.op-card input,.op-card select,.op-card textarea,.operativa-card input,.operativa-card select,.operativa-card textarea{background:#0b111b!important;color:#f2f5f9!important;border-color:rgba(255,255,255,.13)!important;}
+.op-card .muted,.operativa-card .muted{color:#aeb8c6!important;}
+@media(max-width:760px){.op-card,.module-soft-card,.operativa-card,.quick-card{padding:12px!important;border-radius:14px!important}.op-mode-tabs,.task-mode-tabs{gap:8px!important}.op-mode-tabs button,.task-mode-tabs button{min-height:44px!important}}
+
+/* v8_7_329 · Operativa: contraste del bloque Decir tarea y avisos más discretos */
+body[data-page="operativa"] .quick-voice-panel,
+body[data-page="operativa"] .task-card,
+body[data-page="operativa"] .operativa-card{
+  background:linear-gradient(180deg,rgba(18,26,38,.94),rgba(12,18,28,.94))!important;
+  border-color:rgba(255,255,255,.11)!important;color:#eef3fb!important;
+}
+body[data-page="operativa"] h2,body[data-page="operativa"] h3,body[data-page="operativa"] .section-title{color:#f4f7fb!important;text-shadow:0 1px 0 rgba(0,0,0,.25)!important;}
+body[data-page="operativa"] .muted,body[data-page="operativa"] p{color:#c5cedb!important;}
+body[data-page="operativa"] .notice,body[data-page="operativa"] .warning,body[data-page="operativa"] .ia-status{
+  background:rgba(214,180,94,.10)!important;border-color:rgba(214,180,94,.24)!important;color:#f1d98d!important;border-radius:14px!important;padding:10px 12px!important;
+}
+body[data-page="operativa"] .quick-mode-grid button{min-height:46px!important;padding:10px 12px!important;}
+body[data-page="operativa"] .quick-choice,body[data-page="operativa"] .op-card{background:rgba(255,255,255,.055)!important;color:#eef3fb!important;border-color:rgba(255,255,255,.10)!important;}
+@media(max-width:760px){body[data-page="operativa"] .quick-mode-grid{grid-template-columns:1fr 1fr!important;gap:8px!important;}body[data-page="operativa"] .quick-mode-grid button{font-size:14px!important;}}
+
+/* v8_7_332 · Operativa rápida: contraste, avisos discretos y lectura limpia */
+body[data-page="operativa"] .quick-task-panel,
+body[data-page="operativa"] .task-card,
+body[data-page="operativa"] .assistant-card,
+body[data-page="operativa"] .op-card{
+  color:#eef4fb!important;
+}
+body[data-page="operativa"] h1,body[data-page="operativa"] h2,body[data-page="operativa"] h3,
+body[data-page="operativa"] .task-title{color:#f4f7fb!important;opacity:1!important;}
+body[data-page="operativa"] .muted,body[data-page="operativa"] p{color:#c4cfdd!important;opacity:1!important;}
+body[data-page="operativa"] .notice,
+body[data-page="operativa"] .warning,
+body[data-page="operativa"] .soft-warning{
+  background:rgba(214,180,94,.08)!important;
+  border-color:rgba(214,180,94,.24)!important;
+  color:#e9dcc1!important;
+  padding:9px 12px!important;
+  border-radius:12px!important;
+}
+body[data-page="operativa"] .op-mode-tabs button,
+body[data-page="operativa"] .task-mode-tabs button{min-height:40px!important;}
+
+/* v8_7_334 · Operativa: contraste legible y avisos menos invasivos */
+body[data-page="operativa"] .operativa-task-panel, body[data-page="operativa"] .voice-panel, body[data-page="operativa"] .quick-task-card{background:rgba(17,24,35,.82)!important;border-color:rgba(255,255,255,.12)!important;color:#eef4ff!important;}
+body[data-page="operativa"] .operativa-task-panel h2, body[data-page="operativa"] .voice-panel h3, body[data-page="operativa"] label{color:#f4f7fb!important;opacity:1!important;}
+body[data-page="operativa"] .notice.warn, body[data-page="operativa"] .ia-status-card{background:rgba(115,82,22,.18)!important;border-color:rgba(215,172,84,.34)!important;color:#f3e6bf!important;padding:10px 14px!important;border-radius:13px!important;}
+body[data-page="operativa"] .quick-task-mode button, body[data-page="operativa"] .task-mode-btn{min-height:42px!important;padding:9px 14px!important;}
+
+/* v8_7_346 · OÍDO ALFI pantalla práctica: texto/dictado, respuesta voz+texto y acciones seguras */
+body[data-page="operativa"] .op-alfi-central{border:1px solid rgba(212,166,74,.26)!important;background:linear-gradient(180deg,rgba(18,25,36,.96),rgba(10,15,24,.96))!important;box-shadow:0 18px 46px rgba(0,0,0,.28)!important;}
+body[data-page="operativa"] .alfi-headline{align-items:flex-start!important;}
+body[data-page="operativa"] .alfi-input-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;align-items:start;margin-top:12px;}
+body[data-page="operativa"] .alfi-main-input label,body[data-page="operativa"] .alfi-side-inputs label{display:block;color:#f6e8bf!important;font-weight:950!important;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+body[data-page="operativa"] #alfiText{width:100%;min-height:128px;resize:vertical;font-size:17px;line-height:1.35;background:#0b111b!important;color:#f8fafc!important;border:1px solid rgba(212,166,74,.22)!important;border-radius:16px!important;padding:14px!important;}
+body[data-page="operativa"] #alfiRequestedBy{width:100%;min-height:46px;background:#0b111b!important;color:#f8fafc!important;border:1px solid rgba(255,255,255,.14)!important;border-radius:13px!important;padding:10px 12px!important;}
+body[data-page="operativa"] .alfi-side-inputs{display:flex;flex-direction:column;gap:9px;}
+body[data-page="operativa"] .alfi-speak-toggle{display:flex!important;align-items:center;gap:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px!important;color:#e8edf6!important;text-transform:none!important;letter-spacing:0!important;font-size:.9rem!important;}
+body[data-page="operativa"] .alfi-mobile-hint{margin-top:7px;color:#aeb8c6;font-size:.86rem;line-height:1.35;}
+body[data-page="operativa"] .alfi-quick-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+body[data-page="operativa"] .alfi-quick-actions button{border:1px solid rgba(212,166,74,.25);background:rgba(212,166,74,.08);color:#ffe7ad;border-radius:999px;padding:8px 11px;font-weight:900;font-size:.88rem;min-height:34px;}
+body[data-page="operativa"] .alfi-quick-actions button:hover{background:rgba(212,166,74,.16);}
+body[data-page="operativa"] .alfi-main-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;}
+body[data-page="operativa"] .alfi-main-actions .op-btn{min-height:42px!important;padding:9px 14px!important;}
+body[data-page="operativa"] .alfi-result{margin-top:12px;background:rgba(7,11,18,.68)!important;border:1px solid rgba(255,255,255,.11)!important;color:#eef4fb!important;border-radius:16px!important;padding:12px!important;}
+body[data-page="operativa"] .alfi-message{font-size:1rem;line-height:1.45;margin:10px 0;color:#f5f7fb!important;}
+body[data-page="operativa"] .alfi-review-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0;}
+body[data-page="operativa"] .alfi-review-grid div{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:9px;min-width:0;}
+body[data-page="operativa"] .alfi-review-grid span{display:block;color:#9ca7b8;font-size:.73rem;text-transform:uppercase;font-weight:900;letter-spacing:.04em;}
+body[data-page="operativa"] .alfi-review-grid strong{display:block;color:#fff;font-size:.96rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+body[data-page="operativa"] .alfi-items{margin:8px 0 0 0;padding-left:18px;color:#dfe6f2;}
+body[data-page="operativa"] .alfi-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+body[data-page="operativa"] .alfi-links a, body[data-page="operativa"] .mini-actions a{display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(212,166,74,.30);background:rgba(212,166,74,.12);color:#ffe7ad!important;border-radius:999px;padding:8px 11px;text-decoration:none;font-weight:950;font-size:.86rem;}
+body[data-page="operativa"] .op-clarify.soft{background:rgba(255,255,255,.07)!important;border-color:rgba(255,255,255,.12)!important;color:#e8edf6!important;}
+@media(max-width:900px){
+ body[data-page="operativa"] .alfi-input-grid{grid-template-columns:1fr;gap:10px;}
+ body[data-page="operativa"] #alfiText{min-height:118px;font-size:16px;}
+ body[data-page="operativa"] .alfi-side-inputs{display:grid;grid-template-columns:1fr;}
+ body[data-page="operativa"] .alfi-review-grid{grid-template-columns:1fr 1fr;}
+ body[data-page="operativa"] .alfi-main-actions .op-btn{flex:1 1 145px;}
+ body[data-page="operativa"] .alfi-quick-actions{gap:7px;}
+ body[data-page="operativa"] .alfi-quick-actions button{font-size:.82rem;padding:7px 9px;}
+}
+
+
+/* v8_7_353 · OÍDO ALFI móvil limpio: 3 pestañas, diagnóstico plegado y pruebas de voz */
+body[data-page="operativa"] .alfi-mobile-tabs{display:none;}
+body[data-page="operativa"] .alfi-howto{margin-top:8px;border:1px solid rgba(212,166,74,.18);border-radius:12px;padding:8px 10px;background:rgba(212,166,74,.06);color:#dbe3ef;}
+body[data-page="operativa"] .alfi-howto summary{cursor:pointer;font-weight:900;color:#ffe6ad;}
+body[data-page="operativa"] .alfi-howto ol{margin:8px 0 0 18px;padding:0;color:#cbd5e1;font-size:.9rem;line-height:1.35;}
+body[data-page="operativa"] .alfi-diagnostics-box{max-width:280px;}
+body[data-page="operativa"] .alfi-diagnostics-box summary{cursor:pointer;color:#ffe6ad;font-weight:900;}
+body[data-page="operativa"] .alfi-test-box{background:rgba(12,18,28,.96);border:1px solid rgba(79,156,249,.28);border-radius:14px;padding:10px;margin:10px 0;color:#e8f1ff;}
+body[data-page="operativa"] .alfi-test-box strong{color:#fff;}
+body[data-page="operativa"] .alfi-test-box code{display:block;white-space:pre-wrap;background:rgba(255,255,255,.05);border-radius:10px;padding:8px;margin-top:6px;color:#dbeafe;}
+@media(max-width:760px){
+  body[data-page="operativa"] .operativa-section{padding:10px 10px 120px!important;}
+  body[data-page="operativa"] .operativa-hero{display:none!important;}
+  body[data-page="operativa"] .op-warning{font-size:.9rem!important;padding:10px!important;margin:8px 0!important;}
+  body[data-page="operativa"] .alfi-mobile-tabs{display:grid!important;grid-template-columns:repeat(3,1fr);gap:6px;position:sticky;top:66px;z-index:20;background:rgba(8,13,22,.96);padding:7px 0;border-bottom:1px solid rgba(255,255,255,.08);}
+  body[data-page="operativa"] .alfi-mobile-tabs button{border:1px solid rgba(212,166,74,.28);background:rgba(255,255,255,.04);color:#f5e2b2;border-radius:999px;padding:8px 5px;font-weight:950;font-size:.82rem;}
+  body[data-page="operativa"] .alfi-mobile-tabs button.active{background:#d5a634;color:#161008;border-color:#d5a634;}
+  body[data-page="operativa"] [data-alfi-panel]{display:none!important;}
+  body[data-page="operativa"][data-alfi-view="dictar"] [data-alfi-panel="dictar"],
+  body[data-page="operativa"][data-alfi-view="resultado"] [data-alfi-panel="resultado"],
+  body[data-page="operativa"][data-alfi-view="colas"] [data-alfi-panel="colas"]{display:block!important;}
+  body[data-page="operativa"] .op-alfi-central{padding:13px!important;margin:10px 0!important;border-radius:18px!important;}
+  body[data-page="operativa"] .op-card-headline{display:block!important;}
+  body[data-page="operativa"] .op-kicker{font-size:.7rem!important;padding:5px 8px!important;}
+  body[data-page="operativa"] .op-card h2, body[data-page="operativa"] .op-alfi-central h2{font-size:1.24rem!important;line-height:1.15!important;margin:7px 0!important;}
+  body[data-page="operativa"] .alfi-short-help{font-size:.93rem!important;line-height:1.35!important;margin-bottom:8px!important;color:#cbd5e1!important;}
+  body[data-page="operativa"] .alfi-diagnostics-box{margin:8px 0 0!important;max-width:none!important;padding:8px 10px!important;border-radius:12px!important;background:rgba(13,63,32,.35)!important;}
+  body[data-page="operativa"] .alfi-input-grid{grid-template-columns:1fr!important;gap:8px!important;margin-top:8px!important;}
+  body[data-page="operativa"] #alfiText{min-height:106px!important;font-size:16px!important;padding:12px!important;border-radius:14px!important;}
+  body[data-page="operativa"] #alfiRequestedBy{min-height:42px!important;}
+  body[data-page="operativa"] .alfi-side-inputs{gap:7px!important;}
+  body[data-page="operativa"] .alfi-speak-toggle{font-size:.82rem!important;padding:8px!important;white-space:normal!important;line-height:1.2!important;}
+  body[data-page="operativa"] .alfi-side-inputs .op-btn{min-height:40px!important;padding:8px 10px!important;}
+  body[data-page="operativa"] .alfi-quick-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;margin-top:8px!important;}
+  body[data-page="operativa"] .alfi-quick-actions button{font-size:.78rem!important;padding:7px 6px!important;min-height:34px!important;}
+  body[data-page="operativa"] .alfi-main-actions{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;margin-top:10px!important;}
+  body[data-page="operativa"] .alfi-main-actions .op-btn{min-height:42px!important;padding:9px 8px!important;font-size:.93rem!important;border-radius:13px!important;}
+  body[data-page="operativa"] .alfi-main-actions a[href*="mobile-beta"]{grid-column:1/-1;}
+  body[data-page="operativa"] #alfiStatus, body[data-page="operativa"] #alfiAudioDiag{font-size:.88rem!important;line-height:1.28!important;padding:9px 10px!important;margin-top:8px!important;border-radius:12px!important;}
+  body[data-page="operativa"] #alfiAudioDiag{display:none!important;}
+  body[data-page="operativa"] .alfi-result{padding:10px!important;margin:8px 0!important;border-radius:14px!important;}
+  body[data-page="operativa"] .op-intent-head{display:block!important;text-align:center!important;}
+  body[data-page="operativa"] .op-corrected{font-size:.9rem!important;line-height:1.35!important;word-break:break-word;}
+  body[data-page="operativa"] .alfi-message{font-size:.94rem!important;line-height:1.35!important;margin:8px 0!important;}
+  body[data-page="operativa"] .alfi-review-grid{grid-template-columns:1fr 1fr!important;gap:7px!important;}
+  body[data-page="operativa"] .alfi-review-grid div{padding:8px!important;}
+  body[data-page="operativa"] .alfi-links a{font-size:.82rem!important;padding:8px 9px!important;}
+  body[data-page="operativa"] .op-shortcuts{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;margin:10px 0!important;}
+  body[data-page="operativa"] .op-shortcut{min-height:64px!important;padding:12px!important;background:#fffaf0!important;color:#17130f!important;}
+  body[data-page="operativa"] .op-grid{grid-template-columns:1fr!important;gap:10px!important;}
+  body[data-page="operativa"] .op-panel-card{padding:12px!important;border-radius:16px!important;margin:10px 0!important;}
+  body[data-page="operativa"] .op-panel-card h2{font-size:1.08rem!important;}
+  body[data-page="operativa"] .mac-voice-fab, body[data-page="operativa"] #macVoiceAssistant{right:8px!important;bottom:74px!important;transform:scale(.88);transform-origin:bottom right;}
+}
+
+/* v8_7_373 · Operativa rápida: eliminar bloques blancos y unificar paleta System MAC */
+body[data-page="operativa"] .operativa-section,
+body[data-page="operativa"] .operativa-shell{
+  color:#e8edf6!important;
+}
+body[data-page="operativa"] .op-status-card,
+body[data-page="operativa"] .op-card,
+body[data-page="operativa"] .priority-card,
+body[data-page="operativa"] .op-dictation-card,
+body[data-page="operativa"] .op-panel-card,
+body[data-page="operativa"] .op-line,
+body[data-page="operativa"] .op-shortcut,
+body[data-page="operativa"] .op-empty,
+body[data-page="operativa"] .op-help,
+body[data-page="operativa"] .op-guided-examples,
+body[data-page="operativa"] .op-interpretation,
+body[data-page="operativa"] .op-corrected,
+body[data-page="operativa"] .op-not-found,
+body[data-page="operativa"] .ai-warning,
+body[data-page="operativa"] .ia-status-card,
+body[data-page="operativa"] .notice,
+body[data-page="operativa"] .warning,
+body[data-page="operativa"] .soft-warning{
+  background:linear-gradient(180deg,rgba(18,25,36,.94),rgba(10,15,24,.94))!important;
+  border:1px solid rgba(214,178,83,.22)!important;
+  color:#e8edf6!important;
+  box-shadow:0 10px 28px rgba(0,0,0,.20)!important;
+}
+body[data-page="operativa"] .op-status-card strong,
+body[data-page="operativa"] .op-status-card span,
+body[data-page="operativa"] .op-status-card small,
+body[data-page="operativa"] .op-card h2,
+body[data-page="operativa"] .op-card h3,
+body[data-page="operativa"] .op-panel-card h2,
+body[data-page="operativa"] .op-panel-card h3,
+body[data-page="operativa"] .op-shortcut strong,
+body[data-page="operativa"] .op-line-main strong,
+body[data-page="operativa"] .op-line-main p,
+body[data-page="operativa"] .op-muted,
+body[data-page="operativa"] .op-guided-examples strong,
+body[data-page="operativa"] .op-interpretation p,
+body[data-page="operativa"] .op-interpretation li{
+  color:#eef4fb!important;
+}
+body[data-page="operativa"] .op-status-card span,
+body[data-page="operativa"] .op-kicker,
+body[data-page="operativa"] .op-panel-card .muted,
+body[data-page="operativa"] .op-shortcut span:last-child{
+  color:#d9c589!important;
+}
+body[data-page="operativa"] .op-warning,
+body[data-page="operativa"] .op-help.warn,
+body[data-page="operativa"] .ai-warning,
+body[data-page="operativa"] .op-clarify,
+body[data-page="operativa"] .op-not-found{
+  background:rgba(111,75,18,.22)!important;
+  border-color:rgba(214,178,83,.34)!important;
+  color:#f2dfaa!important;
+}
+body[data-page="operativa"] .op-help.ok,
+body[data-page="operativa"] .op-line-actions button.ok{
+  background:rgba(21,94,54,.22)!important;
+  border-color:rgba(74,222,128,.35)!important;
+  color:#baf7ce!important;
+}
+body[data-page="operativa"] .op-line-actions button.cancel{
+  background:rgba(127,29,29,.24)!important;
+  border-color:rgba(248,113,113,.35)!important;
+  color:#ffc6c6!important;
+}
+body[data-page="operativa"] .op-mode-tabs label,
+body[data-page="operativa"] .quick-mode-grid button,
+body[data-page="operativa"] .op-examples button,
+body[data-page="operativa"] .op-btn,
+body[data-page="operativa"] .op-line-actions button,
+body[data-page="operativa"] #opStopVoice{
+  background:rgba(17,24,35,.88)!important;
+  border:1px solid rgba(214,178,83,.26)!important;
+  color:#f4e7bd!important;
+  box-shadow:none!important;
+}
+body[data-page="operativa"] .op-mode-tabs label:has(input:checked),
+body[data-page="operativa"] .quick-mode-grid button.active,
+body[data-page="operativa"] .op-btn.gold,
+body[data-page="operativa"] .op-btn.dark,
+body[data-page="operativa"] .primary-voice{
+  background:linear-gradient(180deg,#d5a634,#b88722)!important;
+  color:#14100b!important;
+  border-color:#e8c66d!important;
+}
+body[data-page="operativa"] .op-form input,
+body[data-page="operativa"] .op-form textarea,
+body[data-page="operativa"] .op-create-article-form input,
+body[data-page="operativa"] .op-create-article-form select,
+body[data-page="operativa"] .op-mini-form input,
+body[data-page="operativa"] #alfiText,
+body[data-page="operativa"] #alfiRequestedBy{
+  background:#0b111b!important;
+  color:#f8fafc!important;
+  border:1px solid rgba(214,178,83,.24)!important;
+}
+body[data-page="operativa"] .op-form input::placeholder,
+body[data-page="operativa"] .op-form textarea::placeholder,
+body[data-page="operativa"] #alfiText::placeholder{color:#8794a8!important;opacity:1!important;}
+body[data-page="operativa"] .op-line-main span,
+body[data-page="operativa"] .op-line-badges span,
+body[data-page="operativa"] .qty-badge{
+  background:rgba(214,178,83,.12)!important;
+  border:1px solid rgba(214,178,83,.28)!important;
+  color:#f0d990!important;
+}
+body[data-page="operativa"] .alfi-mobile-tabs{background:rgba(8,13,22,.98)!important;}
+@media(max-width:760px){
+  body[data-page="operativa"] .op-shortcut{background:linear-gradient(180deg,rgba(18,25,36,.94),rgba(10,15,24,.94))!important;color:#e8edf6!important;}
+}

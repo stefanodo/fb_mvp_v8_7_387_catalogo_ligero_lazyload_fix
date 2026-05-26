@@ -1,0 +1,141 @@
+HANDOVER TÉCNICO — v8_7_264_mermas_control_voz_foto
+Sistema F&B MAC
+
+OBJETIVO IMPLEMENTADO
+Se añade un bloque independiente de MERMAS y otro bloque de CONTROL DE MERMAS para analítica económica y operativa.
+
+BLOQUE 1 — MERMAS
+Ruta UI:
+- /?page=mermas&center_id=<id>
+
+Funcionalidad:
+- Alta manual de merma.
+- Alta por voz mediante dictado del navegador.
+- Alta por foto con evidencia guardada.
+- Registro obligatorio recomendado de responsable.
+- Asociación con centro/local y almacén.
+- Asociación con artículo/elaboración cuando sea identificable.
+- Estados: DRAFT, REVIEW, CONFIRMED, CANCELLED.
+- Confirmación humana antes de impactar stock.
+- Impacto en stock solo al confirmar.
+- Registro de coste estimado por unidad y pérdida total.
+- Histórico con edición/revisión y acceso a foto.
+
+REGLA CRÍTICA DE STOCK
+- Si la merma corresponde a materia prima: descuenta de movements como OUT sobre el artículo.
+- Si la merma corresponde a elaboración producida: se vincula al artículo producido si existe como item; no recalcula ni vuelve a descontar ingredientes de receta.
+- No se toca food cost de recetas, escandallos ni lógica interna de producción.
+
+BLOQUE 2 — CONTROL DE MERMAS
+Ruta UI:
+- /?page=mermas_control&center_id=<id>
+
+Analíticas incluidas:
+- Dinero perdido confirmado.
+- Pérdida potencial pendiente.
+- Número de registros confirmados.
+- Coste medio por merma.
+- Productos con más pérdida.
+- Motivos principales.
+- Responsables que registran más pérdida.
+- Familias afectadas.
+- Últimos registros incluidos.
+- Lectura operativa: compras, producción, manipulación y coste.
+
+ARCHIVOS NUEVOS
+- backend/app/services/waste_service.py
+- backend/app/routers/mermas.py
+- backend/app/templates/sections/mermas.html
+- backend/app/templates/sections/mermas_control.html
+- backend/app/static/css/waste.css
+- backend/app/static/js/waste.js
+
+ARCHIVOS MODIFICADOS
+- backend/app/core.py
+  - BUILD_ID actualizado.
+  - Migración/tabla waste_records añadida.
+- backend/app/main.py
+  - Router de mermas incluido.
+  - Nuevas páginas permitidas: mermas, mermas_control.
+  - Contexto de waste_records y waste_control añadido al template.
+- backend/app/templates/index.html
+  - Menú desktop y móvil con Mermas y Control.
+  - Includes de secciones, CSS y JS de mermas.
+- backend/app/templates/partials/voice_assistant.html
+  - Botones y ayuda del asistente ampliados.
+- backend/app/static/js/voice_assistant.js
+  - Comandos de mermas añadidos.
+
+COMANDOS DE ASISTENTE AÑADIDOS
+- abrir mermas
+- registrar merma por voz
+- registrar merma por foto
+- ver mermas pendientes
+- ver mermas confirmadas
+- control de mermas
+- dinero perdido en mermas
+
+FOTO / RECONOCIMIENTO
+En esta versión, la foto se guarda como evidencia y el sistema puede crear una propuesta con apoyo del texto/nota/nombre de archivo. No se fuerza reconocimiento visual real si no hay proveedor IA/OCR visual configurado. Regla: si no hay confianza suficiente, queda en REVIEW. No se inventan cantidades ni producto.
+
+VOZ / RECONOCIMIENTO
+El dictado usa SpeechRecognition/webkitSpeechRecognition del navegador cuando esté disponible. Si Safari/iPhone no lo permite, queda campo de texto manual. La voz intenta extraer:
+- responsable
+- producto/elaboración
+- cantidad
+- unidad
+- motivo
+Siempre crea pendiente/revisión; no confirma stock automáticamente.
+
+TABLA NUEVA
+waste_records:
+- id
+- center_id
+- warehouse_id
+- responsible_user_id
+- responsible_name
+- source_type
+- item_type
+- article_id
+- recipe_id
+- item_name_detected
+- qty
+- unit
+- qty_base
+- base_unit
+- reason
+- notes
+- photo_path
+- voice_text_raw
+- image_text_raw
+- confidence
+- status
+- unit_cost_snapshot
+- total_cost_snapshot
+- movement_id
+- created_at
+- confirmed_at
+- confirmed_by
+
+VALIDACIONES REALIZADAS
+- compileall backend/app: OK.
+- Import app.main: OK.
+- TestClient GET:
+  - Inicio: OK.
+  - Mermas: OK.
+  - Control de mermas: OK.
+  - Pedidos: OK.
+  - Producciones: OK.
+  - Albaranes: OK.
+- Test de alta manual temporal + confirmación + movimiento OUT: OK.
+- Registro temporal de prueba eliminado de waste_records y movements después del test.
+
+RIESGOS CONTROLADOS
+- No se ha tocado cálculo de recetas.
+- No se ha tocado OCR de albaranes.
+- No se ha tocado lógica de pedidos.
+- No se ha tocado confirmación de producciones.
+- El bloque impacta stock solo al confirmar merma.
+
+LIMITACIÓN EXPLÍCITA
+El reconocimiento visual real por contenido de imagen requiere integrar proveedor de IA/visión u OCR visual. La estructura queda preparada, pero esta versión no inventa datos desde la foto si no puede verificarlos.

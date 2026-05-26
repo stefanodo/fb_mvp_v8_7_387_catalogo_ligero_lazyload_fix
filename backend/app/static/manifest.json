@@ -1,0 +1,9 @@
+{
+  "name": "System MAC",
+  "short_name": "System MAC",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#b68a2a",
+  "icons": []
+}

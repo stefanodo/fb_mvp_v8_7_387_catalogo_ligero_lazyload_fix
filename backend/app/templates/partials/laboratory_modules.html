@@ -1,0 +1,289 @@
+<div class="lab-shell" data-lab-root>
+  <div class="lab-hero">
+    <div>
+      <p class="lab-kicker">Laboratorio seguro</p>
+      <h2>Pruebas futuras sin tocar operativa real</h2>
+      <p>TPV, continuidad anti-caída y conciliación documental quedan separados de Catálogo. Todo lo crítico funciona en PREVIEW o revisión humana.</p>
+    </div>
+    <div class="lab-hero-actions">
+      <a class="btn" href="/manual/system-mac" target="_blank">📘 Manual imprimible</a>
+      <button type="button" class="btn ghost" data-lab-refresh>Actualizar LAB</button>
+    </div>
+  </div>
+
+  <div class="lab-tabs" role="tablist">
+    <button type="button" class="lab-tab active" data-lab-tab="tpv">🧾 TPV / Ventas</button>
+    <button type="button" class="lab-tab" data-lab-tab="continuidad">🛟 Continuidad</button>
+    <button type="button" class="lab-tab" data-lab-tab="conciliacion">📑 Albarán-Factura-Pago</button>
+    <button type="button" class="lab-tab" data-lab-tab="bar">🍸 Coctelería / Barra</button>
+    <button type="button" class="lab-tab" data-lab-tab="critical">📱 Operativa móvil + ALFI</button>
+    <button type="button" class="lab-tab" data-lab-tab="iaocr">🤖 IA / OCR</button>
+  </div>
+
+  <div class="lab-panel active" data-lab-panel="tpv">
+    <div class="lab-grid-2">
+      <div class="lab-card lab-card-strong">
+        <h3>Simulador TPV móvil / manual</h3>
+        <p class="lab-note">Carga una venta de prueba. Conserva venta cruda, intenta mapear plato/artículo, interpreta modificadores y genera consumo teórico PREVIEW. No descuenta stock real.</p>
+        <form id="tpvLabForm" class="lab-form">
+          <label>Local
+            <select name="restaurant_id">
+              <option value="0">Todos / LAB</option>
+              {% for c in centers %}<option value="{{c.id}}">{{c.name}}</option>{% endfor %}
+            </select>
+          </label>
+          <label>Responsable / camarero<input name="waiter_name" placeholder="Ej. Pedro"></label>
+          <label>Canal
+            <select name="channel"><option>sala</option><option>barra</option><option>delivery</option><option>take_away</option><option>kiosco</option><option>web</option></select>
+          </label>
+          <label>Plato / receta / artículo
+            <input name="product_name" list="labProducts" placeholder="Ej. PICO DE GALLO" required>
+          </label>
+          <datalist id="labProducts">
+            {% for r in recipes %}<option value="{{r.name}}"></option>{% endfor %}
+            {% for it in items[:200] %}<option value="{{it.name}}"></option>{% endfor %}
+          </datalist>
+          <label>Cantidad<input name="quantity" type="number" step="0.001" value="1"></label>
+          <label>Modo de consumo
+            <select name="consumption_mode">
+              <option value="racion" selected>Ración / porción vendida</option>
+              <option value="lote">Lote completo de receta</option>
+            </select>
+          </label>
+          <label>Raciones del lote si no está configurado<input name="fallback_yield_portions" type="number" step="0.1" value="10" placeholder="Ej. 10"></label>
+          <label>Precio venta<input name="unit_price" type="number" step="0.01" placeholder="0.00"></label>
+          <label class="lab-span-2">Modificadores / notas<textarea name="modifiers" rows="2" placeholder="sin pan; extra queso; cambiar patatas por ensalada"></textarea></label>
+          <button type="submit" class="btn gold lab-span-2">Simular venta TPV</button>
+        </form>
+      </div>
+      <div class="lab-card">
+        <h3>Resultado TPV LAB</h3>
+        <div id="tpvLabResult" class="lab-result">Todavía no hay simulación en esta carga.</div>
+        <details class="lab-details"><summary>Estado TPV LAB</summary><div id="tpvLabSummary" class="lab-result small"></div></details>
+      </div>
+    </div>
+
+    <div class="lab-card mt">
+      <h3>Preparar insumos/componentes para pruebas TPV</h3>
+      <p class="lab-note">Revisa si un plato existente tiene escandallo suficiente para simular consumos. No sustituye Catálogo ni modifica stock definitivo.</p>
+      <div class="lab-inline">
+        <select id="labRecipeCheck">
+          <option value="">Selecciona receta/plato...</option>
+          {% for r in recipes %}<option value="{{r.id}}">{{r.name}}</option>{% endfor %}
+        </select>
+        <button type="button" class="btn" id="labCheckRecipeBtn">Revisar receta</button>
+      </div>
+      <div id="labRecipeCheckResult" class="lab-result small"></div>
+    </div>
+  </div>
+
+  <div class="lab-panel" data-lab-panel="continuidad">
+    <div class="lab-grid-2">
+      <div class="lab-card lab-card-strong">
+        <h3>Continuidad / Anti-caída</h3>
+        <p class="lab-note">Simula operaciones en modo offline. Las acciones se guardan como eventos y se sincronizan de forma controlada. Stock crítico pasa a conflicto/revisión.</p>
+        <div class="lab-actions-grid">
+          <button class="btn" data-offline-case="merma">Simular merma offline</button>
+          <button class="btn" data-offline-case="produccion">Simular producción offline</button>
+          <button class="btn" data-offline-case="inventario">Simular inventario offline</button>
+          <button class="btn" data-offline-case="pedido">Simular pedido offline</button>
+          <button class="btn" data-offline-case="tpv">Simular venta TPV offline</button>
+          <button class="btn ghost" data-offline-case="oido">Simular nota OÍDO</button>
+        </div>
+        <button type="button" class="btn gold mt" id="labSyncBtn">Reintentar sincronización LAB</button>
+      </div>
+      <div class="lab-card">
+        <h3>Estado de cola</h3>
+        <div id="continuitySummary" class="lab-result">Cargando...</div>
+      </div>
+    </div>
+    <div class="lab-card mt">
+      <h3>Recomendación operativa por local</h3>
+      <p class="lab-note">Documental: router dual WAN con failover, fibra + SIM 4G/5G secundaria y SAI para router, TPV, servidor local e impresora principal.</p>
+    </div>
+  </div>
+
+  <div class="lab-panel" data-lab-panel="conciliacion">
+    <div class="lab-grid-2">
+      <div class="lab-card lab-card-strong">
+        <h3>Conciliación albarán / factura / pago proveedor</h3>
+        <p class="lab-note">Prepara el futuro flujo documental: OCR de albarán, OCR de factura, conciliación, vencimiento y propuesta de pago. Pago real siempre desactivado hasta validación humana final.</p>
+        <button class="btn gold" id="labAccountingSimBtn">Simular conciliación LAB</button>
+      </div>
+      <div class="lab-card">
+        <h3>Resumen documental</h3>
+        <div id="accountingSummary" class="lab-result">Cargando...</div>
+      </div>
+    </div>
+    <div class="lab-card mt">
+      <h3>Paquete gestoría / estudio contable</h3>
+      <p class="lab-note">Preparado para agrupar albaranes/facturas por proveedor, local, día/rango/mes, tipo documental, estado OCR, conciliación y estado contable. Futuro PDF con índice y resumen.</p>
+    </div>
+  </div>
+
+
+  <div class="lab-panel" data-lab-panel="bar">
+    <div class="lab-grid-2">
+      <div class="lab-card lab-card-strong">
+        <h3>Coctelería / Barra · Demo no productivo</h3>
+        <p class="lab-note">Bloque separado de Cocina: Stock Bar, Producciones Bar, Recetas de cócteles, histórico de costes y preparación futura TPV. Mantiene unidades propias de barra en ml/gr y no convierte visualmente líquidos a kg.</p>
+        <div class="lab-actions-grid">
+          <button type="button" class="btn gold" id="labBarLoadBtn">Cargar / actualizar demo Coctelería</button>
+          <button type="button" class="btn ghost" id="labBarRefreshBtn">Actualizar resumen</button>
+        </div>
+        <p class="lab-note mt">Todo queda marcado como <strong>demo_data</strong> y <strong>DATOS_DEMO_NO_PRODUCTIVOS</strong>. No toca Stock Cocina, Recetas Cocina, pedidos reales ni TPV real.</p>
+      </div>
+      <div class="lab-card">
+        <h3>Resumen Barra</h3>
+        <div id="barLabSummary" class="lab-result compact">Cargando...</div>
+      </div>
+    </div>
+
+    <div class="bar-module-nav mt" aria-label="Navegación Coctelería Barra">
+      <button type="button" class="btn gold active" data-bar-view="recetas">🍸 Recetas</button>
+      <button type="button" class="btn ghost" data-bar-view="stock">📦 Stock Bar</button>
+      <button type="button" class="btn ghost" data-bar-view="inventario">🧾 Inventario Bar</button>
+      <button type="button" class="btn ghost" data-bar-view="producciones">⚗️ Producciones</button>
+      <button type="button" class="btn ghost" data-bar-view="servicios">🥃 Bebidas servicio</button>
+      <button type="button" class="btn ghost" data-bar-view="albaranes">📄 Albaranes</button>
+      <button type="button" class="btn ghost" data-bar-view="pedidos">🛒 Pedidos</button>
+    </div>
+    
+    <div class="lab-card mt bar-view-section" data-bar-view-section="stock">
+      <h3>Stock Bar separado por familias</h3>
+      <p class="lab-note">Pantalla agrupada para no mezclar bebidas, secos y garnish: alcoholes, vinos, cervezas, mixers/refrescos, frutas/garnish, secos/syrups e hielo. No mezcla Cocina.</p>
+      <div class="lab-actions-grid slim"><button type="button" class="btn ghost" id="labBarStockRefreshBtn">Actualizar Stock Bar</button></div>
+      <div id="barStockSummary" class="lab-result small mt">Cargando Stock Bar...</div>
+    </div>
+
+    <div class="lab-card mt bar-view-section" data-bar-view-section="inventario">
+      <h3>Inventario Bar</h3>
+      <p class="lab-note">Pantalla preparada para conteo de Barra. De momento muestra stock teórico demo; luego tendrá sesión, responsable, estado, conteo físico y diferencias.</p>
+      <div class="lab-actions-grid slim"><button type="button" class="btn ghost" id="labBarInventoryRefreshBtn">Actualizar Inventario Bar</button></div>
+      <div id="barInventorySummary" class="lab-result small mt">Cargando Inventario Bar...</div>
+    </div>
+
+<div class="lab-card mt cocktail-browser-card bar-view-section active" data-bar-view-section="recetas">
+      <h3>Recetas cócteles</h3>
+      <p class="lab-note">Elige primero el cóctel y luego se despliega la ficha completa con foto, escandallo, procedimiento, coste, margen y % de alcohol calculado por medidas.</p>
+      <div class="lab-inline cocktail-picker cocktail-search-row">
+        <input id="barCocktailSearch" list="barCocktailDatalist" placeholder="Escribe para buscar cóctel..." autocomplete="off">
+        <datalist id="barCocktailDatalist"></datalist>
+        <select id="barCocktailSelect"><option value="">Selecciona cóctel...</option></select>
+        <button type="button" class="btn gold" id="barCocktailOpenBtn">Ver ficha</button>
+        <button type="button" class="btn ghost" id="barCocktailNewBtn">Crear cóctel</button>
+      </div>
+      <div id="barCocktailSuggestions" class="bar-suggestions"></div>
+      <div id="barCocktailList" class="bar-hidden-list" aria-hidden="true"></div>
+      <div id="barCocktailDetail" class="lab-result cocktail-detail-full mt">Busca, selecciona o crea un cóctel.</div>
+    </div>
+    <div class="lab-card mt bar-view-section" data-bar-view-section="producciones">
+      <h3>Producciones Bar / subrecetas internas</h3>
+      <div id="barProductionList" class="lab-result small">Cargando...</div>
+    </div>
+
+    <div class="lab-card mt bar-view-section" data-bar-view-section="servicios">
+      <h3>Bebidas por servicio · Barra LAB</h3>
+      <p class="lab-note">Capa separada para vino por copas, refrescos vendidos solos, cervezas, espirituosos por copa/chupito y combinados tipo vodka + Red Bull o whisky + cola. El ticket puede salir como precio completo o líneas separadas; el consumo siempre descuenta los componentes reales de Stock Bar en modo PREVIEW.</p>
+      <div class="lab-actions-grid">
+        <button type="button" class="btn gold" id="labBarBeverageLoadBtn">Cargar / actualizar bebidas por servicio</button>
+      </div>
+      <div id="barBeverageSummary" class="lab-result small mt">Cargando...</div>
+      <div id="barBeverageResult" class="lab-result small mt">Selecciona “Simular” en un servicio vendible.</div>
+    </div>
+
+    <div class="lab-card mt bar-view-section" data-bar-view-section="servicios">
+      <h3>Mixers/refrescos multi-servicio · Barra LAB</h3>
+      <p class="lab-note">Permite botella 1L/2L, sifón o bag-in-box para varias bebidas. Descuenta por ml servido, controla envase abierto, ml usados/restantes, gas perdido y caducidad. Red Bull puede seguir como lata individual.</p>
+      <div class="lab-actions-grid">
+        <button type="button" class="btn gold" id="labBarMixerLoadBtn">Cargar / actualizar envases multi-servicio</button>
+      </div>
+      <div id="barMixerSummary" class="lab-result small mt">Cargando...</div>
+    </div>
+
+    <div class="lab-card mt bar-view-section" data-bar-view-section="albaranes">
+      <h3>Albarán OCR bebidas → Stock Bar · LAB</h3>
+      <p class="lab-note">Simula lectura/validación de albarán de bebidas. Alcoholes, vino, cerveza, mixers y refrescos entran en Stock Bar e Inventario Bar; líneas compartidas como lima/azúcar/sal quedan en revisión salvo reparto validado. No toca Cocina.</p>
+      <div class="lab-actions-grid">
+        <button type="button" class="btn gold" id="labBarReceiptSimBtn">Simular albarán bebidas correcto</button>
+        <button type="button" class="btn ghost" id="labBarReceiptSharedBtn">Simular albarán con línea compartida</button>
+      </div>
+      <div id="barReceiptSummary" class="lab-result small mt">Sin simulacro todavía.</div>
+    </div>
+
+
+    <div class="lab-card mt bar-view-section" data-bar-view-section="albaranes">
+      <h3>Albarán único compartido proveedor → Cocina + Barra · LAB</h3>
+      <p class="lab-note">Para verduras, frutas y secos comunes: el proveedor entrega un solo albarán. El sistema reparte cada línea hacia Stock Cocina y/o Stock Bar usando primero el pedido previo consolidado; si no existe, aplica porcentaje configurado; si no hay regla, deja revisión. No crea dos albaranes artificiales.</p>
+      <div class="lab-actions-grid">
+        <button type="button" class="btn gold" id="labSharedReceiptOrderBtn">Simular con pedido previo</button>
+        <button type="button" class="btn ghost" id="labSharedReceiptPctBtn">Simular por porcentaje</button>
+        <button type="button" class="btn ghost" id="labSharedReceiptReviewBtn">Simular sin regla / revisión</button>
+      </div>
+      <div id="barSharedReceiptSummary" class="lab-result small mt">Sin simulacro todavía.</div>
+    </div>
+
+    <div class="lab-card mt bar-view-section" data-bar-view-section="pedidos">
+      <h3>Pedidos consolidados Cocina + Barra · LAB</h3>
+      <p class="lab-note">Cada área calcula su pedido con min/max propios. El sistema solo consolida el envío al proveedor y conserva el reparto interno para la recepción. No crea pedidos reales ni toca stock productivo.</p>
+      <div class="lab-actions-grid">
+        <button type="button" class="btn gold" id="labBarOrderSimBtn">Simular recepción correcta</button>
+        <button type="button" class="btn ghost" id="labBarOrderDiffBtn">Simular diferencia en recepción</button>
+      </div>
+      <div id="barOrderSummary" class="lab-result small mt">Sin simulacro todavía.</div>
+    </div>
+  </div>
+
+
+  <div class="lab-panel" data-lab-panel="critical">
+    <div class="lab-grid-2">
+      <div class="lab-card lab-card-strong">
+        <h3>Operativa crítica móvil + OÍDO ALFI · LAB</h3>
+        <p class="lab-note">Simula los tres flujos nuevos sin tocar stock productivo: corrección de validaciones, pedido sugerido editable y racionado/despiece. La misma acción debe poder nacer desde móvil o desde ALFI, siempre con prelectura e impacto antes de confirmar.</p>
+        <div class="lab-actions-grid">
+          <button type="button" class="btn gold" id="labCriticalSimBtn">Correr simulacro completo</button>
+          <button type="button" class="btn ghost" id="labCriticalRefreshBtn">Actualizar resumen</button>
+        </div>
+        <form id="labCriticalAlfiForm" class="lab-form mt">
+          <label class="lab-span-2">Probar comando ALFI seguro
+            <textarea name="text" rows="3" placeholder="Ej. ALFI, raciona 10 kg de atún: 4 kg tataki, 3 kg tartar y 1,8 kg especiales"></textarea>
+          </label>
+          <button type="submit" class="btn gold lab-span-2">Crear prelectura ALFI</button>
+        </form>
+      </div>
+      <div class="lab-card">
+        <h3>Resultado / prelectura</h3>
+        <div id="criticalFlowResult" class="lab-result">Todavía no hay simulacro en esta carga.</div>
+      </div>
+    </div>
+    <div class="lab-card mt">
+      <h3>Borradores y auditoría</h3>
+      <p class="lab-note">Confirmar aquí solo registra confirmación LAB; no mueve stock real. La conexión productiva se hará módulo por módulo cuando reversos, permisos y auditoría estén validados.</p>
+      <div id="criticalFlowSummary" class="lab-result small">Cargando...</div>
+    </div>
+    <div class="lab-grid-3 mt">
+      <div class="lab-card"><h4>1 · Corrección de validaciones</h4><p class="lab-note">Reverso/ajuste controlado para producción, inventario, merma, albarán o pedido ya validado por error.</p></div>
+      <div class="lab-card"><h4>2 · Pedido sugerido editable</h4><p class="lab-note">Cada línea mantiene sugerido original, cantidad final, proveedor, nota, motivo y responsable.</p></div>
+      <div class="lab-card"><h4>3 · Racionado / despiece</h4><p class="lab-note">Una pieza origen genera porciones o preparados internos con coste proporcional por lote.</p></div>
+    </div>
+  </div>
+
+  <div class="lab-panel" data-lab-panel="iaocr">
+    <div class="lab-grid-2">
+      <div class="lab-card">
+        <h3>Recetas IA LAB</h3>
+        <p class="lab-note">Borradores por texto, foto o voz. No modifica recetas maestras salvo validación.</p>
+        <div class="actions"><a class="btn" href="/recipe-ai/ui">Abrir Recetas IA</a><a class="btn ghost" href="/recipe-ai/ui/drafts">Ver borradores</a></div>
+      </div>
+      <div class="lab-card">
+        <h3>OCR por proveedor</h3>
+        <p class="lab-note">Plantillas OCR, pruebas por proveedor y revisión de mapeo. No valida stock sin revisión humana.</p>
+        <div class="lab-list">
+          <div class="lab-item"><strong>Plantillas OCR</strong><span class="lab-pill">Preparado</span></div>
+          <div class="lab-item"><strong>Prueba de albarán</strong><span class="lab-pill">Sandbox</span></div>
+          <div class="lab-item"><strong>Rollback por proveedor</strong><span class="lab-pill">Futuro</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

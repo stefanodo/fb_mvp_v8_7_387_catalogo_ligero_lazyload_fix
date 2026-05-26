@@ -1,0 +1,51 @@
+System MAC · v8_7_268 · Operativa rápida con intención, responsable y panel automático
+
+Cambios implementados:
+1) Operativa rápida más visual
+- Botones y paneles más destacados.
+- Accesos rápidos a Pedidos, Producciones y Mermas.
+- Panel correcto se ilumina después de interpretar o crear una propuesta.
+- Caja de interpretación visible antes de guardar.
+
+2) Detección de intención
+- Modo AUTO: detecta si la frase es Pedido, Producción o Merma.
+- También permite forzar manualmente: Pedido / Producción / Merma.
+- Si hay duda, avisa que requiere revisión humana.
+
+3) Responsable
+- Campo de responsable visible.
+- Detección automática de frases tipo “Soy Juan...” o “Responsable Pedro...”.
+- Si no hay responsable, la interfaz exige completarlo antes de crear propuesta.
+
+4) Voz en directo
+- Si el navegador soporta Web Speech API, muestra texto parcial mientras se dicta.
+- Si iPhone/Safari no lo permite, mantiene fallback usando el micrófono del teclado de iOS en el textarea.
+
+5) Interpretación más intuitiva
+- Soporta frases naturales como:
+  “Soy Juan, agrega 2 kilos de zanahoria al pedido”.
+  “Soy Pedro, quiero producir 12 raciones de lasaña de verduras”.
+  “Hay una merma de salsa de tomate, 2 kilos, por mal estado”.
+- Soporta varias líneas en una frase simple:
+  “pide dos kilos de zanahoria y medio kilo de cebolla”.
+- Consolida líneas iguales en la cola compartida.
+
+6) IA externa opcional
+- Se añadió soporte opcional para interpretación con IA externa vía OPENAI_API_KEY.
+- No se activa por defecto.
+- Para activarla: OPERATIVA_AI_MODE=openai y OPENAI_API_KEY.
+- Si no está configurada, usa reglas locales sin romper el sistema.
+
+Validación realizada:
+- compileall backend/app: OK.
+- Importación FastAPI: OK.
+- TestClient páginas Inicio, Operativa, Pedidos, Producciones, Mermas: HTTP 200.
+- Endpoint /api/operativa/interpret: OK.
+- Prueba de frase multiartículo: zanahoria + cebolla crea dos líneas y se limpiaron los registros temporales.
+
+Notas de seguridad:
+- No confirma stock automáticamente.
+- No cierra pedidos automáticamente.
+- No confirma producciones automáticamente.
+- No usa biometría de voz.
+- El responsable se detecta por texto/frase, no por identificación biométrica.

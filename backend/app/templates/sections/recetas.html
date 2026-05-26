@@ -1,0 +1,11 @@
+<section id="recetas" class="page {% if page=='recetas' %}active{% endif %}">
+  {% include "partials/module_exit.html" %}
+  {% include "partials/recipes_toolbar.html" %}
+  {% if request.query_params.get('new') %}
+    {% include "partials/recipes_new.html" %}
+  {% else %}
+    <div class="grid2 recipe-main-grid">
+      {% include "partials/recipes_editor.html" %}
+    </div>
+  {% endif %}
+</section>

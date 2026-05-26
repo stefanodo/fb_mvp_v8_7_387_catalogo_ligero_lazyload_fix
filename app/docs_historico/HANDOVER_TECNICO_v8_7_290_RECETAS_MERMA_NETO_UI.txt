@@ -1,0 +1,43 @@
+System MAC · v8_7_290_recetas_merma_neto_ui_compact_fix
+
+Objetivo del hotfix:
+- Corregir vista de Recetas cuando se edita merma % de ingrediente.
+- Evitar que bruto/neto parezcan incoherentes antes de guardar.
+- Compactar columnas para que Guardar y Quitar queden visibles sin scroll lateral.
+
+Cambios:
+1. recipes_ingredients_table.html
+   - Tabla de ingredientes reducida a 4 columnas: Ingrediente, Cantidad, Coste, Editar.
+   - Botón Quitar integrado en la misma zona de edición.
+   - Etiquetas más claras:
+     - Cantidad receta = neto usado en la receta.
+     - Stock bruto = cantidad que descuenta stock si hay merma.
+     - Neto receta = cantidad útil de receta.
+
+2. recetas.js
+   - Recalcula en vivo también con .waste-field además de .waste-pct.
+   - Al cambiar merma %, actualiza inmediatamente bruto, neto y coste antes de guardar.
+
+3. recipes.css
+   - Columnas compactas.
+   - Ingrediente y cantidad más estrechos.
+   - Merma, unidad, guardar y quitar alineados.
+   - Quitar visible sin obligar a desplazamiento horizontal.
+   - Vista móvil en tarjetas.
+
+4. recetas.py
+   - Redirecciones de guardar/quitar ingrediente vuelven a #recipePanel.
+   - Se conserva mejor la zona activa tras guardar.
+
+Regla funcional:
+- La cantidad escrita en receta es el NETO de receta.
+- Si hay merma, el sistema calcula BRUTO = NETO / (1 - merma%).
+- El coste y stock consumido se calculan sobre bruto.
+- La subreceta sigue entrando como neto ya elaborado, sin merma adicional.
+
+No tocado:
+- OCR
+- Voz
+- Albaranes
+- Stock/pedidos
+- Base de datos

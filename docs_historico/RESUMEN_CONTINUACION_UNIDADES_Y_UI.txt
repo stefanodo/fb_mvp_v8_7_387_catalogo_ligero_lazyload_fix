@@ -1,0 +1,15 @@
+Actualización de continuación sobre la directriz global g/kg.
+
+Aplicado en esta iteración:
+- Recetas: visualización de ingredientes más coherente; bruto/neto se muestran en la misma unidad visible de receta.
+- Recetas: selector inteligente de unidades mapea ml->g y l->kg.
+- Catálogo: unidades visibles reducidas a g/kg/ud; precios visibles a €/g €/kg €/ud.
+- Precios proveedor: compra visible reducida a g/kg/ud.
+- Producciones: se quitan ml/l de la edición visible de líneas.
+- Pedidos: se quitan ml/l de la edición visible de líneas.
+- Albaranes manual/OCR: la UI prioriza g/kg/ud; litros viejos pasan a kg/g en la selección visible.
+- Humanización de cantidades: ml/l se muestran como g/kg en el render amigable.
+
+Pendiente aún de revisión fina:
+- posibles textos heredados en OCR o lógica interna histórica que sigan mencionando l/ml.
+- casos excepcionales por unidad (ud) que requieran conversión manual definida por artículo.

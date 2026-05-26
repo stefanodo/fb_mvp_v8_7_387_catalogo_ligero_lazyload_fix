@@ -1,0 +1,34 @@
+System MAC · v8_7_287_minmax_kg_conversion_fix_macfix
+
+Objetivo:
+- Corregir min/max heredados guardados en gramos después de migrar artículos a kg.
+- Evitar pedidos absurdos tipo ZANAHORIA 20000 kg cuando el máximo correcto era 20 kg.
+
+Correcciones:
+1) Blindaje de lectura:
+   - Si item.unit = kg y min_qty/max_qty >= 1000, se interpreta como gramos heredados y se muestra/calcula dividido por 1000.
+   - Aplica en Stock, edición Min/Max y pedidos automáticos.
+
+2) Blindaje de guardado:
+   - save_item_minmax corrige antes de guardar valores absurdos heredados.
+
+3) Pedidos:
+   - Sug. stk, Prod., Max F, Max C, Max S, Max L usan los min/max saneados.
+   - Ejemplo: max_qty 20000 heredado en kg -> 20 kg real.
+
+4) Base incluida:
+   - Se corrigieron registros min/max kg >=1000 en runtime incluido.
+
+5) Comando nuevo:
+   - CORREGIR_MINMAX_KG.command
+   - Corrige la base activa del Mac: ~/Documents/F&B_MAC_RUNTIME/fb_mvp_v8.db
+   - Crea backup antes.
+
+6) Mantenimiento:
+   - MANTENIMIENTO_SYSTEM_MAC.command incluye opción nueva para corregir Min/Max kg heredado.
+
+Validación:
+- compileall backend/app: OK
+- compileall app/backend/app: OK
+- FastAPI import: OK
+- normalize_minmax_qty_for_base(20000, kg) => 20

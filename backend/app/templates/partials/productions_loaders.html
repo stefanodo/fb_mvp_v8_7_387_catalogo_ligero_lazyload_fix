@@ -1,0 +1,6 @@
+{% if production_detail.status=='DRAFT' %}
+  <h4 class="mt">Cargar receta / base</h4>
+  {% if request.query_params.get('err')=='1' %}<div class="notice err mt"><span class="notice-icon">✕</span><span class="notice-text">Revisa estado, líneas o receta seleccionada.</span></div>{% endif %}
+  {% include "partials/productions_recipe_loader_form.html" %}
+  {% include "partials/productions_batch_panel.html" %}
+{% endif %}

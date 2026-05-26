@@ -1,0 +1,33 @@
+System MAC v8_7_279 · Inventario móvil / scroll estable
+
+Objetivo
+- Evitar que Inventario vuelva al inicio de la página al cambiar rubro, familia o guardar conteos desde móvil.
+
+Cambios aplicados
+1. Inventario conserva foco operativo:
+   - al cambiar Materias primas / Producciones / Limpieza / Líneas libres vuelve al bloque de trabajo, no al inicio.
+   - al cambiar familia (Frío, Salsas, Verduras, etc.) vuelve directamente a Conteo.
+   - al guardar bloque o añadir línea libre vuelve a Conteo.
+2. Se añadieron anclas internas:
+   - #inventoryWorkArea
+   - #inventoryCountArea
+3. Se reforzó sessionStorage:
+   - guarda objetivo de foco, no solo coordenada scrollY.
+   - si hay hash en URL, prioriza scroll al bloque correcto.
+4. Router de Inventario ahora redirige con ancla interna.
+5. CSS añade scroll-margin-top para no tapar el bloque activo bajo cabecera fija.
+
+No tocado
+- Fórmulas de costes.
+- Stock.
+- Confirmaciones de inventario.
+- Recetas.
+- Pedidos.
+- Producciones.
+- Mermas.
+- IA/Voz.
+
+Validación interna
+- Compilación Python de backend/app y app/backend/app: OK.
+- Importación FastAPI: OK.
+- Revisión de plantilla Inventario: OK.

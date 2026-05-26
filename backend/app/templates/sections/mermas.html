@@ -1,0 +1,198 @@
+<section class="waste-section" id="wasteBlock">
+  <div class="section-head waste-head">
+    <div>
+      <h1>🗑️ Mermas</h1>
+      <p>Registro rápido por voz o foto. La merma queda pendiente hasta revisión/confirmación humana.</p>
+    </div>
+    <div class="waste-head-actions">
+      <a class="btn" href="/movil" target="_blank">📱 Acceso móvil</a>
+      <a class="btn" href="/?page=mermas_control&center_id={{selected_center_id}}">📊 Control económico</a>
+      <a class="btn" href="/?page=mermas&center_id={{selected_center_id}}&waste_status=REVIEW">Pendientes</a>
+      <a class="btn" href="/?page=mermas&center_id={{selected_center_id}}&waste_status=CONFIRMED">Confirmadas</a>
+    </div>
+  </div>
+
+  {% if selected_center_id == 0 %}
+  <div class="alert warn">Para registrar una merma con impacto de stock selecciona un local concreto. En “Todos” solo conviene consultar.</div>
+  {% endif %}
+
+  <div class="waste-assistant-shell">
+    <div class="waste-assistant-hero">
+      <div class="waste-hero-text">
+        <span class="waste-kicker">Entrada rápida</span>
+        <h2>¿Cómo quieres registrar la merma?</h2>
+        <p>Di o escribe algo como: <strong>“Hay una merma de salsa de tomate, 2 kg, por mal estado. Responsable Juan.”</strong></p>
+      </div>
+      <div class="waste-quick-money">
+        <span>Dinero perdido confirmado</span>
+        <strong>{{'%.2f'|format(waste_control.total_loss or 0)}} €</strong>
+        <small>{{waste_control.days}} días · pendientes: {{waste_control.pending_records}}</small>
+      </div>
+    </div>
+
+    <div class="waste-action-grid">
+      <button type="button" class="waste-action-card primary" data-waste-mode="voice">
+        <span>🎙️</span><strong>Decir merma por voz</strong><em>Producto, cantidad, motivo y responsable.</em>
+      </button>
+      <button type="button" class="waste-action-card" data-waste-mode="photo">
+        <span>📷</span><strong>Registrar con foto</strong><em>Foto como evidencia + datos mínimos.</em>
+      </button>
+      <button type="button" class="waste-action-card" data-waste-mode="manual">
+        <span>✍️</span><strong>Escribir manual</strong><em>Formulario compacto de revisión.</em>
+      </button>
+    </div>
+
+    <div class="waste-panel active" id="wastePanelVoice">
+      <div class="card waste-card assistant-card">
+        <h2>🎙️ Merma por voz</h2>
+        <p class="muted small">El sistema crea una propuesta pendiente. No descuenta stock hasta que confirmes. Si dices “salsa de tomate” buscará artículos y recetas/elaboraciones con ese nombre.</p>
+        <form method="post" action="/waste/from_voice" class="waste-form" id="wasteVoiceForm" enctype="multipart/form-data">
+          <input type="hidden" name="center_id" value="{{selected_center_id}}">
+          <label>Responsable</label>
+          <div class="two-cols compact">
+            <select name="responsible_user_id">
+              <option value="0">Detectar / escribir</option>
+              {% for u in users %}<option value="{{u.id}}">{{u.name}}</option>{% endfor %}
+            </select>
+            <input name="responsible_name" placeholder="Nombre si no lo dices por voz">
+          </div>
+          <label>Dictado</label>
+          <textarea id="wasteVoiceText" name="voice_text" rows="4" placeholder="Ej.: Hay una merma de salsa de tomate, 2 kg, por mal estado. Responsable Juan."></textarea>
+          <label>Foto opcional de evidencia</label>
+          <input type="file" name="photo" accept="image/*" capture="environment">
+          <textarea name="photo_note" rows="2" placeholder="Nota opcional sobre la foto: textura, color, estado, lote, turno..."></textarea>
+          <div class="actions inline-actions">
+            <button type="button" class="btn big-voice" onclick="wasteStartVoice('wasteVoiceText')">🎙️ Dictar ahora</button>
+            <button class="gold" type="submit">Crear pendiente</button>
+          </div>
+          <div id="wasteVoiceSupport" class="waste-voice-support" hidden>Si el navegador no abre el micrófono, pulsa dentro del campo y usa el micrófono del teclado del iPhone.</div>
+        </form>
+      </div>
+    </div>
+
+    <div class="waste-panel" id="wastePanelPhoto">
+      <div class="card waste-card assistant-card">
+        <h2>📷 Merma con foto</h2>
+        <p class="muted small">La foto queda como evidencia. Sin IA visual externa configurada, el sistema no inventa producto ni cantidad: deja la propuesta para revisión.</p>
+        <form method="post" action="/waste/from_photo" enctype="multipart/form-data" class="waste-form">
+          <input type="hidden" name="center_id" value="{{selected_center_id}}">
+          <label>Responsable</label>
+          <div class="two-cols compact">
+            <select name="responsible_user_id"><option value="0">Escribir nombre</option>{% for u in users %}<option value="{{u.id}}">{{u.name}}</option>{% endfor %}</select>
+            <input name="responsible_name" placeholder="Nombre">
+          </div>
+          <label>Foto evidencia</label>
+          <input type="file" name="photo" accept="image/*" capture="environment" required>
+          <label>Qué se ve en la foto</label>
+          <textarea name="photo_note" rows="3" placeholder="Ej.: salsa de tomate cortada, 2 kg aprox., cámara, turno noche"></textarea>
+          <div class="two-cols compact">
+            <div><label>Cantidad</label><input type="number" step="0.001" name="qty" placeholder="0"></div>
+            <div><label>Unidad</label><select name="unit"><option>kg</option><option>g</option><option>ud</option><option>racion</option><option>l</option></select></div>
+          </div>
+          <label>Motivo</label>
+          <select name="reason">{% for r in waste_reasons %}<option value="{{r}}">{{r}}</option>{% endfor %}</select>
+          <button class="gold" type="submit">Subir foto y crear pendiente</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="waste-panel" id="wastePanelManual">
+      <div class="card waste-card assistant-card">
+        <h2>✍️ Merma manual compacta</h2>
+        <form method="post" action="/waste/manual" class="waste-form">
+          <input type="hidden" name="center_id" value="{{selected_center_id}}">
+          <label>Responsable</label>
+          <div class="two-cols compact">
+            <select name="responsible_user_id"><option value="0">Escribir nombre</option>{% for u in users %}<option value="{{u.id}}">{{u.name}}</option>{% endfor %}</select>
+            <input name="responsible_name" placeholder="Nombre">
+          </div>
+          <label class="waste-label-strong">Artículo / elaboración</label>
+          <div class="two-cols compact waste-article-row">
+            <div class="waste-article-search-wrap">
+              <input type="hidden" name="article_id" id="wasteManualArticleId" value="0">
+              <input type="text" id="wasteManualArticleSearch" class="waste-article-search" placeholder="Escribe 2+ letras para buscar" autocomplete="off" aria-label="Buscar artículo o elaboración">
+              <select id="wasteManualArticleSource" hidden aria-hidden="true"><option value="0" data-unit="kg">Buscar / escribir abajo</option>{% for it in items %}<option value="{{it.id}}" data-unit="{{it.unit}}">{{it.name}} · {{it.unit}}</option>{% endfor %}</select>
+              <div id="wasteManualArticleSuggestions" class="waste-article-suggestions" hidden></div>
+            </div>
+            <input name="item_name_detected" id="wasteManualFallbackName" placeholder="Nombre si no está identificado">
+          </div>
+          <div class="two-cols compact">
+            <div><label>Cantidad</label><input type="number" step="0.001" name="qty" placeholder="0"></div>
+            <div><label>Unidad</label><select name="unit"><option>kg</option><option>g</option><option>ud</option><option>racion</option><option>l</option></select></div>
+          </div>
+          <label>Motivo</label>
+          <div class="waste-reason-pills">{% for r in waste_reasons %}<label><input type="radio" name="reason" value="{{r}}"> ✅ {{r}}</label>{% endfor %}</div>
+          <label>Notas</label><textarea name="notes" rows="2" placeholder="Observaciones, lote, turno, causa..."></textarea>
+          <button class="gold" type="submit">Guardar borrador</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="card waste-list-card">
+    <div class="section-head slim">
+      <h2>Registros recientes</h2>
+      <form method="get" action="/" class="filter-row">
+        <input type="hidden" name="page" value="mermas"><input type="hidden" name="center_id" value="{{selected_center_id}}">
+        <select name="waste_status" onchange="this.form.submit()">
+          <option value="" {% if not waste_status_filter %}selected{% endif %}>Todos</option>
+          <option value="REVIEW" {% if waste_status_filter=='REVIEW' %}selected{% endif %}>Pendientes</option>
+          <option value="DRAFT" {% if waste_status_filter=='DRAFT' %}selected{% endif %}>Borradores</option>
+          <option value="CONFIRMED" {% if waste_status_filter=='CONFIRMED' %}selected{% endif %}>Confirmadas</option>
+          <option value="CANCELLED" {% if waste_status_filter=='CANCELLED' %}selected{% endif %}>Anuladas</option>
+        </select>
+      </form>
+    </div>
+    <div class="waste-list">
+      {% for wr in waste_records %}
+      <article class="waste-row status-{{wr.status|lower}}" id="waste-{{wr.id}}">
+        <div class="waste-row-main">
+          <div class="waste-title">{{wr.display_name}}</div>
+          {% set _dt = (wr.created_at|string).replace('T',' ').split(' ') %}
+          {% set _d = _dt[0] if _dt|length>0 else '' %}
+          {% set _h = (_dt[1][:5] if _dt|length>1 else '') %}
+          <div class="waste-meta waste-meta-clean">
+            <span>{{wr.center_name or 'Sin local'}}</span><span>{{wr.warehouse_name or 'Sin almacén'}}</span><span>{{wr.responsible_name or 'Sin responsable'}}</span>
+            {% if _d %}<span class="date-chip">{{_d[8:10]}}/{{_d[5:7]}}/{{_d[0:4]}}</span>{% endif %}
+            {% if _h %}<span class="time-chip">{{_h}}</span>{% endif %}
+          </div>
+          <div class="waste-tags">
+            <span>{{wr.qty|fmt_qty}} {{wr.unit}}</span><span>{{wr.reason or 'Sin motivo'}}</span><span>Conf. {{wr.confidence|fmt_qty}}%</span><span class="money-loss">-{{'%.2f'|format(wr.total_cost_snapshot or 0)}} €</span><span>{{wr.status}}</span>
+          </div>
+          {% if wr.photo_path %}<a class="small" href="/uploads/{{wr.photo_path}}" target="_blank">Ver foto evidencia</a>{% endif %}
+          {% if wr.voice_text_raw %}<p class="muted small">Voz: {{wr.voice_text_raw}}</p>{% endif %}
+          {% if wr.notes %}<p class="muted small">Notas: {{wr.notes}}</p>{% endif %}
+        </div>
+        <details class="waste-edit">
+          <summary>Editar / validar datos</summary>
+          <form method="post" action="/waste/{{wr.id}}/update" class="waste-form mini">
+            <input type="hidden" name="center_id" value="{{selected_center_id or wr.center_id}}">
+            <div class="three-cols compact">
+              <select name="article_id"><option value="0">Sin identificar</option>{% for it in items %}<option value="{{it.id}}" {% if wr.article_id==it.id %}selected{% endif %}>{{it.name}} · {{it.unit}}</option>{% endfor %}</select>
+              <input type="number" step="0.001" name="qty" value="{{wr.qty}}">
+              <select name="unit"><option {% if wr.unit=='kg' %}selected{% endif %}>kg</option><option {% if wr.unit=='g' %}selected{% endif %}>g</option><option {% if wr.unit=='ud' %}selected{% endif %}>ud</option><option {% if wr.unit=='racion' %}selected{% endif %}>racion</option><option {% if wr.unit=='l' %}selected{% endif %}>l</option></select>
+            </div>
+            <div class="three-cols compact">
+              <input name="responsible_name" value="{{wr.responsible_name}}" placeholder="Responsable">
+              <select name="reason">{% for r in waste_reasons %}<option value="{{r}}" {% if wr.reason==r %}selected{% endif %}>{{r}}</option>{% endfor %}</select>
+              <select name="status"><option value="REVIEW" {% if wr.status=='REVIEW' %}selected{% endif %}>Pendiente</option><option value="DRAFT" {% if wr.status=='DRAFT' %}selected{% endif %}>Borrador</option><option value="CANCELLED" {% if wr.status=='CANCELLED' %}selected{% endif %}>Anulada</option></select>
+            </div>
+            <textarea name="notes" rows="2">{{wr.notes}}</textarea>
+            <button type="submit">Guardar revisión</button>
+          </form>
+        </details>
+        <div class="waste-row-actions">
+          {% if wr.status != 'CONFIRMED' and wr.status != 'CANCELLED' %}
+          <form method="post" action="/waste/{{wr.id}}/confirm" onsubmit="return confirm('Confirmar merma e impactar stock?')"><input type="hidden" name="center_id" value="{{selected_center_id or wr.center_id}}"><input type="hidden" name="confirmed_by" value="{{wr.responsible_name}}"><button class="danger" type="submit">Confirmar merma</button></form>
+          <form method="post" action="/waste/{{wr.id}}/cancel" onsubmit="return confirm('Anular esta merma?')"><input type="hidden" name="center_id" value="{{selected_center_id or wr.center_id}}"><button class="cancel-btn" type="submit">Anular merma</button></form>
+          {% elif wr.status == 'CANCELLED' %}
+          <span class="status-chip cancelled">Merma anulada</span>
+          {% else %}
+          <span class="status-chip confirmed">Merma confirmada</span>
+          {% endif %}
+        </div>
+      </article>
+      {% else %}<div class="empty">Sin registros de merma para el filtro actual.</div>{% endfor %}
+    </div>
+  </div>
+</section>

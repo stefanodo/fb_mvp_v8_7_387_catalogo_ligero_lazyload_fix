@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>System MAC · Informe mensual proveedores</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:24px;color:#191919;background:#fff}
+    header{border-bottom:3px solid #5b2b24;margin-bottom:18px;padding-bottom:12px}
+    h1{margin:0;font-size:24px;color:#5b2b24} h2{margin-top:24px;color:#5b2b24;font-size:18px}
+    .muted{color:#666}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0}.kpi{border:1px solid #ddd;border-radius:10px;padding:10px}.kpi b{display:block;font-size:18px}.danger{color:#a21b1b}.ok{color:#126b31}
+    table{width:100%;border-collapse:collapse;margin:10px 0 18px;font-size:12px} th,td{border-bottom:1px solid #ddd;padding:7px;text-align:left;vertical-align:top} th{background:#f4efed;color:#3b211c}.num{text-align:right;white-space:nowrap}.tag{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:2px 6px;margin:1px;background:#fafafa}
+    ul{margin-top:6px}.small{font-size:11px}@media print{body{margin:12mm}.no-print{display:none}.kpis{grid-template-columns:repeat(5,1fr)}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>System MAC · Informe mensual de proveedores y margen</h1>
+  <div class="muted">Periodo {{ report.period or '-' }} · {{ selected_center_name }} · {{ BUILD_ID }}</div>
+  <button class="no-print" onclick="window.print()">Imprimir / guardar PDF</button>
+</header>
+<section class="kpis">
+  <div class="kpi"><span>Eventos comparables</span><b>{{ report.events_count or 0 }}</b></div>
+  <div class="kpi"><span>Subidas</span><b class="danger">{{ report.increase_count or 0 }}</b></div>
+  <div class="kpi"><span>Bajadas</span><b class="ok">{{ report.decrease_count or 0 }}</b></div>
+  <div class="kpi"><span>Sin histórico</span><b>{{ report.missing_comparison_count or 0 }}</b></div>
+  <div class="kpi"><span>Impacto estimado</span><b class="danger">{{ fmt_price(report.total_estimated_impact or 0) }} €</b></div>
+</section>
+{% if not report.has_data %}
+  <p class="muted">Sin datos comparables en este periodo. El informe medirá cuando existan albaranes con histórico previo.</p>
+{% else %}
+<h2>Proveedores por riesgo económico</h2>
+<table><thead><tr><th>Proveedor</th><th>Eventos</th><th>Subidas</th><th>Máx. subida</th><th>Impacto estimado</th><th>Recetas afectadas</th></tr></thead><tbody>
+{% for g in report.suppliers_by_risk %}
+<tr><td>{{ g.name }}</td><td>{{ g.events }}</td><td>{{ g.increases }}</td><td class="num">{{ '%.1f'|format(g.max_increase_pct or 0) }}%</td><td class="num danger">{{ fmt_price(g.total_estimated_month_impact or 0) }} €</td><td>{% for r in g.affected_recipes[:5] %}<span class="tag">{{ r.name }}</span>{% endfor %}</td></tr>
+{% endfor %}
+</tbody></table>
+<h2>Mayores subidas por artículo</h2>
+<table><thead><tr><th>Artículo</th><th>Proveedor</th><th>Precio anterior</th><th>Precio nuevo</th><th>Subida</th><th>Impacto mes</th><th>Recetas</th></tr></thead><tbody>
+{% for x in report.top_increases %}
+<tr><td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td><td class="num">{{ fmt_price(x.old_price) }}</td><td class="num">{{ fmt_price(x.new_price) }}</td><td class="num danger">{{ '%.1f'|format(x.delta_pct or 0) }}%</td><td class="num danger">{{ fmt_price(x.estimated_month_impact or 0) }} €</td><td>{% for r in x.affected_recipes[:4] %}<span class="tag">{{ r.name }} · {{ '%.1f'|format(r.food_cost_pct or 0) }}%</span>{% endfor %}</td></tr>
+{% endfor %}
+</tbody></table>
+
+<h2>Proveedor alternativo más barato para artículos caros</h2>
+<table><thead><tr><th>Artículo</th><th>Proveedor actual</th><th>Precio actual</th><th>Proveedor sugerido</th><th>Precio sugerido</th><th>Ahorro/u.</th><th>Ahorro mes</th><th>Reparto/mínimo/plazo</th><th>Nota</th></tr></thead><tbody>
+{% for x in report.supplier_alternatives %}
+{% set alt = x.cheapest_alternative %}
+<tr>
+  <td>{{ x.item_name }}</td>
+  <td>{{ x.supplier_name }}</td>
+  <td class="num">{{ fmt_price(x.new_price) }}</td>
+  <td>{{ alt.supplier_name }}</td>
+  <td class="num ok">{{ fmt_price(alt.normalized_price) }}</td>
+  <td class="num ok">{{ fmt_price(alt.saving_per_unit) }} · {{ '%.1f'|format(alt.saving_pct or 0) }}%</td>
+  <td class="num ok">{{ fmt_price(alt.estimated_month_saving or 0) }} €</td>
+  <td class="small">{{ alt.delivery_status or 'OK' }} · Reparto {{ alt.delivery_days_label or 'sin regla' }} · Próx. {{ alt.next_delivery_date or '-' }}{% if alt.delivery_min_order_amount %}<br>Min. {{ fmt_price(alt.delivery_min_order_amount) }} € · estimado {{ fmt_price(alt.estimated_alt_order_value or 0) }} €{% endif %}{% if alt.delivery_warnings %}<br>{{ alt.delivery_warnings|join(' · ') }}{% endif %}</td>
+  <td class="small">No cambia proveedor automáticamente. Validar calidad, formato, mínimo, reparto y plazo.</td>
+</tr>
+{% endfor %}
+</tbody></table>
+<h2>Recetas afectadas</h2>
+<table><thead><tr><th>Receta</th><th>Estado margen</th><th>Food cost</th><th>Ingrediente causante</th><th>Proveedor</th><th>Subida</th></tr></thead><tbody>
+{% for r in report.affected_recipes %}
+<tr><td>{{ r.name }}</td><td>{{ r.margin_state }}</td><td class="num">{{ '%.1f'|format(r.food_cost_pct or 0) }}%</td><td>{{ r.cause_item }}</td><td>{{ r.cause_supplier }}</td><td class="num danger">{{ '%.1f'|format(r.delta_pct or 0) }}%</td></tr>
+{% endfor %}
+</tbody></table>
+<h2>Artículos sin histórico previo</h2>
+<table><thead><tr><th>Artículo</th><th>Proveedor</th><th>Precio actual</th><th>Fecha</th></tr></thead><tbody>
+{% for x in report.missing_comparison %}
+<tr><td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td><td class="num">{{ fmt_price(x.current_price) }}</td><td>{{ x.event_date }}</td></tr>
+{% endfor %}
+</tbody></table>
+<h2>Evaluación</h2>
+<ul>{% for rec in report.recommendations %}<li>{{ rec }}</li>{% endfor %}</ul>
+{% endif %}
+</body></html>

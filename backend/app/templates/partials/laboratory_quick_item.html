@@ -1,0 +1,65 @@
+<div class="lab-card">
+        <h4>Alta rápida de insumos</h4>
+        <p class="lab-note">Alta manual preparada para crear insumos nuevos sin salir del panel técnico. Guarda el artículo y, si quieres, enlaza precio inicial al proveedor.</p>
+        <form method="post" action="/item/create_form" class="compact">
+          <input type="hidden" name="return_page" value="laboratorio">
+          <div class="grid2">
+            <div class="row"><label>Nombre comercial</label><input name="name" required placeholder="Ej. ALCACHOFA CORAZÓN JV BOLSA 1 KILO"></div>
+            <div class="row"><label>Proveedor inicial</label>
+              <select name="supplier_id">
+                <option value="0">— Sin enlazar —</option>
+                {% for s in suppliers %}<option value="{{s.id}}">{{s.name}}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="grid3">
+            <div class="row"><label>Unidad base</label>
+              <select name="unit" required>
+                <option value="g">g</option>
+                <option value="ud">ud</option>
+                <option value="kg">kg</option>
+              </select>
+            </div>
+            <div class="row"><label>Precio inicial</label><input name="current_price" placeholder="Ej. 3.75"></div>
+            <div class="row"><label>Precio expresado como</label>
+              <select name="current_price_unit">
+                <option value="g">€/g</option>
+                <option value="kg" selected>€/kg</option>
+                <option value="ud">€/ud</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="row"><label>Merma orientativa %</label><input name="waste_default_pct" type="number" step="0.01" placeholder="Vacío = sugerencia automática"></div>
+            <div class="row"><label>Nota</label><input name="lab_note" placeholder="Opcional. Referencia rápida interna"></div>
+          </div>
+          <div class="hint">Se crea el artículo en catálogo. Si eliges proveedor y precio, también se guarda una primera referencia de compra para ese proveedor.</div>
+          <div class="actions"><button type="submit" class="primary">Guardar insumo</button></div>
+        </form>
+        {% if request.query_params.get("lab") == "item_created" %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Insumo creado correctamente en Laboratorio.</span></div>{% endif %}
+        {% if request.query_params.get("err") == "item_dup" and page=='laboratorio' %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">Ya existe un artículo con ese nombre y unidad.</span></div>{% endif %}
+      </div>
+    </div>
+
+    <div class="lab-stack">
+      <div class="lab-card">
+        <h4>Estado de seguridad</h4>
+        <div class="lab-list">
+          <div class="lab-item"><div><strong>Panel técnico visible</strong><span class="lab-note">La estructura ya aparece dentro del sistema.</span></div><span class="lab-status-ok">Activo</span></div>
+          <div class="lab-item"><div><strong>Modo prueba / publicación</strong><span class="lab-note">Interfaz preparada; desarrollo funcional pendiente.</span></div><span class="lab-status-warn">Siguiente bloque</span></div>
+          <div class="lab-item"><div><strong>Rollback y versiones</strong><span class="lab-note">Interfaz preparada; persistencia pendiente.</span></div><span class="lab-status-warn">Siguiente bloque</span></div>
+          <div class="lab-item"><div><strong>Flags de módulos</strong><span class="lab-note">Para apagar OCR experimental o cambios visuales sin romper operativa.</span></div><span class="lab-status-warn">Siguiente bloque</span></div>
+        </div>
+      </div>
+
+      <div class="lab-card">
+        <h4>Hoja de ruta interna</h4>
+        <div class="lab-list">
+          <div class="lab-item"><div><strong>Bloque 1</strong><span class="lab-note">Registro persistente de plantillas OCR por proveedor.</span></div><span class="lab-pill">Pendiente</span></div>
+          <div class="lab-item"><div><strong>Bloque 2</strong><span class="lab-note">Sandbox de pruebas y publicación controlada.</span></div><span class="lab-pill">Pendiente</span></div>
+          <div class="lab-item"><div><strong>Bloque 3</strong><span class="lab-note">Altas masivas de insumos y recetas por bloques.</span></div><span class="lab-pill">Pendiente</span></div>
+          <div class="lab-item"><div><strong>Bloque 4</strong><span class="lab-note">Rollback técnico y flags por módulo.</span></div><span class="lab-pill">Pendiente</span></div>
+        </div>
+      </div>
+    </div>
+  </div>

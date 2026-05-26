@@ -1,0 +1,22 @@
+System MAC v8_7_289 · Pedidos topbar + proveedor objetivo usable
+
+Cambios:
+- Pedidos: el panel de crear pedido / pedido actual / historial deja de ser una columna fija desaprovechada y pasa a un bloque superior horizontal en escritorio.
+- La zona de carga/lista de líneas queda a ancho completo debajo, con más espacio útil para manipular pedidos.
+- Proveedor objetivo: si el proveedor seleccionado tiene artículos vinculados, se muestran solo esos.
+- Proveedor objetivo: si el proveedor seleccionado todavía no tiene artículos vinculados para ese filtro, se muestran los artículos del bloque/familia para poder asignarlos a ese proveedor al añadir cantidades.
+- Se añade aviso visual de modo asignación cuando no existen vínculos de proveedor.
+- Botones automáticos Sug. stk / Prod. / Max F / Max C / Max S / Max L permiten artículos sin proveedor asociado cuando hay proveedor objetivo, asignándolos al proveedor elegido, sin ocultarlos.
+- Ajustes de espaciado en contadores de lista manual para evitar textos pegados tipo 124visibles / Todosproveedor.
+
+No tocado:
+- OCR
+- Voz
+- Albaranes
+- Fórmulas de stock/recetas/producciones
+- Base de datos
+
+Validación:
+- compileall backend/app: OK
+- FastAPI import: OK
+- GET pedidos: 200 OK

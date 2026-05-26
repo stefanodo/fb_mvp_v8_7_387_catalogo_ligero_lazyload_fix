@@ -1,0 +1,12 @@
+<div id="validateReceiptSection" class="actions wrap">
+  <a class="btn" href="/production/{{production_detail.id}}/print" target="_blank">Imprimir (A4 / PDF)</a>
+  {% if production_detail.status=='CONFIRMED' %}
+    <form method="post" action="/production/{{production_detail.id}}/reopen_form" style="display:inline">
+      <button type="submit" class="btn">Reabrir para editar</button>
+    </form>
+  {% else %}
+    <form method="post" action="/production/{{production_detail.id}}/delete_form" style="display:inline" onsubmit="return confirm('¿Eliminar este borrador de producción?');">
+      <button type="submit" class="btn">Eliminar borrador</button>
+    </form>
+  {% endif %}
+</div>

@@ -1,0 +1,2 @@
+Esta edición vuelve a marcar los .command como ejecutables dentro del paquete.
+Usa primero DESBLOQUEAR_y_INICIAR.command.

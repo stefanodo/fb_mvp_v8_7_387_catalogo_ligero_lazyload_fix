@@ -1,0 +1,61 @@
+System MAC · Handover técnico v8_7_288
+
+Objetivo:
+- Simplificar pantalla de Pedidos.
+- Separar lógica por proveedor y por bloque.
+- Aprovechar panel izquierdo.
+- Evitar salto al inicio al pulsar Quitar.
+
+Cambios principales:
+1) Pedidos: panel izquierdo útil
+- Nuevo pedido queda arriba.
+- Pedido actual muestra resumen: líneas, marcadas, stock máximo, producciones.
+- Historial pasa a bloque plegable para no ocupar la pantalla principal.
+
+2) Lista manual por proveedor/bloque
+- Selector “Proveedor objetivo”.
+- Si se elige proveedor, se filtran los artículos de ese proveedor.
+- Si no se elige proveedor, se trabaja por bloque/familia.
+- Bloques: Frescos, Congelados, Secos, Limpieza, Libres y Producciones.
+- Frescos mantiene subfiltros: Todos, Verduras, Pescados, Carnes, Huevos, Lácteos.
+
+3) Botones automáticos respetan proveedor seleccionado
+- Sug. stk, Prod., Max F, Max C, Max S y Max L incluyen supplier_id.
+- Con proveedor elegido, añaden solo líneas asociadas a ese proveedor.
+- Sin proveedor elegido, mantienen comportamiento general por bloque/stock.
+
+4) Quitar sin salto arriba
+- El botón Quitar de líneas del pedido se intercepta por JS.
+- Borra inline mediante fetch.
+- Elimina la fila sin recargar toda la página.
+- Mantiene el scroll actual.
+
+5) Visual
+- Las listas manuales pasan a tarjetas compactas en vez de tablas anchas.
+- Reduce scroll lateral.
+- Cantidad y unidad quedan juntos.
+- Proveedor preferente queda visible por línea.
+
+Archivos modificados:
+- backend/app/routers/pedidos.py
+- backend/app/templates/partials/orders_sidebar.html
+- backend/app/templates/partials/orders_detail_add_forms.html
+- backend/app/templates/partials/orders_detail_lines.html
+- backend/app/static/js/orders.js
+- backend/app/static/css/orders.css
+- app/backend/app/* sincronizado
+
+Validación realizada:
+- python compileall backend/app: OK
+- python compileall app/backend/app: OK
+- FastAPI import: OK
+- GET pedidos: 200 OK
+- GET stock: 200 OK
+- GET recetas: 200 OK
+
+No tocado:
+- OCR
+- voz
+- albaranes
+- fórmulas de stock
+- base de datos

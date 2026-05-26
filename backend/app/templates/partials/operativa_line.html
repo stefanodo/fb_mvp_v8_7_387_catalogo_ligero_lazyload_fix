@@ -1,0 +1,36 @@
+<article class="op-line" id="op-line-{{ln.id}}">
+  <div class="op-line-main">
+    <strong>{{ln.item_name}}</strong>
+    <div class="op-line-badges">
+      <span class="qty-badge">{{ln.qty_total|fmt_qty}} {{ln.unit}}</span>
+      <span>{{ln.status}}</span>
+      {% if ln.confidence is defined %}<span>Conf. {{((ln.confidence or 0)*100)|fmt_qty}}%</span>{% endif %}
+      {% if ln.intent_source %}<span>{{ln.intent_source}}</span>{% endif %}
+    </div>
+    {% if ln.decision_note %}<p>{{ln.decision_note}}</p>{% endif %}
+    {% if ln.contributions %}
+    <details>
+      <summary>Aportes: {{ln.contributions|length}}</summary>
+      <ul>
+      {% for c in ln.contributions %}<li>{{c.requested_by or 'Sin responsable'}}: +{{c.qty_requested|fmt_qty}} {{c.unit}} · {{c.created_at}}</li>{% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
+  <div class="op-line-actions">
+    <form method="post" action="/operativa/line/{{ln.id}}/action" class="op-mini-form">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}">
+      <input type="hidden" name="action" value="QTY">
+      <input name="qty_total" value="{{ln.qty_total|fmt_qty}}">
+      <button>Editar total</button>
+    </form>
+    <form method="post" action="/operativa/line/{{ln.id}}/action">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}"><input type="hidden" name="action" value="VALIDATE">
+      <button class="ok">Marcar validado</button>
+    </form>
+    <form method="post" action="/operativa/line/{{ln.id}}/action">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}"><input type="hidden" name="action" value="CANCEL">
+      <button class="cancel">Anular</button>
+    </form>
+  </div>
+</article>

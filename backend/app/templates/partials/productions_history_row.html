@@ -1,0 +1,9 @@
+<tr>
+  <td>
+    <span class="badge" style="font-size:10px;margin-bottom:3px;display:inline-block;">{{p.production_group or 'Otros'}}</span><br>
+    <span style="font-size:12px;">{{p.note or ('Producción #' ~ p.id)}}</span>
+  </td>
+  <td>{% if p.status=='CONFIRMED' %}<span class="badge ok">✓</span>{% else %}<span class="badge warn">Borrador</span>{% endif %}</td>
+  <td class="muted" style="font-size:11px;white-space:nowrap;">{{(p.created_at or '')[:10]}}<br>{{(p.created_at or '')[11:16]}}</td>
+  <td><a class="mini" href="/?page=producciones&center_id={{selected_center_id}}&pid={{p.id}}">Abrir</a></td>
+</tr>

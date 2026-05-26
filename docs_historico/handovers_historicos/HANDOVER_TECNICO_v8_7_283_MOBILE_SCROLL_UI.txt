@@ -1,0 +1,47 @@
+System MAC · Handover técnico v8_7_283
+
+Objetivo:
+- Corregir creación/guardado accidental al hacer scroll en móvil.
+- Mejorar visualización de Pedidos, Catálogo/Admin, Proveedores, Producciones y Recetas.
+- No tocar OCR ni voz.
+- No modificar lógica crítica de stock/albaranes/pedidos ya cerrada.
+
+Cambios principales:
+1) ui.js
+- Eliminado patrón global e.preventDefault()+el.click() en touchend.
+- Ese patrón podía disparar botones al terminar un scroll sobre un botón.
+- Reemplazado por detector de desplazamiento táctil que bloquea clicks derivados de scroll.
+
+2) orders.js / orders_sidebar.html
+- Formulario Nuevo pedido marcado como data-scroll-safe-submit.
+- Si hubo desplazamiento táctil antes del submit, se cancela la creación accidental.
+- Botón Nuevo pedido queda protegido contra doble envío.
+
+3) orders.css
+- Historial de pedidos en móvil pasa a tarjetas.
+- Botones Abrir/Borrar más legibles y táctiles.
+- Nuevo pedido ocupa ancho completo en móvil.
+
+4) admin.css
+- Catálogo de artículos en móvil pasa a tarjetas.
+- Proveedores en móvil pasa a tarjetas.
+- Precio/unidad/merma/acciones reducen solapamientos.
+- Artículo conserva más ancho en escritorio.
+
+5) productions.css
+- Filtros de historial de producciones pasan a scroll horizontal.
+- Historial de producciones en móvil pasa a tarjetas.
+
+6) recipes.css
+- Tabla de ingredientes reduce solape Merma % / Guardar.
+- En móvil, ingredientes pasan a tarjeta con controles más grandes.
+
+Validación:
+- compileall backend/app OK.
+- FastAPI import OK.
+- No se modificó base incluida más allá de mantener checkpoint limpio de v8_7_282.
+- OCR no tocado.
+- Voz no tocada.
+
+Nota operativa:
+- Si en el runtime del Mac ya se crearon pedidos borrador por scroll, usar LIMPIAR_PEDIDOS_Y_PRODUCCIONES.command o PONER_STOCK_PEDIDOS_PRODUCCIONES_A_CERO.command según corresponda antes de seguir probando.

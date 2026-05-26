@@ -1,0 +1,40 @@
+HOTFIX PEDIDOS v8_7_261
+
+Fallo principal corregido:
+- El listado manual de Pedidos no estaba saliendo de una fuente única y estable de base de datos.
+- Mezclaba señales de stock colapsado, heurísticas de inventario y campos no presentes en esta base (como order_category), lo que provocaba omisiones y clasificaciones erróneas.
+- Además, la búsqueda del selector dependía de un endpoint genérico sin filtro firme por bloque/categoría.
+
+Qué se tocó:
+- backend/app/main.py
+- backend/app/routers/stock.py
+- backend/app/services/orders_service.py
+- backend/app/static/js/orders.js
+- sincronización completa a app/backend/
+
+Lógica final usada:
+- Fuente real del listado manual: tabla items.
+- Campo principal de bloque: items.stock_area.
+- Mapeo de bloque:
+  - FRESCOS -> fresh
+  - CONGELADOS -> frozen
+  - SECOS -> dry
+  - LIMPIEZA -> clean
+  - resto -> free
+- Subclasificación dentro de FRESCOS:
+  - verduras / pescados / carnes / huevos / lacteos
+  - se infiere de forma determinista por nombre del artículo cuando no existe campo explícito en la base.
+
+Qué hace ahora:
+- La lista manual por bloque en Pedidos se construye directamente desde items, ordenada por nombre.
+- El endpoint /api/items/search acepta block y fresh_group para no mezclar categorías en búsquedas del front.
+- El JS del selector manda esos filtros al backend para que la búsqueda coincida con el bloque activo.
+
+Validación interna realizada:
+- VERDURAS: visible y filtrado correcto.
+- PESCADOS: visible y filtrado correcto.
+- CARNES: visible y filtrado correcto.
+- CONGELADOS: visible y filtrado correcto.
+- SECOS: visible y filtrado correcto.
+- LIMPIEZA: visible y filtrado correcto.
+- búsqueda dentro de bloque: devuelve artículos válidos sin mezclar familias.

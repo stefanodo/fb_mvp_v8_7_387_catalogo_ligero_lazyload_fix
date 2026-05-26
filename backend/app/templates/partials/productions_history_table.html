@@ -1,0 +1,10 @@
+<div class="table-wrap production-history-wrap">
+  <table class="production-history-table">
+    <thead><tr><th>Receta / nota</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+    <tbody>
+      {% for p in productions %}
+        {% include "partials/productions_history_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

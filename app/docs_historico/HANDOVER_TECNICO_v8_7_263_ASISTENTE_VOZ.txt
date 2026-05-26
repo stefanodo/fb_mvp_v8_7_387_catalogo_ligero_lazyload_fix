@@ -1,0 +1,99 @@
+HANDOVER TÉCNICO — v8_7_263_voice_assistant_mobile
+
+Base de trabajo:
+- ZIP recibido: fb_mvp_v8_7_262_orders_manual_list_runtime_fix_macfix.zip
+- Ruta viva del launcher principal: backend/app
+- Se mantuvo copia sincronizada en app/backend/app para evitar confusión entre árboles duplicados.
+
+Objetivo aplicado:
+Actualizar puntos críticos de uso constante e incorporar un asistente operativo para móvil y ordenador con comando de voz/texto, enfocado en:
+- carga de albaranes,
+- realizar pedidos,
+- realizar producciones.
+
+Cambios añadidos:
+1) Asistente operativo flotante
+- Nuevo partial: backend/app/templates/partials/voice_assistant.html
+- Nuevo CSS: backend/app/static/css/voice_assistant.css
+- Nuevo JS: backend/app/static/js/voice_assistant.js
+- Incluido globalmente en backend/app/templates/index.html
+- Se carga en todas las páginas, sin modificar la lógica de negocio existente.
+
+2) Voz y texto
+- Usa Web Speech API del navegador cuando está disponible.
+- Si el navegador no expone reconocimiento de voz, mantiene campo de texto con los mismos comandos.
+- No usa IA externa, no envía audio a backend y no introduce dependencias nuevas.
+
+3) Comandos operativos principales
+Albaranes:
+- “abrir albaranes”
+- “crear albarán” / “nuevo albarán” / “crear borrador”
+- “subir foto” / “escanear”
+- “procesar OCR”
+- “validar albarán”
+
+Pedidos:
+- “abrir pedidos”
+- “crear pedido”
+- “mostrar frescos”
+- “mostrar verduras”
+- “mostrar pescados”
+- “mostrar carnes”
+- “mostrar huevos”
+- “mostrar lácteos”
+- “mostrar congelados”
+- “mostrar secos”
+- “mostrar limpieza”
+- “revisar proveedor”
+- “confirmar pedido”
+
+Producciones:
+- “abrir producciones”
+- “crear producción”
+- “buscar receta”
+- “añadir línea”
+- “confirmar producción”
+- “imprimir producción”
+
+Otros:
+- “abrir stock”
+- “abrir recetas”
+- “inicio”
+
+4) Puntos críticos de uso constante cubiertos
+- Navegación rápida móvil entre Albaranes, Pedidos y Producciones.
+- Acceso directo a creación de borradores.
+- Acceso directo a foto/OCR/validación de albaranes.
+- Selección rápida de bloques de pedido por voz, incluyendo categorías frescas.
+- Acceso directo a confirmar/imprimir producciones.
+- Panel con botones rápidos para uso sin voz.
+
+5) Seguridad operativa
+- Capa aislada en frontend.
+- No se han cambiado fórmulas de stock, costes, recetas, producciones ni albaranes.
+- No se han añadido dependencias Python.
+- No se han tocado rutas de validación ni confirmación existentes.
+- El asistente solo dispara acciones ya existentes en la interfaz.
+
+Validación realizada:
+- python3 -m compileall -q app: OK
+- Import de app.main: OK
+- Smoke test con uvicorn en localhost: OK
+  - /: 200
+  - /?page=pedidos&center_id=1: 200
+  - /?page=albaranes&center_id=1: 200
+  - /?page=producciones&center_id=1: 200
+  - /static/js/voice_assistant.js: 200
+  - /static/css/voice_assistant.css: 200
+- node --check voice_assistant.js: OK
+
+Limitaciones conocidas:
+- El reconocimiento de voz depende del navegador y permisos de micrófono. En iPhone/Safari puede variar según versión y permisos; por eso se mantiene el campo de texto como fallback.
+- El asistente no interpreta cantidades complejas todavía. Por seguridad, no rellena cantidades por voz sin validación humana.
+- Para confirmar albaranes/pedidos/producciones, debe existir un borrador abierto con el botón correspondiente visible.
+
+Siguiente evolución recomendada:
+- Añadir comandos estructurados con cantidades: “añade 2 kilos de tomate a pedido”.
+- Añadir endpoints backend seguros para ejecutar acciones con validación JSON, en vez de simular clicks del front.
+- Añadir confirmación verbal antes de acciones irreversibles: validar albarán, confirmar pedido, confirmar producción.
+- Integrar una capa IA opcional para interpretar lenguaje natural, pero manteniendo revisión humana y sin inventar datos.

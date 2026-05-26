@@ -1,0 +1,5 @@
+System MAC v8_7_293
+
+El árbol backend duplicado app/backend ha sido eliminado/congelado de forma ordenada.
+El único backend vivo es: ../backend desde esta carpeta, o backend/ desde la raíz del ZIP.
+Los lanzadores dentro de app/ redirigen al lanzador equivalente de la raíz para evitar bases y código duplicados.

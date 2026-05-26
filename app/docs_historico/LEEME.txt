@@ -1,0 +1,28 @@
+F&B MVP · v8.7.175 MODULAR + UI
+
+VERSIÓN MODULAR con mejoras de interfaz.
+
+CAMBIOS TÉCNICOS (v8.7.175):
+- main.py: 8.523 líneas → 435 líneas
+- Código separado en 10 módulos (stock, recetas, producciones,
+  pedidos, albaranes, laboratorio, admin, core, ocr/engine)
+- 6 funciones duplicadas eliminadas
+- OCR engine aislado en subprocess separado
+
+MEJORAS DE INTERFAZ:
+- Cada sección con su color propio en la barra de navegación
+  (azul=stock, lila=recetas, verde=producciones, ámbar=pedidos,
+   rojo=albaranes, cyan=laboratorio, gris=admin)
+- Franja de color bajo la nav que indica dónde estás
+- Iconos en la navegación (📦🍳🛒🧾...)
+- Sistema de notificaciones toast (banners flotantes visibles)
+  que sustituyen los mensajes pequeños que se perdían
+- Mensajes de error y éxito con color y ícono claros
+- Formularios con grupos visuales y campos obligatorios marcados
+- CSS reescrito: 1.343 líneas → 582 líneas sin !important
+- Botones principales diferenciados por tipo y sección
+
+EJECUCIÓN:
+1. Ejecuta DESBLOQUEAR_y_INICIAR.command
+2. Verifica: v8_7_175_modular
+3. Abre http://127.0.0.1:8000

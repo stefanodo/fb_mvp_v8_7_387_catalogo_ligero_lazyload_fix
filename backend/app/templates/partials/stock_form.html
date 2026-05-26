@@ -1,0 +1,8 @@
+<div class="panel">
+  <h3>📦 Registrar movimiento</h3>
+  {% include "partials/stock_form_main.html" %}
+  {% include "partials/stock_refresh.html" %}
+  {% include "partials/stock_initial_load.html" %}
+  {% if request.query_params.get('mv_ok') %}<div class="notice ok"><span class="notice-icon">✓</span><span class="notice-text">Movimiento guardado.</span></div>{% endif %}
+  {% if request.query_params.get('err') %}<div class="notice err"><span class="notice-icon">✕</span><span class="notice-text">No se pudo guardar. Revisa campos/unidad.</span></div>{% endif %}
+</div>

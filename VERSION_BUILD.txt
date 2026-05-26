@@ -1,0 +1,1 @@
+v8_7_387_catalogo_ligero_lazyload_fix

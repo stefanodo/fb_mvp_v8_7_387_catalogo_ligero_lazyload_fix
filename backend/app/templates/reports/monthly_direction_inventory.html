@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Informe mensual dirección · inventario</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:24px;color:#1f2937;background:#fff}
+    h1{margin:0 0 4px;font-size:24px} h2{font-size:17px;margin:28px 0 8px} h3{font-size:14px;margin:18px 0 6px}
+    .muted{color:#6b7280}.head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:16px}
+    .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}.card{border:1px solid #d1d5db;border-radius:10px;padding:10px}.label{font-size:11px;color:#6b7280;text-transform:uppercase}.value{font-size:20px;font-weight:700}.danger{color:#991b1b}.ok{color:#047857}.warn{color:#92400e}
+    table{border-collapse:collapse;width:100%;margin:8px 0 18px;font-size:12px} th,td{border:1px solid #d1d5db;padding:6px 7px;text-align:left;vertical-align:top} th{background:#f3f4f6}.num{text-align:right;white-space:nowrap}.small{font-size:11px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.avoid-break{break-inside:avoid;page-break-inside:avoid} ul{margin-top:6px}.toolbar{margin:0 0 16px;text-align:right}.btn{display:inline-block;padding:8px 10px;border:1px solid #111827;border-radius:8px;text-decoration:none;color:#111827;background:#fff}
+    @media print{.toolbar{display:none} body{margin:12mm}.head{break-after:avoid}.grid{display:block}.cards{grid-template-columns:repeat(4,1fr)}}
+  </style>
+</head>
+<body>
+  <div class="toolbar"><button onclick="window.print()" class="btn">Imprimir / guardar PDF</button></div>
+  <div class="head">
+    <div>
+      <h1>Informe mensual de dirección · inventario</h1>
+      <div class="muted">Periodo {{ report.period or '-' }} · {{ selected_center_name }}</div>
+    </div>
+    <div class="muted small">System MAC · {{ BUILD_ID }}</div>
+  </div>
+
+  <div class="cards avoid-break">
+    <div class="card"><div class="label">Pérdidas</div><div class="value danger">{{ fmt_price(report.total_loss or 0) }} €</div></div>
+    <div class="card"><div class="label">Sobrantes</div><div class="value ok">{{ fmt_price(report.total_surplus or 0) }} €</div></div>
+    <div class="card"><div class="label">Neto</div><div class="value warn">{{ fmt_price(report.total_net or 0) }} €</div></div>
+    <div class="card"><div class="label">Diferencias graves</div><div class="value">{{ report.critical_count or 0 }}</div></div>
+  </div>
+
+  {% if not report.has_data %}
+    <p class="muted">Sin inventarios cerrados con diferencias en este periodo.</p>
+  {% else %}
+  <div class="grid">
+    <section class="avoid-break">
+      <h2>Por proveedor · alfabético</h2>
+      <table><thead><tr><th>Proveedor</th><th>Líneas</th><th>Pérdida</th><th>Sobrante</th><th>Neto</th><th>Graves</th></tr></thead><tbody>
+      {% for g in report.by_supplier_alpha %}
+        <tr><td>{{ g.name }}</td><td class="num">{{ g.lines }}</td><td class="num danger">{{ fmt_price(g.loss_value) }} €</td><td class="num ok">{{ fmt_price(g.surplus_value) }} €</td><td class="num">{{ fmt_price(g.net_value) }} €</td><td class="num">{{ g.critical_lines }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </section>
+    <section class="avoid-break">
+      <h2>Por rubro · alfabético</h2>
+      <table><thead><tr><th>Rubro</th><th>Líneas</th><th>Pérdida</th><th>Sobrante</th><th>Neto</th><th>Graves</th></tr></thead><tbody>
+      {% for g in report.by_rubro_alpha %}
+        <tr><td>{{ g.name }}</td><td class="num">{{ g.lines }}</td><td class="num danger">{{ fmt_price(g.loss_value) }} €</td><td class="num ok">{{ fmt_price(g.surplus_value) }} €</td><td class="num">{{ fmt_price(g.net_value) }} €</td><td class="num">{{ g.critical_lines }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </section>
+  </div>
+
+  <section class="avoid-break">
+    <h2>Por local · riesgo económico</h2>
+    <table><thead><tr><th>Local</th><th>Líneas</th><th>Pérdida</th><th>Sobrante</th><th>Neto</th><th>Graves</th></tr></thead><tbody>
+    {% for g in report.by_center_risk %}
+      <tr><td>{{ g.name }}</td><td class="num">{{ g.lines }}</td><td class="num danger">{{ fmt_price(g.loss_value) }} €</td><td class="num ok">{{ fmt_price(g.surplus_value) }} €</td><td class="num">{{ fmt_price(g.net_value) }} €</td><td class="num">{{ g.critical_lines }}</td></tr>
+    {% endfor %}
+    </tbody></table>
+  </section>
+
+  <div class="grid">
+    <section class="avoid-break">
+      <h2>Mayores pérdidas</h2>
+      <table><thead><tr><th>Artículo</th><th>Proveedor</th><th>Rubro</th><th>Local</th><th>Valor</th><th>Sev.</th></tr></thead><tbody>
+      {% for x in report.top_losses %}
+        <tr><td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td><td>{{ x.rubro }}</td><td>{{ x.center_name }}</td><td class="num danger">{{ fmt_price(x.diff_value) }} €</td><td>{{ x.severity }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </section>
+    <section class="avoid-break">
+      <h2>Mayores sobrantes</h2>
+      <table><thead><tr><th>Artículo</th><th>Proveedor</th><th>Rubro</th><th>Local</th><th>Valor</th><th>Sev.</th></tr></thead><tbody>
+      {% for x in report.top_surpluses %}
+        <tr><td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td><td>{{ x.rubro }}</td><td>{{ x.center_name }}</td><td class="num ok">{{ fmt_price(x.diff_value) }} €</td><td>{{ x.severity }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </section>
+  </div>
+
+  <section class="avoid-break">
+    <h2>Diferencias graves</h2>
+    <table><thead><tr><th>Artículo</th><th>Proveedor</th><th>Rubro</th><th>Local</th><th>Almacén</th><th>Diferencia</th><th>Valor</th><th>Responsable</th></tr></thead><tbody>
+    {% for x in report.critical_lines %}
+      <tr><td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td><td>{{ x.rubro }}</td><td>{{ x.center_name }}</td><td>{{ x.warehouse_name }}</td><td class="num">{{ '%.3f'|format(x.diff_qty) }} {{ x.base_unit }}</td><td class="num danger">{{ fmt_price(x.diff_value) }} €</td><td>{{ x.responsible_name }}</td></tr>
+    {% endfor %}
+    </tbody></table>
+  </section>
+  {% endif %}
+
+  <section class="avoid-break">
+    <h2>Evaluación para dirección</h2>
+    <ul>{% for rec in report.recommendations %}<li>{{ rec }}</li>{% endfor %}</ul>
+    {% if report.missing_supplier_count or report.missing_rubro_count %}
+      <p class="muted">Datos incompletos: {{ report.missing_supplier_count }} líneas sin proveedor habitual · {{ report.missing_rubro_count }} líneas sin rubro claro.</p>
+    {% endif %}
+  </section>
+</body>
+</html>

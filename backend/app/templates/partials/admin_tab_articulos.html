@@ -1,0 +1,127 @@
+<div class="admin-tab" id="tab-articulos">
+    <div id="itemsSection"></div>
+    <div class="grid2">
+      <div class="panel panel-accent">
+        <h3>Añadir artículo</h3>
+        <form method="post" action="/item/create_form" class="admin-item-create-compact">
+          <div class="admin-add-line admin-add-line-main">
+            <div class="row required admin-search-row admin-add-name"><label>Nombre / nomenclatura proveedor</label><input name="name" class="admin-item-create-query" required placeholder="Ej. PATATA AGRIA · nombre proveedor si difiere" autocomplete="off"><div class="smart-inline-results admin-item-create-results" style="display:none"></div></div>
+            <div class="row admin-add-provider"><label>Proveedor habitual</label><select name="supplier_id"><option value="0">Sin vincular</option>{% if suppliers is defined %}{% for s in suppliers %}{% if s.name != "Proveedor pendiente OCR" %}<option value="{{s.id}}">{{s.name}}</option>{% endif %}{% endfor %}{% endif %}</select></div>
+          </div>
+          <div class="admin-add-line admin-add-line-meta">
+            <div class="row required compact-field"><label>Unidad</label><select name="unit" required><option value="kg" selected>kg</option><option value="g">g</option><option value="ud">ud</option></select></div>
+            <div class="row compact-field"><label>Tipo</label><select name="item_type"><option value="INSUMO" selected>Insumo · comprado</option><option value="PREPARACION">Preparación · interna</option></select></div>
+            <div class="row compact-field price-field"><label>Precio actual</label><div class="admin-price-inline"><input name="current_price" placeholder="ej. 1,50" inputmode="decimal"><select name="current_price_unit"><option value="g">€/g</option><option value="kg" selected>€/kg</option><option value="ud">€/ud</option></select></div></div>
+            <div class="row compact-field"><label>Ubicación stock</label><select name="stock_area">{% for key,label in stock_area_options %}<option value="{{key}}" {% if key=='' %}selected{% endif %}>{{label}}</option>{% endfor %}</select></div>
+          </div>
+          <div class="admin-add-line admin-add-line-final">
+            <div class="row compact-field"><label>Categoría pedido</label><select name="order_category">{% for key,label in order_category_options %}<option value="{{key}}" {% if key=='' %}selected{% endif %}>{{label}}</option>{% endfor %}</select></div>
+            <div class="row compact-field waste-field"><label>Merma %</label><input name="waste_default_pct" type="number" step="0.01" placeholder="auto"></div>
+            <div class="admin-create-help">kg por defecto · recetas aceptan g y convierten · si eliges proveedor queda vinculado como habitual.</div>
+            <div class="actions compact-actions"><button type="submit" class="gold btn-section">Añadir artículo</button></div>
+          </div>
+        </form>
+        {% if request.query_params.get("err")=="item_dup" %}<div class="notice err mt"><span class="notice-icon">✕</span><span class="notice-text">Ya existe un artículo con ese nombre y unidad.</span></div>{% endif %}{% if request.query_params.get("err")=="item_has_links" %}<div class="notice err mt"><span class="notice-icon">✕</span><span class="notice-text">No se puede quitar: el artículo tiene uso en recetas, stock o histórico.</span></div>{% endif %}
+      </div>
+      <div class="panel">
+        <h3>Artículos del catálogo</h3>
+        <div class="admin-items-explain">Carga progresiva: se muestran pocas líneas y se buscan más al escribir. Tipo: <b>Insumo</b> = materia prima comprable/inventariable. <b>Preparación</b> = elaboración interna/subreceta con stock propio.</div>
+        <div class="admin-items-toolbar">
+          <div class="row admin-search-row"><input id="itemsFilter" placeholder="Buscar artículo..." autocomplete="off" spellcheck="false"><div id="itemsFilterSuggestions" class="smart-inline-results" style="display:none"></div></div>
+          <button type="button" id="saveAllItemsBtn" class="gold admin-save-all-items" disabled>Guardar todas las modificaciones</button>
+          <span id="saveAllItemsStatus" class="admin-save-all-status">Cargando catálogo...</span>
+        </div>
+        <div class="tablewrap admin-items-wrap" style="max-height:460px;">
+          <table class="table admin-items-table admin-items-layout-v281" id="itemsTable">
+            <thead><tr><th>Artículo</th><th>Tipo</th><th>Unidad</th><th>Ubicación</th><th>Cat. ped.</th><th>Precio</th><th>Estado</th><th>Merma %</th><th></th><th></th></tr></thead>
+            <tbody><tr><td colspan="10" class="muted">Cargando primeras líneas...</td></tr></tbody>
+          </table>
+        </div>
+        <div class="actions compact-actions"><button type="button" class="mini ghost" id="itemsLoadMoreBtn">Cargar más</button></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const STOCK_OPTIONS = {{ stock_area_options|tojson }};
+  const ORDER_OPTIONS = {{ order_category_options|tojson }};
+  const table = document.getElementById('itemsTable');
+  const tbody = table ? table.querySelector('tbody') : null;
+  const filter = document.getElementById('itemsFilter');
+  const suggestions = document.getElementById('itemsFilterSuggestions');
+  const saveAll = document.getElementById('saveAllItemsBtn');
+  const status = document.getElementById('saveAllItemsStatus');
+  const loadMore = document.getElementById('itemsLoadMoreBtn');
+  if(!table || !tbody || !filter) return;
+  let offset = 0, limit = 50, total = 0, currentQ = '', loading = false;
+  let rows = [];
+  const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const optHtml = (opts, value) => (opts||[]).map(o=>`<option value="${esc(o[0])}" ${String(value||'')===String(o[0]||'')?'selected':''}>${esc(o[1])}</option>`).join('');
+  const unitOpts = v => ['kg','g','ud'].map(u=>`<option value="${u}" ${String(v||'')===u?'selected':''}>${u}</option>`).join('');
+  function priceUnitOpts(unit){ return (unit==='ud') ? `<option value="ud" selected>€/ud</option>` : `<option value="kg" selected>€/kg</option><option value="g">€/g</option><option value="manojo">€/manojo</option>`; }
+  function rowHtml(it){
+    const displayPrice = Number(it.display_price||0) > 0 ? Number(it.display_price||0).toFixed(2) : '';
+    const waste = Number(it.waste_default_pct||0) > 0 ? Number(it.waste_default_pct||0).toFixed(2) : '';
+    return `<tr id="item-${it.id}" data-item-id="${it.id}" data-update-url="/item/${it.id}/update_form">
+      <td class="admin-item-name-cell"><input name="name" value="${esc(it.name)}" required></td>
+      <td class="admin-item-type-cell"><select name="item_type"><option value="INSUMO" ${it.item_type==='PREPARACION'?'':'selected'}>Insumo</option><option value="PREPARACION" ${it.item_type==='PREPARACION'?'selected':''}>Preparación</option></select></td>
+      <td class="admin-item-unit-cell"><select name="unit" required>${unitOpts(it.unit)}</select></td>
+      <td class="admin-item-area-cell"><select name="stock_area">${optHtml(STOCK_OPTIONS, it.stock_area||'')}</select></td>
+      <td class="admin-item-order-cell"><select name="order_category">${optHtml(ORDER_OPTIONS, it.order_category||'')}</select></td>
+      <td class="admin-item-price-cell"><div class="admin-price-inline"><input name="current_price" inputmode="decimal" placeholder="—" value="${displayPrice}" data-clear-zero="1"><select name="current_price_unit">${priceUnitOpts(it.unit)}</select></div><div class="muted admin-price-meta">Interno: ${esc(it.current_price_fmt||'0')} €/${esc(it.unit||'')}</div></td>
+      <td class="admin-item-price-status"><span class="pill price-status ${esc(String(it.price_status||'').toLowerCase())}">${esc(String(it.price_status||'SIN ESTADO').replaceAll('_',' '))}</span><div class="muted small">${esc(it.price_confidence||'')}</div></td>
+      <td class="admin-item-waste-cell"><input name="waste_default_pct" type="number" step="0.01" placeholder="—" value="${waste}" data-clear-zero="1"></td>
+      <td class="admin-item-actions-cell"><button type="button" class="mini js-save-item-row">Guardar</button></td>
+      <td class="admin-item-actions-cell"><form method="post" action="/item/${it.id}/delete_form" class="inline admin-item-delete-form"><button type="submit" class="mini ghost danger" onclick="return confirm('Quitar este artículo del catálogo?');">Quitar</button></form></td>
+    </tr>`;
+  }
+  function rowFields(row){ return Array.from(row.querySelectorAll('input[name],select[name],textarea[name]')).filter(el=>el.name && !['submit','button'].includes(String(el.type||'').toLowerCase())); }
+  function snap(row){ return rowFields(row).map(el=>el.name+'='+String(el.value??'').trim()).join('&'); }
+  function bindRows(){
+    rows = Array.from(tbody.querySelectorAll('tr[data-item-id][data-update-url]'));
+    rows.forEach(row=>{
+      if(row.dataset.bound==='1') return;
+      row.dataset.bound='1'; row.dataset.initialSnapshot=snap(row); row.dataset.dirty='0';
+      rowFields(row).forEach(el=>{
+        const mark=()=>{ const dirty=snap(row)!==row.dataset.initialSnapshot; row.dataset.dirty=dirty?'1':'0'; row.classList.toggle('item-row-dirty', dirty); updateButton(); };
+        el.addEventListener('input', mark); el.addEventListener('change', mark);
+        if(el.matches('input[data-clear-zero="1"], input[name="waste_default_pct"], input[name="current_price"]')) el.addEventListener('focus', ()=>{ if(['0','0.0','0.00'].includes(String(el.value||'').replace(',','.'))) try{el.select();}catch(_e){} });
+      });
+    });
+    updateButton();
+  }
+  function dirtyRows(){ return rows.filter(r=>r.dataset.dirty==='1'); }
+  function updateButton(){ const n=dirtyRows().length; if(saveAll){ saveAll.disabled=n===0; saveAll.classList.toggle('has-pending',n>0); } if(status && !loading) status.textContent = n ? `${n} fila(s) modificada(s) sin guardar.` : `Mostrando ${rows.length} de ${total} artículo(s).`; }
+  async function load(reset=false){
+    if(loading) return; loading=true; if(status) status.textContent='Cargando catálogo...';
+    if(reset){ offset=0; tbody.innerHTML='<tr><td colspan="10" class="muted">Cargando...</td></tr>'; }
+    const q=String(filter.value||'').trim(); currentQ=q;
+    try{
+      const res=await fetch(`/api/admin/items_page?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`, {headers:{'Accept':'application/json'}});
+      const data=await res.json();
+      total=Number(data.total||0);
+      if(reset) tbody.innerHTML='';
+      if(data.items && data.items.length){ tbody.insertAdjacentHTML('beforeend', data.items.map(rowHtml).join('')); offset += data.items.length; }
+      if(!tbody.querySelector('tr[data-item-id]')) tbody.innerHTML='<tr><td colspan="10" class="muted">Sin artículos para ese filtro.</td></tr>';
+      bindRows();
+      if(loadMore){ loadMore.style.display = offset < total ? '' : 'none'; }
+    }catch(e){ tbody.innerHTML='<tr><td colspan="10" class="notice err">No se pudo cargar Catálogo.</td></tr>'; if(status) status.textContent='Error cargando catálogo.'; }
+    finally{ loading=false; updateButton(); }
+  }
+  async function saveRow(row){
+    const fd=new FormData(); rowFields(row).forEach(el=>fd.set(el.name, String(el.value??'').trim())); fd.set('ajax','1');
+    row.classList.add('item-row-saving'); row.classList.remove('item-row-error');
+    try{ const res=await fetch(row.dataset.updateUrl,{method:'POST',body:fd,headers:{'Accept':'application/json','X-Requested-With':'fetch'}}); const data=await res.json().catch(()=>({ok:false})); if(res.ok && data.ok){ row.dataset.initialSnapshot=snap(row); row.dataset.dirty='0'; row.classList.remove('item-row-dirty','item-row-error'); row.classList.add('item-row-saved'); setTimeout(()=>row.classList.remove('item-row-saved'),1200); return {ok:true}; } row.classList.add('item-row-error'); return {ok:false}; }
+    catch(e){ row.classList.add('item-row-error'); return {ok:false}; }
+    finally{ row.classList.remove('item-row-saving'); }
+  }
+  let t=null;
+  filter.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(()=>load(true), 220); });
+  filter.addEventListener('focus', ()=>{ if(suggestions){ suggestions.style.display='none'; suggestions.innerHTML=''; } });
+  if(loadMore) loadMore.addEventListener('click', ()=>load(false));
+  table.addEventListener('click', async e=>{ const btn=e.target.closest('.js-save-item-row'); if(!btn) return; const row=btn.closest('tr[data-item-id]'); if(!row) return; btn.disabled=true; const old=btn.textContent; btn.textContent='Guardando...'; const r=await saveRow(row); btn.disabled=false; btn.textContent=old; if(status) status.textContent=r.ok?'Fila guardada sin recargar.':'No se pudo guardar esa fila.'; updateButton(); });
+  if(saveAll) saveAll.addEventListener('click', async ()=>{ const queue=dirtyRows(); if(!queue.length) return; saveAll.disabled=true; saveAll.textContent='Guardando...'; let ok=0, fail=0; for(const row of queue){ const r=await saveRow(row); r.ok?ok++:fail++; } saveAll.textContent='Guardar todas las modificaciones'; if(status) status.textContent=fail?`Guardadas ${ok}. Con error: ${fail}.`:`Guardadas ${ok} modificación(es) sin recargar.`; updateButton(); });
+  load(true);
+})();
+</script>

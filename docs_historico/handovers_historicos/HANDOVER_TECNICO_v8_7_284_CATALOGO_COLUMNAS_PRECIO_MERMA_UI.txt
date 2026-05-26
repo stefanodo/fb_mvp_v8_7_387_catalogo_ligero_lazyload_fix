@@ -1,0 +1,19 @@
+HANDOVER TECNICO v8_7_284 - CATALOGO COLUMNAS PRECIO/MERMA UI
+
+Objetivo:
+- Ajuste visual menor en Catálogo/Admin para evitar solapes vistos en Mac/tablet.
+
+Cambios:
+- Se achicó la píldora de estado PRECIO ESTIMADO.
+- Se amplió la columna Precio y el selector €/kg para que no se corte.
+- Se amplió la columna Merma % y el input para que no se solape con el control desplegable.
+- Solo se tocó CSS de Catálogo/Admin.
+
+No tocado:
+- Base de datos.
+- OCR.
+- Voz.
+- Stock.
+- Pedidos.
+- Producciones.
+- Albaranes.

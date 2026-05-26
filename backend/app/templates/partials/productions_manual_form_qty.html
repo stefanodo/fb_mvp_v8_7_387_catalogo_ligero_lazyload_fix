@@ -1,0 +1,8 @@
+<div class="row"><label>Cantidad</label>
+  <div class="qtyline" style="flex-wrap:nowrap;gap:8px;">
+    <input type="number" name="qty_value" step="any" min="0" value="" placeholder="Ej: 8" required style="flex:1;min-width:80px;max-width:none;">
+    <select name="qty_unit" data-smart-unit="1" style="flex:0 0 80px;">
+      {% for unit in production_units if unit != 'lotes' %}<option value="{{unit}}">{{unit}}</option>{% endfor %}
+    </select>
+  </div>
+</div>

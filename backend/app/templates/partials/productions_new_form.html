@@ -1,0 +1,19 @@
+<form method="post" action="/production/new_form" class="mt production-create-form">
+  <div class="row"><label>Local</label>
+    <select name="center_id" required>
+      {% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="row"><label>Almacén</label>
+    <select name="warehouse_id" required>
+      {% for w in warehouses %}<option value="{{w.id}}">{{w.center_name}} · {{w.name}}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="row"><label>Partida</label>
+    <select name="production_group" required>
+      {% for grp in production_groups %}<option value="{{grp}}">{{grp}}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="row"><label>Nota</label><input name="note" placeholder="Opcional"></div>
+  <div class="actions production-primary-action"><button type="submit" class="gold">Nueva producción</button></div>
+</form>

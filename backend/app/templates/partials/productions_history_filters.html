@@ -1,0 +1,8 @@
+<div class="actions mt wrap">
+  {% for grp in ['','Calientes','Fríos','Postres','Salsas','Guarniciones','Bases','Masas','Pastelería','Porcionados','Otros'] %}
+    <a class="mini {% if (production_group_filter or '') == grp %}active{% endif %}" href="/?page=producciones&center_id={{selected_center_id}}{% if grp %}&prod_group={{grp}}{% endif %}">{{ grp or 'Todas' }}</a>
+  {% endfor %}
+</div>
+{% if production_group_filter %}
+  <div class="actions mt"><a class="btn" href="/productions/print_group?center_id={{selected_center_id}}&production_group={{production_group_filter}}" target="_blank">Imprimir PDF · {{production_group_filter}}</a></div>
+{% endif %}

@@ -1,0 +1,57 @@
+HANDOVER TÉCNICO — v8_7_260_stable_hotfix_structural_sync
+
+Raíz estructural corregida
+- Runtime real confirmado: los scripts Mac arrancan desde backend/.
+- Se detectó duplicidad peligrosa entre backend/... y app/backend/... con diferencias reales en Python, plantillas y JS.
+- Se declaró backend/ como fuente canónica.
+- Se eliminó la divergencia sincronizando app/backend/ desde backend/ para que ambos puntos de arranque queden idénticos.
+- Se limpiaron __pycache__ para evitar que el runtime use restos obsoletos.
+
+Módulos tocados
+- Estructura/runtime:
+  - backend/ + sincronización completa a app/backend/
+- Recetas:
+  - backend/app/routers/recetas.py
+  - corregido bug real en update de ingredientes que podía lanzar error interno por referencia fuera de contexto.
+- Producciones:
+  - backend/app/routers/producciones.py
+  - backend/app/services/productions_redirect_service.py
+  - backend/app/static/js/core.js
+  - se redujo la dependencia de anchors en redirects de detalle y se reforzó restauración de scroll/contexto.
+- Inventario:
+  - backend/app/main.py
+  - se relajó el filtro excesivamente restrictivo por almacén preferente para que Cocina pueda ver sus artículos reales al inventariar.
+- Albaranes OCR:
+  - backend/app/routers/albaranes.py
+  - validación final ya no inventa proveedores nuevos a partir del OCR si siguen pendientes; solo reutiliza uno existente si encaja exactamente.
+  - si el proveedor sigue pendiente, se actualiza el precio actual del artículo pero no se crea precio por proveedor pendiente.
+
+Validación interna ejecutada
+- Arranque de app OK.
+- Recetas:
+  - creación/control de subreceta de prueba
+  - cálculo de receta final con subreceta como coste neto base de materia prima
+- Producciones:
+  - crear borrador
+  - añadir líneas
+  - borrar línea intermedia
+  - cargar receta
+  - confirmar
+  - comprobar que una segunda confirmación no duplica movimientos
+- Pedidos:
+  - crear pedido
+  - añadir línea manual por bloque
+  - añadir sugerencias
+  - confirmar y reabrir
+- Inventario:
+  - crear sesión con responsable
+  - comprobar materias primas visibles en Cocina
+  - comprobar producciones visibles en inventario de producciones
+- OCR / Albaranes:
+  - aceptar línea OCR asistida
+  - validar albarán
+  - comprobar impacto en stock/precio actual
+
+Pendiente real
+- No quedó una batería UI visual automatizada de todas las pantallas móviles; la validación hecha es funcional/backend y de render principal.
+- El OCR de proveedor sigue siendo asistido: si el proveedor queda pendiente, la regla ahora es conservadora y no lo inventa al validar.

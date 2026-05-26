@@ -1,0 +1,6 @@
+<div class="actions recipe-actions-row">
+  <button type="submit" class="gold" id="recipeUpdateSubmit">Guardar ficha</button>
+  <a class="btn" target="_blank" href="/recipe/{{recipe_detail.id}}/print?mode=staff">Imprimir receta</a>
+  <a class="btn" target="_blank" href="/recipe/{{recipe_detail.id}}/print?mode=costs">Imprimir receta + costes</a>
+  <button type="submit" form="deleteRecipeForm{{recipe_detail.id}}" class="mini" onclick="return confirm('¿Borrar esta receta y sus ingredientes?');">Borrar receta</button>
+</div>

@@ -1,0 +1,31 @@
+AUDITORÍA PREVIA — v236
+
+Ámbito auditado antes de empaquetar:
+- Pedidos
+- Stock
+- Producciones
+- Inventario
+- Sin tocar Albaranes
+
+Verificaciones realizadas:
+- Revisión de rutas críticas de Pedidos, Stock, Producciones e Inventario
+- Comprobación de integridad local/almacén en flujos sensibles
+- Revisión de redirects, aliases de bloque y compatibilidad de unidades
+- Compilación Python satisfactoria de módulos críticos
+
+Correcciones incluidas en este build sobre la base v235:
+1) Pedidos
+- CONGELADOS ya no se mapea a FRESCOS
+- Resolución de almacén preferido para congelados más coherente
+- Alias de bloque más robustos (frescos/secos/limpieza/congelados/libres)
+- add_suggestions_form valida almacén real del local y no sigue si no existe
+- add_block_to_max_form corrige INSERT con is_checked
+- add_line_form reutiliza línea existente en vez de duplicarla
+- update_line_form conserva proveedor con COALESCE y corta si la unidad es incompatible
+
+Base de partida:
+- fb_mvp_v8_7_235_stock_deep_search_fullscan_norm_units.zip
+
+Nota:
+- Este ZIP no incluye cambios en Albaranes.
+- Se ha priorizado corrección conservadora y de bajo riesgo.

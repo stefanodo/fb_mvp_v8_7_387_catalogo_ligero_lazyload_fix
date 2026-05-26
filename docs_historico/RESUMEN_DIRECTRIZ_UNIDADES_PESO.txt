@@ -1,0 +1,17 @@
+DIRECTRIZ APLICADA
+- El sistema pasa a trabajar operativamente con peso como unidad principal.
+- Líquidos: equivalencia operativa 1 l = 1 kg y 1 ml = 1 g.
+- Unidades principales visibles: g y kg.
+- ud solo para excepciones reales.
+
+CAMBIOS APLICADOS
+- Core de unidades: conversión y render centrados en g/kg.
+- Recetas: formularios y tabla de ingredientes sin ml/l como opción operativa principal.
+- Producciones: unidades operativas simplificadas a g/kg/ud/raciones.
+- Stock / inventario / pedidos: selectores visibles actualizados para g/kg/ud.
+- Albaranes/OCR: litros/ml siguen siendo aceptados como entrada legado/proveedor, pero se normalizan a peso.
+- Base de datos incluida: artículos y recetas con unidades ml/l migrados a g o kg equivalentes operativos.
+
+NOTA
+- La equivalencia 1:1 es operativa, no una densidad físico-química exacta para todos los líquidos.
+- El sistema queda preparado para excepciones futuras por artículo si más adelante quieres densidades específicas.

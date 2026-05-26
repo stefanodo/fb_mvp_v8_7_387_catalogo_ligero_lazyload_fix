@@ -1,0 +1,14 @@
+<details class="mt" {% if request.query_params.get('err') %}open{% endif %}>
+  <summary><b>CARGA INICIAL</b> (usar una sola vez por artículo/almacén)</summary>
+  <form method="post" action="/stock/initial_load_form" class="mt compact preserve-flow" data-flow-target="stock">
+    <div class="row"><label>Local</label>
+      <select name="center_id" required>{% for c in centers %}<option value="{{c.id}}" {% if selected_center_id==c.id %}selected{% endif %}>{{c.name}}</option>{% endfor %}</select>
+    </div>
+    <div class="row"><label>Almacén</label>
+      <select name="warehouse_id" required>{% for w in warehouses %}<option value="{{w.id}}">{{w.center_name}} · {{w.name}}</option>{% endfor %}</select>
+    </div>
+    <div class="row"><label>Artículo</label><input type="text" class="mini smart-item" name="item_query" list="items_datalist" placeholder="Escribe artículo…" /><input type="hidden" name="item_id" value="" data-smart-item-id="1" /><input type="hidden" name="stock_section" value="{{ stock_section or 'fresh' }}"></div>
+    <div class="row"><label>Cantidad inicial</label><div class="qtyline"><input type="number" name="qty_value" step="0.001" value="1"><select name="qty_unit" data-smart-unit="1"><option value="g">g</option><option value="kg">kg</option><option value="manojo">manojo</option><option value="ml">ml</option><option value="l">l</option><option value="ud">ud</option></select></div></div>
+    <div class="actions"><button type="submit" class="gold">Cargar stock inicial</button></div>
+  </form>
+</details>

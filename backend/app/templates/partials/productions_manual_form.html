@@ -1,0 +1,11 @@
+<h4 class="mt" id="productionAddLine">Añadir línea manual</h4>
+{% if production_detail.status=='DRAFT' %}
+<form method="post" action="/production/{{production_detail.id}}/add_line_form" class="preserve-flow" data-flow-target="productionAddLine">
+  {% include "partials/productions_manual_form_type.html" %}
+  {% include "partials/productions_manual_form_item.html" %}
+  {% include "partials/productions_manual_form_qty.html" %}
+  <div class="actions"><button type="submit" class="gold btn-section">Añadir línea</button></div>
+</form>
+{% else %}
+  <div class="muted">La producción está confirmada. No se pueden añadir ni editar líneas.</div>
+{% endif %}

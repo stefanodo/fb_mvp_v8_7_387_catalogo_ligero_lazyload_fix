@@ -1,0 +1,59 @@
+AUDITORÍA DE FÓRMULAS · System MAC v8_7_276
+
+Alcance revisado:
+- Normalización de precios de artículos.
+- Coste de recetas por ingrediente.
+- Merma de ingrediente: bruto = neto / (1 - merma%).
+- Subrecetas dentro de recetas.
+- Producciones desde receta y carga de insumos.
+- Confirmación de producciones como movimientos de stock.
+- Pedidos/producciones en blanco para empezar desde cero.
+
+1) PRECIOS / ARTÍCULOS
+Estado: correcto con ajuste de UX aplicado.
+- Para artículos con unidad base g, el precio introducido como €/kg se normaliza internamente a €/g.
+- Ejemplo: 1,50 €/kg -> 0,0015 €/g.
+- Esto es correcto para cálculo, pero se mostraba confuso. En esta versión se corrige la visualización: el usuario ve precio compra €/kg y el dato €/g queda como interno.
+- Se acepta coma o punto mediante _parse_float.
+
+Riesgo controlado:
+- No se cambia la fórmula de normalización, solo la presentación y el flujo de guardado.
+
+2) RECETAS / COSTE POR INGREDIENTE
+Estado: correcto con mejora de impresión aplicada.
+- Coste de línea = cantidad bruta requerida × precio base unitario.
+- Si el ingrediente tiene merma, la cantidad bruta ya se calcula como neto / (1 - merma%).
+- La impresión ahora muestra por ingrediente: cantidad, precio usado y coste de línea.
+- Si un ingrediente no tiene precio, aparece SIN PRECIO para evitar costes falsamente bajos.
+
+3) MERMA DE INGREDIENTE
+Estado: alineado con la especificación.
+- Alta de ingrediente usa: bruto = neto / (1 - merma%).
+- El stock y la producción deben consumir bruto real requerido, no neto útil.
+- Ejemplo: 900 g netos con 10% merma => 1000 g brutos.
+
+4) SUBRECETAS
+Estado: razonable y alineado con directriz vigente.
+- En coste de receta, la subreceta se costea como unidad elaborada proporcional a su rendimiento.
+- Para coste no se añade una segunda merma extra sobre la subreceta; se usa el coste base proporcional de la subreceta.
+- Esto evita inflar coste dos veces.
+
+5) PRODUCCIONES / CARGA DE INSUMOS
+Estado: correcto en la lógica principal.
+- Producciones desde receta recogen las salidas OUT desde ingredientes requeridos.
+- Usa _production_required_gross, que respeta qty_gross y, si falta, calcula bruto desde neto y merma.
+- Confirmar producción crea movimientos SALIDA para insumos y ENTRADA para elaborado cuando existe artículo de salida vinculado.
+- No descuenta stock hasta confirmar producción.
+
+6) PUNTOS A VIGILAR EN PRÓXIMAS FASES
+- Mantener una única fuente viva: backend/app. app/backend/app queda sincronizado en este ZIP por compatibilidad, pero la ruta viva recomendada sigue siendo backend/app.
+- Seguir revisando conversiones especiales que no sean peso/ud, aunque la directriz actual prioriza kg/g incluso para líquidos.
+- Cuando se implemente suficiencia de pedidos desde producciones, debe comparar stock actual + pedido pendiente - necesidad de producciones pendientes - min/max.
+
+7) LIMPIEZA PARA EMPEZAR DESDE CERO
+Aplicado en este paquete:
+- Se limpiaron pedidos, líneas de pedido, producciones, líneas de producción y cola operativa del runtime incluido.
+- Se añadió LIMPIAR_PEDIDOS_Y_PRODUCCIONES.command para repetir esta limpieza sin tocar recetas, stock, artículos, albaranes, mermas ni inventario.
+
+Conclusión:
+Las fórmulas base de coste y consumo están alineadas con las especificaciones principales: precios normalizados, merma por bruto real, coste por ingrediente, subrecetas proporcionales y producción sin impacto hasta confirmación. Los cambios de esta versión son principalmente de UX, impresión, limpieza operativa y presentación de datos para evitar errores de uso.

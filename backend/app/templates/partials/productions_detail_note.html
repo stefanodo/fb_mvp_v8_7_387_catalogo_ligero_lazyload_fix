@@ -1,0 +1,30 @@
+<div class="mt production-note-block">
+  <div class="muted">Nota de producción</div>
+  {% set note_pieces = [] %}
+  {% if production_detail.note %}
+    {% set note_pieces = production_detail.note.split(' + ') %}
+  {% endif %}
+  {% if production_detail.status=='DRAFT' %}
+    <form method="post" action="/production/{{production_detail.id}}/update_note_form" class="compact preserve-flow production-note-form" data-flow-target="productionDetailPanel">
+      <input name="note" value="{{production_detail.note or ''}}" placeholder="Opcional">
+      <button type="submit" class="mini primary">Guardar nota</button>
+    </form>
+    {% if note_pieces %}
+      <ul class="production-note-list mt">
+      {% for piece in note_pieces if piece.strip() %}
+        <li>{{ piece.strip() }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% else %}
+    {% if note_pieces %}
+      <ul class="production-note-list">
+      {% for piece in note_pieces if piece.strip() %}
+        <li>{{ piece.strip() }}</li>
+      {% endfor %}
+      </ul>
+    {% else %}
+      <div>-</div>
+    {% endif %}
+  {% endif %}
+</div>

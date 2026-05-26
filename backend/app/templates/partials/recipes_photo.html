@@ -1,0 +1,24 @@
+<div class="recipe-photo-card recipe-photo-card-clean">
+  <div class="recipe-photo-box">
+    {% if recipe_detail.recipe_photo_path %}
+      <img src="{{ recipe_detail.recipe_photo_path }}" alt="Foto receta" class="recipe-photo-img">
+    {% else %}
+      <div class="recipe-photo-empty">FOTO RECETA</div>
+    {% endif %}
+  </div>
+  <div class="recipe-photo-actions recipe-photo-actions-below">
+    <form method="post" action="/recipe/{{recipe_detail.id}}/upload_photo" enctype="multipart/form-data" class="recipe-photo-upload preserve-flow" data-flow-target="recipePanel">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}">
+      <input type="file" name="photo" accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif" capture="environment" class="recipe-photo-input" onchange="this.form.submit()">
+      <button type="button" class="mini photo-btn" onclick="this.previousElementSibling.click()">Subir foto</button>
+    </form>
+    {% if recipe_detail.recipe_photo_path %}
+    <form method="post" action="/recipe/{{recipe_detail.id}}/remove_photo" class="preserve-flow" data-flow-target="recipePanel">
+      <input type="hidden" name="center_id" value="{{selected_center_id}}">
+      <button type="submit" class="mini ghost danger photo-btn">Quitar foto</button>
+    </form>
+    {% else %}
+    <button type="button" class="mini ghost danger photo-btn" disabled style="opacity:.55;cursor:not-allowed;">Quitar foto</button>
+    {% endif %}
+  </div>
+</div>

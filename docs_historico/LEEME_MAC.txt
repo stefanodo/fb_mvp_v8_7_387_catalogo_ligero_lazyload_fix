@@ -1,0 +1,10 @@
+MAC · W94 NETWORK + PENDING CLEAN
+
+1. Cierra cualquier servidor anterior con Control+C
+2. Si quieres limpiar pendientes locales antes de abrir:
+   ejecuta LIMPIAR_PENDIENTES_RUNTIME.command
+3. Ejecuta DESBLOQUEAR_y_INICIAR.command
+4. Comprueba arriba:
+   v8_7_56_receipts_w94_network_pendingclean
+5. Mira en la terminal la URL de móvil:
+   http://TU_IP_LOCAL:8000

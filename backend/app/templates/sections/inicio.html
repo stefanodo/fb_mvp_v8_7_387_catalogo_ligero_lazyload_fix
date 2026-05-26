@@ -1,0 +1,353 @@
+<section id="inicio" class="page {% if page=='inicio' %}active{% endif %}">
+    <div class="cards">
+      <div class="card"><div class="label">Centros</div><div class="value">{{summary.centers}}</div></div>
+      <div class="card"><div class="label">Posiciones stock</div><div class="value">{{summary.positions}}</div></div>
+      <div class="card warn"><div class="label">Bajo mínimo</div><div class="value">{{summary.below_min}}</div></div>
+    </div>
+
+    <div class="panel daily-business-panel">
+      <div class="section-head compact daily-business-head">
+        <div>
+          <h3>Cuenta diaria del negocio</h3>
+          <p class="muted">Ventas, coste teórico, food cost, compras y sugerencias de salida · {{ daily_business.period or '-' }}</p>
+        </div>
+        <div class="daily-business-badges">
+          <span class="pill">Cocina</span><span class="pill">Barra</span><span class="pill">Total</span>
+        </div>
+      </div>
+      <div class="cards mini-cards daily-kpis">
+        <div class="card"><div class="label">Ventas</div><div class="value">{{ fmt_price(daily_business.total.sales or 0) }} €</div></div>
+        <div class="card"><div class="label">Coste teórico</div><div class="value">{{ fmt_price(daily_business.total.theoretical_cost or 0) }} €</div></div>
+        <div class="card warn"><div class="label">Food cost</div><div class="value">{{ '%.1f'|format(daily_business.total.food_cost_pct or 0) }}%</div></div>
+        <div class="card"><div class="label">Margen bruto</div><div class="value">{{ fmt_price(daily_business.total.gross_margin or 0) }} €</div></div>
+        <div class="card danger"><div class="label">Mermas</div><div class="value">{{ fmt_price(daily_business.total.waste or 0) }} €</div></div>
+        <div class="card"><div class="label">Compras / entradas</div><div class="value">{{ fmt_price(daily_business.total.purchases or 0) }} €</div></div>
+      </div>
+      <div class="daily-area-grid">
+        {% for area in daily_business.areas %}
+        <div class="daily-area-card">
+          <div class="daily-area-title">{{ area.name }}</div>
+          <div class="daily-area-metrics">
+            <span>Ventas <strong>{{ fmt_price(area.sales or 0) }} €</strong></span>
+            <span>Coste <strong>{{ fmt_price(area.theoretical_cost or 0) }} €</strong></span>
+            <span>Food cost <strong>{{ '%.1f'|format(area.food_cost_pct or 0) }}%</strong></span>
+            <span>Margen <strong>{{ '%.1f'|format(area.gross_margin_pct or 0) }}%</strong></span>
+            <span>Mermas <strong>{{ fmt_price(area.waste or 0) }} €</strong></span>
+            <span>Compras <strong>{{ fmt_price(area.purchases or 0) }} €</strong></span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="dashboard-grid-2 daily-action-grid">
+        <div class="subpanel daily-suggestions">
+          <h4>Sugerencias de venta por caducidad / rotación</h4>
+          {% if daily_business.suggestions %}
+            <div class="daily-suggestion-list">
+              {% for s in daily_business.suggestions[:6] %}
+              <div class="daily-suggestion-card">
+                <div class="suggestion-top"><strong>{{ s.item }}</strong><span>{{ s.area }}</span></div>
+                <p>{{ s.risk }}</p>
+                <p class="muted">{{ s.detail }}</p>
+                <div class="suggestion-action">{{ s.action }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-note">Sin sugerencias accionables en este periodo. Se activará con caducidades, botellas abiertas, preparaciones y rotación real.</div>
+          {% endif %}
+        </div>
+        <div class="subpanel daily-notes">
+          <h4>Lectura y alertas</h4>
+          <ul class="tiny-list">
+            {% for n in daily_business.notes[:5] %}<li>{{ n }}</li>{% endfor %}
+            {% for a in daily_business.alerts[:5] %}<li class="danger-text">{{ a }}</li>{% endfor %}
+          </ul>
+          <p class="muted">Las acciones del dashboard son avisos y accesos de revisión; no modifican stock, precios ni descuentos automáticamente.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel direction-monthly-panel">
+      <div class="section-head compact direction-monthly-head">
+        <div>
+          <h3>Dashboard de dirección · inventario</h3>
+          <p class="muted">Periodo {{ direction_monthly.period or '-' }} · agrupado por proveedor, rubro y local.</p>
+        </div>
+        <form class="direction-monthly-filters direction-range-filter direction-range-filter-v358" method="get" action="/">
+          <input type="hidden" name="page" value="inicio">
+          <input type="hidden" name="center_id" value="{{ selected_center_id or 0 }}">
+          <div class="range-filter-field">
+            <label for="directionStartInput">Desde</label>
+            <input id="directionStartInput" type="date" name="direction_start" value="{{ direction_start or direction_monthly.start_date or '' }}">
+          </div>
+          <div class="range-filter-field">
+            <label for="directionEndInput">Hasta</label>
+            <input id="directionEndInput" type="date" name="direction_end" value="{{ direction_end or direction_monthly.range_end or direction_monthly.start_date or '' }}">
+          </div>
+          <div class="range-filter-actions">
+            <button class="btn tiny" type="submit">Ver</button>
+            <a class="btn tiny" target="_blank" href="/direction/monthly/print?center_id={{ selected_center_id or 0 }}&start={{ direction_start or direction_monthly.start_date }}&end={{ direction_end or direction_monthly.range_end or direction_monthly.start_date }}">Imprimir</a>
+          </div>
+          <p class="range-filter-help">El informe muestra solo diferencias de inventarios cerrados y conciliados dentro del rango seleccionado.</p>
+        </form>
+      </div>
+      <div class="cards mini-cards">
+        <div class="card danger"><div class="label">Pérdidas</div><div class="value">{{ fmt_price(direction_monthly.total_loss or 0) }} €</div></div>
+        <div class="card"><div class="label">Sobrantes</div><div class="value">{{ fmt_price(direction_monthly.total_surplus or 0) }} €</div></div>
+        <div class="card warn"><div class="label">Neto</div><div class="value">{{ fmt_price(direction_monthly.total_net or 0) }} €</div></div>
+        <div class="card"><div class="label">Graves</div><div class="value">{{ direction_monthly.critical_count or 0 }}</div></div>
+      </div>
+      {% if not direction_monthly.has_data %}
+        <div class="empty-note">Sin inventarios cerrados con diferencias en este periodo. El dashboard empezará a medir cuando cierres inventarios conciliados.</div>
+      {% else %}
+        <div class="dashboard-grid-2">
+          <div class="subpanel">
+            <h4>Por proveedor · alfabético</h4>
+            <table class="mini-table">
+              <thead><tr><th>Proveedor</th><th>Líneas</th><th>Pérdida</th><th>Sobrante</th><th>Neto</th></tr></thead>
+              <tbody>
+                {% for g in direction_monthly.by_supplier_alpha[:10] %}
+                <tr>
+                  <td>{{ g.name }}</td><td>{{ g.lines }}</td>
+                  <td class="num danger-text">{{ fmt_price(g.loss_value) }} €</td>
+                  <td class="num">{{ fmt_price(g.surplus_value) }} €</td>
+                  <td class="num">{{ fmt_price(g.net_value) }} €</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="subpanel">
+            <h4>Por rubro · alfabético</h4>
+            <table class="mini-table">
+              <thead><tr><th>Rubro</th><th>Líneas</th><th>Pérdida</th><th>Sobrante</th><th>Neto</th></tr></thead>
+              <tbody>
+                {% for g in direction_monthly.by_rubro_alpha %}
+                <tr>
+                  <td>{{ g.name }}</td><td>{{ g.lines }}</td>
+                  <td class="num danger-text">{{ fmt_price(g.loss_value) }} €</td>
+                  <td class="num">{{ fmt_price(g.surplus_value) }} €</td>
+                  <td class="num">{{ fmt_price(g.net_value) }} €</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="dashboard-grid-2">
+          <div class="subpanel">
+            <h4>Locales con mayor riesgo</h4>
+            <table class="mini-table">
+              <thead><tr><th>Local</th><th>Pérdida</th><th>Sobrante</th><th>Graves</th></tr></thead>
+              <tbody>
+                {% for g in direction_monthly.by_center_risk[:6] %}
+                <tr><td>{{ g.name }}</td><td class="num danger-text">{{ fmt_price(g.loss_value) }} €</td><td class="num">{{ fmt_price(g.surplus_value) }} €</td><td>{{ g.critical_lines }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="subpanel">
+            <h4>Mayores pérdidas</h4>
+            <table class="mini-table">
+              <thead><tr><th>Artículo</th><th>Proveedor</th><th>Rubro</th><th>Valor</th></tr></thead>
+              <tbody>
+                {% for x in direction_monthly.top_losses[:6] %}
+                <tr><td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td><td>{{ x.rubro }}</td><td class="num danger-text">{{ fmt_price(x.diff_value) }} €</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="subpanel recommendations">
+          <h4>Evaluación</h4>
+          <ul>
+            {% for rec in direction_monthly.recommendations %}<li>{{ rec }}</li>{% endfor %}
+          </ul>
+          {% if direction_monthly.missing_supplier_count or direction_monthly.missing_rubro_count %}
+            <p class="muted">Datos incompletos: {{ direction_monthly.missing_supplier_count }} líneas sin proveedor habitual · {{ direction_monthly.missing_rubro_count }} líneas sin rubro claro.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+
+    <div class="panel direction-monthly-panel supplier-risk-panel">
+      <div class="section-head compact direction-monthly-head">
+        <div>
+          <h3>Dashboard mensual de dirección · proveedores y margen</h3>
+          <p class="muted">Subidas de proveedor, artículos causantes y recetas afectadas · periodo {{ direction_suppliers.period or direction_monthly.period or '-' }}.</p>
+        </div>
+        <a class="btn tiny" target="_blank" href="/direction/suppliers/print?center_id={{ selected_center_id or 0 }}&year={{ direction_year or (direction_suppliers.period[:4] if direction_suppliers.period else direction_monthly.period[:4]) }}&month={{ direction_month or (direction_suppliers.period[5:7] if direction_suppliers.period else direction_monthly.period[5:7]) }}">Imprimir proveedores</a>
+      </div>
+      <div class="cards mini-cards">
+        <div class="card danger"><div class="label">Subidas</div><div class="value">{{ direction_suppliers.increase_count or 0 }}</div></div>
+        <div class="card"><div class="label">Bajadas</div><div class="value">{{ direction_suppliers.decrease_count or 0 }}</div></div>
+        <div class="card warn"><div class="label">Impacto estimado</div><div class="value">{{ fmt_price(direction_suppliers.total_estimated_impact or 0) }} €</div></div>
+        <div class="card"><div class="label">Sin histórico</div><div class="value">{{ direction_suppliers.missing_comparison_count or 0 }}</div></div>
+      </div>
+      {% if not direction_suppliers.has_data %}
+        <div class="empty-note">Sin albaranes comparables en el periodo. El sistema no inventa subidas: necesita precio anterior del mismo artículo/proveedor.</div>
+      {% else %}
+        <div class="dashboard-grid-2">
+          <div class="subpanel">
+            <h4>Proveedores con mayor impacto</h4>
+            <table class="mini-table">
+              <thead><tr><th>Proveedor</th><th>Subidas</th><th>Máx.</th><th>Impacto</th></tr></thead>
+              <tbody>
+                {% for g in direction_suppliers.suppliers_by_risk[:8] %}
+                <tr>
+                  <td>{{ g.name }}</td><td>{{ g.increases }}</td>
+                  <td class="num danger-text">{{ '%.1f'|format(g.max_increase_pct or 0) }}%</td>
+                  <td class="num danger-text">{{ fmt_price(g.total_estimated_month_impact or 0) }} €</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="subpanel">
+            <h4>Artículos que más subieron</h4>
+            <table class="mini-table">
+              <thead><tr><th>Artículo</th><th>Proveedor</th><th>Subida</th><th>Impacto</th></tr></thead>
+              <tbody>
+                {% for x in direction_suppliers.top_increases[:8] %}
+                <tr>
+                  <td>{{ x.item_name }}</td><td>{{ x.supplier_name }}</td>
+                  <td class="num danger-text">{{ '%.1f'|format(x.delta_pct or 0) }}%</td>
+                  <td class="num danger-text">{{ fmt_price(x.estimated_month_impact or 0) }} €</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="dashboard-grid-2">
+          <div class="subpanel">
+            <h4>Recetas afectadas</h4>
+            <table class="mini-table">
+              <thead><tr><th>Receta</th><th>Estado</th><th>Causa</th></tr></thead>
+              <tbody>
+                {% for r in direction_suppliers.affected_recipes[:8] %}
+                <tr><td>{{ r.name }}</td><td>{{ r.margin_state }} · {{ '%.1f'|format(r.food_cost_pct or 0) }}%</td><td>{{ r.cause_item }} / {{ r.cause_supplier }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="subpanel">
+            <h4>Proveedor alternativo más barato</h4>
+            <table class="mini-table">
+              <thead><tr><th>Artículo</th><th>Actual</th><th>Alternativa</th><th>Ahorro</th><th>Operativa</th></tr></thead>
+              <tbody>
+                {% for x in direction_suppliers.supplier_alternatives[:8] %}
+                {% set alt = x.cheapest_alternative %}
+                <tr>
+                  <td>{{ x.item_name }}</td>
+                  <td>{{ x.supplier_name }} · {{ fmt_price(x.new_price) }}</td>
+                  <td>{{ alt.supplier_name }} · {{ fmt_price(alt.normalized_price) }}</td>
+                  <td class="num ok-text">{{ fmt_price(alt.estimated_month_saving or 0) }} € · {{ '%.1f'|format(alt.saving_pct or 0) }}%</td>
+                  <td class="tiny">{{ alt.delivery_status or 'OK' }} · Reparto {{ alt.delivery_days_label or 'sin regla' }} · Próx. {{ alt.next_delivery_date or '-' }}{% if alt.delivery_min_order_amount %} · Min. {{ fmt_price(alt.delivery_min_order_amount) }} €{% endif %}{% if alt.delivery_warnings %}<br><span class="warn-text">{{ alt.delivery_warnings|join(' · ') }}</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p class="muted tiny">Sugerencia revisable: primero valida mínimo, reparto, plazo, calidad y formato. No cambia proveedor automáticamente.</p>
+          </div>
+          <div class="subpanel recommendations">
+            <h4>Evaluación proveedor/margen</h4>
+            <ul>{% for rec in direction_suppliers.recommendations %}<li>{{ rec }}</li>{% endfor %}</ul>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+
+    <div class="panel direction-monthly-panel recipe-sales-panel">
+      <div class="section-head compact direction-monthly-head">
+        <div>
+          <h3>Ranking mensual de ventas de platos</h3>
+          <p class="muted">Apartado separado para verificar ventas por plato cuando haya datos TPV · periodo {{ direction_recipe_sales.period or direction_monthly.period or '-' }}.</p>
+        </div>
+        <a class="btn tiny" target="_blank" href="/direction/recipe-sales/print?center_id={{ selected_center_id or 0 }}&year={{ direction_year or (direction_recipe_sales.period[:4] if direction_recipe_sales.period else direction_monthly.period[:4]) }}&month={{ direction_month or (direction_recipe_sales.period[5:7] if direction_recipe_sales.period else direction_monthly.period[5:7]) }}">Imprimir ventas platos</a>
+      </div>
+      <div class="cards mini-cards">
+        <div class="card"><div class="label">Platos vendidos</div><div class="value">{{ '%.1f'|format(direction_recipe_sales.total_qty or 0) }}</div></div>
+        <div class="card"><div class="label">Venta neta</div><div class="value">{{ fmt_price(direction_recipe_sales.total_net_sales or 0) }} €</div></div>
+        <div class="card warn"><div class="label">Coste receta</div><div class="value">{{ fmt_price(direction_recipe_sales.total_food_cost or 0) }} €</div></div>
+        <div class="card"><div class="label">Margen</div><div class="value">{{ '%.1f'|format(direction_recipe_sales.gross_margin_pct or 0) }}%</div></div>
+      </div>
+      {% if not direction_recipe_sales.has_data %}
+        <div class="empty-note">Ranking preparado, pero sin ventas TPV normalizadas en este periodo. No se inventan ventas: cuando se conecte/importe TPV, aparecerá aquí.</div>
+      {% else %}
+        <div class="dashboard-grid-2">
+          <div class="subpanel">
+            <h4>Top por unidades</h4>
+            <table class="mini-table">
+              <thead><tr><th>Plato</th><th>Canal</th><th>Ud.</th><th>Venta</th><th>Margen</th></tr></thead>
+              <tbody>
+                {% for x in direction_recipe_sales.top_by_units[:8] %}
+                <tr><td>{{ x.recipe_name }}</td><td>{{ x.channel }}</td><td class="num">{{ '%.1f'|format(x.qty_sold or 0) }}</td><td class="num">{{ fmt_price(x.net_sales or 0) }} €</td><td class="num">{{ '%.1f'|format(x.gross_margin_pct or 0) }}%</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="subpanel">
+            <h4>Riesgo de margen por ventas</h4>
+            <table class="mini-table">
+              <thead><tr><th>Plato</th><th>Food cost</th><th>Margen</th><th>Acción</th></tr></thead>
+              <tbody>
+                {% for x in direction_recipe_sales.top_margin_risk[:8] %}
+                <tr><td>{{ x.recipe_name }}</td><td class="num danger-text">{{ '%.1f'|format(x.food_cost_pct or 0) }}%</td><td class="num">{{ '%.1f'|format(x.gross_margin_pct or 0) }}%</td><td class="tiny">{{ x.recommended_action }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="subpanel modifiers-panel">
+        <div class="section-head compact">
+          <div>
+            <h4>Modificadores TPV · stock realista</h4>
+            <p class="muted">Ajusta consumo por cambios reales: sin pan, extra queso, guarnición, sin aderezo, etc. No modifica receta maestra.</p>
+          </div>
+          <a class="btn tiny" target="_blank" href="/direction/recipe-modifiers/print?center_id={{ selected_center_id or 0 }}&year={{ direction_year or (direction_recipe_modifiers.period[:4] if direction_recipe_modifiers.period else direction_monthly.period[:4]) }}&month={{ direction_month or (direction_recipe_modifiers.period[5:7] if direction_recipe_modifiers.period else direction_monthly.period[5:7]) }}">Imprimir modificadores</a>
+        </div>
+        <div class="cards mini-cards">
+          <div class="card"><div class="label">Mods vendidos</div><div class="value">{{ '%.1f'|format(direction_recipe_modifiers.total_modifier_qty or 0) }}</div></div>
+          <div class="card"><div class="label">Mapeados</div><div class="value">{{ direction_recipe_modifiers.mapped_count or 0 }}</div></div>
+          <div class="card warn"><div class="label">Sin mapear</div><div class="value">{{ direction_recipe_modifiers.unmapped_count or 0 }}</div></div>
+          <div class="card"><div class="label">Sin impacto stock</div><div class="value">{{ direction_recipe_modifiers.no_stock_count or 0 }}</div></div>
+        </div>
+        {% if not direction_recipe_modifiers.has_data %}
+          <div class="empty-note">Capa preparada. Cuando el TPV envíe modificadores, el sistema calculará consumo base + deltas sin alterar la receta maestra.</div>
+        {% else %}
+          <table class="mini-table">
+            <thead><tr><th>Plato</th><th>Modificador</th><th>Estado</th><th class="num">Ud.</th></tr></thead>
+            <tbody>
+              {% for x in direction_recipe_modifiers.top_modifiers[:8] %}
+              <tr><td>{{ x.recipe_name }}</td><td>{{ x.modifier_name }}</td><td>{{ x.status }}</td><td class="num">{{ '%.1f'|format(x.qty_sold or 0) }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+        <ul class="tiny-list">{% for rec in direction_recipe_modifiers.recommendations[:3] %}<li>{{ rec }}</li>{% endfor %}</ul>
+      </div>
+
+      <div class="subpanel recommendations">
+        <h4>Mejoras opcionales preparadas</h4>
+        <ul>{% for rec in direction_recipe_sales.optional_improvements[:5] %}<li><strong>{{ rec.name }}:</strong> {{ rec.value }}</li>{% endfor %}</ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Accesos rápidos</h3>
+      <div class="quick-grid">
+        <a class="btn" href="/?page=stock&center_id={{selected_center_id}}">📦 Registrar movimiento</a>
+        <a class="btn" href="/?page=albaranes&center_id={{selected_center_id}}">🧾 Nuevo albarán</a>
+        <a class="btn" href="/?page=pedidos&center_id={{selected_center_id}}">🛒 Pedidos</a>
+        <a class="btn" href="/?page=producciones&center_id={{selected_center_id}}">🍳 Producciones</a>
+        <a class="btn" href="/?page=recetas&center_id={{selected_center_id}}">📋 Recetas</a>
+        <a class="btn" href="/?page=admin&center_id={{selected_center_id}}">🗂 Catálogo</a>
+      </div>
+    </div>
+  </section>

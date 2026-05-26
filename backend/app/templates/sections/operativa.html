@@ -1,0 +1,115 @@
+<section class="operativa-section" id="operativaBlock">
+  <div class="operativa-hero compact-hero visual-hero">
+    <div class="op-hero-titlebox">
+      <span class="op-kicker">Uso rápido móvil</span>
+      <h1>⚡ Operativa rápida</h1>
+      <p>Dicta o escribe pedidos, producciones y mermas. El sistema interpreta, activa el panel correcto y crea propuestas pendientes. Nada descuenta stock ni cierra pedidos hasta validar.</p>
+    </div>
+    <div class="op-status-card">
+      <span>Colas pendientes</span>
+      <strong>{{ (operational_queue.ORDER|length) + (operational_queue.PRODUCTION|length) + (operational_queue.WASTE|length) }}</strong>
+      <small>Pedidos: {{operational_queue.ORDER|length}} · Producciones: {{operational_queue.PRODUCTION|length}} · Mermas: {{operational_queue.WASTE|length}}</small>
+    </div>
+  </div>
+
+  {% if selected_center_id == 0 %}
+  <div class="op-warning">Selecciona un local concreto para registrar operativa real. En “Todos” solo conviene revisar.</div>
+  {% endif %}
+  {% if ai_status and not ai_status.configured %}
+  <div class="op-warning ai-warning">IA externa no activa: estás usando reglas locales. Para mejor dictado, configura OpenAI y verifica en Catálogo → Probar IA.</div>
+  {% endif %}
+
+  <div class="alfi-mobile-tabs" aria-label="Navegación rápida OÍDO ALFI móvil">
+    <button type="button" class="active" data-alfi-tab="dictar">1 · Dictar</button>
+    <button type="button" data-alfi-tab="resultado">2 · Resultado</button>
+    <button type="button" data-alfi-tab="colas">3 · Colas</button>
+  </div>
+
+  <div class="op-card op-dictation-card priority-card op-alfi-central" id="alfiCentralPanel" data-alfi-panel="dictar">
+    <div class="op-card-headline alfi-headline">
+      <div>
+        <span class="op-kicker">OÍDO ALFI · asistente operativo central</span>
+        <h2>🎧 Dicta o escribe una orden</h2>
+        <p class="op-muted alfi-short-help">En móvil: pulsa el campo y usa el micrófono del teclado. Para probar la grabación directa, usa “Prueba voz 5 s”.</p>
+      </div>
+      <details class="op-ai-badge alfi-diagnostics-box {% if ai_status and ai_status.configured %}is-on{% else %}is-local{% endif %}">
+        <summary>Diagnóstico IA / voz</summary>
+        <strong>{{ ai_status.status_label if ai_status else 'LOCAL' }}</strong>
+        <span>{{ ai_status.ai_model if ai_status else 'local' }} · {{ ai_status.stt_model if ai_status else 'local' }}</span>
+        <a href="/?page=admin&center_id={{selected_center_id}}#tab-ia">Probar IA</a>
+      </details>
+    </div>
+
+    <div class="alfi-input-grid">
+      <div class="alfi-main-input">
+        <label>Comando operativo</label>
+        <textarea id="alfiText" rows="4" autocomplete="off" placeholder="Ej.: Quiero hacer una producción de pico de gallo / merma de tomate 4 kg por mal estado / faltan puerros / ¿de qué proveedor es bacalao?"></textarea>
+        <details class="alfi-howto"><summary>Cómo probar voz en 3 pasos</summary><ol><li>Pulsa dentro del campo y dicta con el micrófono del teclado.</li><li>Revisa el texto escrito y pulsa Prelectura.</li><li>Si está correcto, pulsa Ejecutar. Para grabación directa usa Prueba voz 5 s.</li></ol></details>
+      </div>
+      <div class="alfi-side-inputs">
+        <label>Responsable</label>
+        <input id="alfiRequestedBy" list="opResponsibleList" placeholder="Opcional si lo dices en la frase" autocomplete="off">
+        <label class="alfi-speak-toggle"><input id="alfiSpeak" type="checkbox" checked> Responder con voz</label>
+        <button type="button" class="op-btn dark" id="alfiMic">🎙️ Grabar y ejecutar</button>
+        <button type="button" class="op-btn" id="alfiTestVoice">🧪 Prueba voz 5 s</button>
+        <button type="button" class="op-btn" id="alfiStop" hidden>⏹️ Parar y analizar</button>
+      </div>
+    </div>
+
+    <div class="alfi-quick-actions" aria-label="Ejemplos rápidos por módulo">
+      <button type="button" data-alfi-fill="quiero hacer una producción de pico de gallo">Producción</button>
+      <button type="button" data-alfi-fill="merma de tomate 4 kg por mal estado">Merma</button>
+      <button type="button" data-alfi-fill="faltan puerros para mañana">Pedido</button>
+      <button type="button" data-alfi-fill="cuánto tomate hay en stock">Stock</button>
+      <button type="button" data-alfi-fill="de qué proveedor es bacalao">Proveedor</button>
+      <button type="button" data-alfi-fill="importar receta por foto">Receta IA</button>
+      <button type="button" data-alfi-fill="leer albarán por foto">Albarán IA</button>
+    </div>
+
+    <div class="op-actions main-actions alfi-main-actions">
+      <button type="button" class="op-btn gold big primary-create" id="alfiExecute">Ejecutar</button>
+      <button type="button" class="op-btn big" id="alfiPreview">Prelectura</button>
+      <a class="op-btn big" href="/ai-system/ui?center_id={{selected_center_id}}">Centro IA</a>
+      <a class="op-btn big" href="/mobile-beta">Acceso móvil beta</a>
+    </div>
+
+    <div id="alfiStatus" class="op-help">Escribe o dicta. Puedes previsualizar antes de ejecutar.</div>
+    <div id="alfiAudioDiag" class="op-help alfi-audio-diag">Diagnóstico voz: comprobando navegador y STT servidor…</div>
+    <div id="alfiResult" class="op-interpretation alfi-result" data-alfi-panel="resultado" hidden></div>
+  </div>
+
+  <div class="op-shortcuts" data-alfi-panel="colas">
+    <a href="#opPanelOrders" class="op-shortcut order">🛒<strong>Pedidos</strong><span>{{operational_queue.ORDER|length}} pendientes</span></a>
+    <a href="#opPanelProductions" class="op-shortcut production">🍳<strong>Producciones</strong><span>{{operational_queue.PRODUCTION|length}} pendientes</span></a>
+    <a href="#opPanelWaste" class="op-shortcut waste">🗑️<strong>Mermas</strong><span>{{operational_queue.WASTE|length}} pendientes</span></a>
+  </div>
+
+  <div class="op-grid panels-grid" data-alfi-panel="colas">
+    <div class="op-card op-panel-card op-panel-order" id="opPanelOrders" data-op-panel="ORDER">
+      <h2>🛒 Carrito compartido de pedidos</h2>
+      <p class="op-muted compact-help">Consolida aportes y guarda responsable.</p>
+      {% for ln in operational_queue.ORDER %}
+        {% include "partials/operativa_line.html" with context %}
+      {% else %}<div class="op-empty">Sin líneas pendientes de pedido.</div>{% endfor %}
+      <a class="op-link primary-link" href="/?page=pedidos&center_id={{selected_center_id}}">Abrir Pedidos para validar</a>
+    </div>
+
+    <div class="op-card op-panel-card op-panel-production" id="opPanelProductions" data-op-panel="PRODUCTION">
+      <h2>🍳 Cola de producciones</h2>
+      <p class="op-muted compact-help">Agrupa antes de confirmar y descontar stock.</p>
+      {% for ln in operational_queue.PRODUCTION %}
+        {% include "partials/operativa_line.html" with context %}
+      {% else %}<div class="op-empty">Sin producciones pendientes.</div>{% endfor %}
+      <a class="op-link primary-link" href="/?page=producciones&center_id={{selected_center_id}}">Abrir Producciones</a>
+    </div>
+  </div>
+
+  <div class="op-card op-panel-card op-panel-waste" id="opPanelWaste" data-op-panel="WASTE" data-alfi-panel="colas">
+    <h2>🗑️ Mermas pendientes desde operativa</h2>
+    <p class="op-muted compact-help">Pendientes; para foto usa Mermas.</p>
+    {% for ln in operational_queue.WASTE %}
+      {% include "partials/operativa_line.html" with context %}
+    {% else %}<div class="op-empty">Sin mermas dictadas desde operativa.</div>{% endfor %}
+    <a class="op-link primary-link" href="/?page=mermas&center_id={{selected_center_id}}">Abrir Mermas</a>
+  </div>
+</section>

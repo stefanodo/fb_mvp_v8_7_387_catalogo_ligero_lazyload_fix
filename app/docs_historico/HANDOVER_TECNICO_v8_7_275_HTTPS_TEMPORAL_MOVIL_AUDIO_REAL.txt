@@ -1,0 +1,41 @@
+System MAC · v8_7_275 · HTTPS temporal para móvil/audio real
+
+Objetivo:
+- Añadir un modo opcional de acceso HTTPS temporal para iPhone sin romper el arranque local actual.
+- Facilitar entrada móvil mediante enlace HTTPS y QR.
+- Permitir probar grabación de audio real en navegador móvil cuando el contexto seguro lo permita.
+
+Cambios:
+1) Nuevo comando:
+   INICIAR_HTTPS_TEMPORAL.command
+
+2) Funcionamiento del comando:
+   - Carga .env y configuración OpenAI si existe.
+   - Usa cloudflared para crear un túnel HTTPS temporal.
+   - Si cloudflared no existe, intenta instalarlo automáticamente:
+     a) con Homebrew si está disponible;
+     b) si no, descarga binario portable de GitHub según arquitectura del Mac.
+   - Arranca la app local en 0.0.0.0:8000.
+   - Expone la app por una URL https://...trycloudflare.com.
+   - Abre /movil para mostrar QR.
+   - Genera ABRIR_HTTPS_TEMPORAL.html y ABRIR_HTTPS_TEMPORAL.txt.
+
+3) main.py:
+   - /movil y /mobile_qr.png ahora priorizan FB_PUBLIC_HTTPS_URL cuando está definida.
+   - Esto hace que el QR apunte al túnel HTTPS si se arrancó con INICIAR_HTTPS_TEMPORAL.command.
+
+4) Seguridad:
+   - El enlace HTTPS temporal es público mientras la Terminal esté abierta.
+   - Recomendado solo para pruebas de voz/audio real.
+   - No sustituye el futuro despliegue profesional con dominio HTTPS, login y roles.
+
+5) No tocado:
+   - No se elimina ni modifica el arranque local normal.
+   - DESBLOQUEAR_y_INICIAR.command sigue funcionando como antes.
+   - No se cambia lógica de stock, recetas, pedidos, producciones ni mermas.
+
+Validación realizada:
+- Sintaxis bash de launchers: OK.
+- Compilación backend/app: OK.
+- Compilación app/backend/app: OK.
+- Importación FastAPI: OK.

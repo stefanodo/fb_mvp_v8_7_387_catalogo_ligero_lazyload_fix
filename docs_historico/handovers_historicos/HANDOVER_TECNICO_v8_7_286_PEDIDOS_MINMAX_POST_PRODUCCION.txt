@@ -1,0 +1,47 @@
+HANDOVER TÉCNICO v8_7_286 · Pedidos min/max post-producción
+
+Objetivo
+- Corregir que, tras confirmar una producción, artículos como PROVOLONE o QUESO PARMESANO quedaran bajo mínimo pero no pasaran correctamente al pedido sugerido.
+- Corregir que Sug. stk revisara solo un almacén por defecto y dejara fuera posiciones con min/max en Cámara/Economato.
+- Corregir que Prod. solo mirara producciones abiertas y no resolviera reposición post-producción ya confirmada.
+- Revisar Max F / Max C / Max S / Max L para pedir hasta máximo por bloque respetando preferencias de ubicación.
+
+Cambios principales
+1. Pedidos / sugerencias stock
+- add_suggestions_form ahora revisa todas las posiciones min/max del centro si no se pasa warehouse_id explícito.
+- Antes podía revisar solo el primer almacén y perder artículos en Cámara/Economato.
+
+2. Pedidos por producción
+- add_production_needs_form ahora contempla:
+  a) producciones DRAFT: stock proyectado = stock actual - necesidad producción.
+  b) producciones CONFIRMED: si el consumo ya dejó el stock bajo mínimo, repone hasta máximo.
+- Si no hay min/max, mantiene el comportamiento de cubrir faltante de producción abierta.
+
+3. Botones Max F / Max C / Max S / Max L
+- Ahora revisan todos los artículos del bloque con min/max, respetando item_location_prefs.
+- Si no hay preferencia específica, usan el almacén operativo preferido del bloque.
+
+4. Duplicados de artículos
+- merge_duplicate_items ahora migra también recipe_ingredients, production_lines, inventory_counts, waste_entries e item_location_prefs.
+- Esto evita que una receta/producción consuma un duplicado de QUESO PARMESANO mientras Stock/Pedidos muestran otro artículo canónico.
+
+Regla operativa resultante
+- Si stock actual < mínimo: pedido sugerido = máximo - stock actual.
+- Ejemplo PROVOLONE: stock -0,3 kg, min 1 kg, max 5 kg => pedir 5,3 kg.
+- Ejemplo QUESO PARMESANO: stock -0,303 kg, min 1 kg, max 5 kg => pedir 5,303 kg.
+- Si falta proveedor, la línea se crea igualmente con proveedor pendiente; no desaparece.
+- Pedido no impacta stock. Solo albarán validado impacta stock.
+
+Validación técnica
+- compileall backend/app: OK
+- compileall app/backend/app: OK
+- Import FastAPI: OK
+- Test sintético Sug. stk con QUESO PARMESANO -0,303 kg, min 1, max 5: genera 5,303 kg en Cámara.
+- Test sintético Max F con artículo fresco min 1, max 5: genera 5 kg.
+
+No tocado
+- OCR
+- Voz
+- Albaranes
+- Confirmación de stock por albarán
+- Diseño visual general

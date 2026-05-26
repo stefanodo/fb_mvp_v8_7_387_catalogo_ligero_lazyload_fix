@@ -1,0 +1,37 @@
+RECETAS CON IA / VISIÓN — PLAN DE IMPLEMENTACIÓN
+
+Objetivo:
+Permitir que el usuario suba una foto, PDF o manuscrito de una receta y que el sistema la convierta a ficha técnica System MAC.
+
+Flujo propuesto:
+1. Usuario sube foto/PDF/scan/manuscrito.
+2. IA visión extrae texto e ingredientes.
+3. IA estructura en JSON controlado:
+   - nombre receta
+   - categoría/subcategoría
+   - rendimiento/raciones
+   - ingredientes
+   - cantidades
+   - unidades
+   - pasos
+   - alérgenos posibles
+   - tiempos de producción
+4. Sistema busca coincidencias en Catálogo.
+5. Líneas claras se proponen; líneas dudosas van a revisión.
+6. Usuario valida antes de crear receta.
+7. No se modifica stock.
+
+Reglas de seguridad:
+- No inventar cantidades.
+- Si la letra o el dato no es claro, mandar a revisión.
+- No crear ingredientes nuevos sin confirmación.
+- No calcular costes como definitivos si hay precios estimados o sin precio fiable.
+- Mantener imagen original como evidencia.
+
+Modelos posibles:
+- OpenAI con visión para leer imagen/PDF/foto.
+- OpenAI Structured Outputs para devolver JSON estable.
+- Fallback OCR local/Tesseract si no hay API o falla la conexión.
+
+Pendiente:
+Implementar después de cerrar bloque base, OCR y voz.

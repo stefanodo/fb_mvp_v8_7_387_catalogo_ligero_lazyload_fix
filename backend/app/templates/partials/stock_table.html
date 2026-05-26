@@ -1,0 +1,38 @@
+<div class="panel" {% if show_stock_table_anchor|default(false) %}id="stockFreshTablePanel"{% endif %}>
+  {% if show_stock_table_header is not defined or show_stock_table_header %}{% include "partials/stock_table_header.html" %}{% endif %}
+  <div class="table-wrap">
+    <table class="stock-table">
+      <thead><tr><th>Almacén</th><th>Artículo</th><th>Ubicación</th><th>Stock</th><th>Origen / Fecha</th><th>Mín</th><th>Máx</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      {% set table_rows = stock_table_rows if stock_table_rows is defined else stocks %}
+      {% for s in table_rows %}
+        {% set row_match = (not stock_q_norm or stock_q_norm in (s._search_norm or '')) and (not stock_item_id_q or stock_item_id_q|string == s.item_id|string) and (not stock_wh_id_q or stock_wh_id_q|string == s.warehouse_id|string) %}
+        {% if row_match %}
+        {% set row_highlight = (stock_q or stock_item_id_q or stock_wh_id_q) and row_match %}
+        <tr {% if row_highlight %}style="outline:2px solid #c8a96a;"{% endif %} data-item-id="{{s.item_id}}" data-center="{{s.center_name|lower}}" data-warehouse="{{s.warehouse_name|lower}}" data-article="{{s.item_name|lower}}">
+          <td>{{s.warehouse_name}}</td>
+          <td><div><b>{{s.item_name}}</b>{% if s._classification_note %}<div class="muted" style="font-size:12px;margin-top:4px;">{{ s._classification_note }}</div>{% endif %}{% if s._operational_note %}<div class="muted" style="font-size:12px;margin-top:4px;">{{ s._operational_note }}</div>{% endif %}</div></td>
+          <td>{% if s.stock_area_label %}<span class="badge">{{s.stock_area_label}}</span>{% else %}<span class="badge warn">Sin ubicar</span>{% endif %}</td>
+          <td><strong>{{ human_qty(s.stock_qty, s.unit) }}</strong></td>
+          <td style="font-size:12px;">{% if s.last_move_note %}<span>{{ s.last_move_note }}</span><br>{% endif %}<span class="muted">{{ fmt_dt(s.last_move_at) or '—' }}</span></td>
+          <td>{{ human_qty(s.min_qty, s.unit) }}</td>
+          <td>{{ human_qty(s.max_qty, s.unit) }}</td>
+          <td>{% if s.stock_qty < s.min_qty %}<span class="badge danger">Bajo mín.</span>{% elif s.max_qty>0 and s.stock_qty > s.max_qty %}<span class="badge warn">Sobre</span>{% else %}<span class="badge ok">OK</span>{% endif %}</td>
+          <td>
+            <form method="get" action="/" class="stock-mini-form">
+              <input type="hidden" name="page" value="stock">
+              <input type="hidden" name="center_id" value="{{ selected_center_id or s.center_id }}">
+              <input type="hidden" name="stock_section" value="{{ stock_section or 'current_all' }}">
+              <input type="hidden" name="minmax_item" value="{{s.item_id}}">
+              <input type="hidden" name="minmax_center" value="{{s.center_id}}">
+              <input type="hidden" name="minmax_wh" value="{{s.warehouse_id}}">
+              <button class="mini stock-mini-btn" type="submit">±</button>
+            </form>
+          </td>
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

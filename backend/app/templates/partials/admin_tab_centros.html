@@ -1,0 +1,23 @@
+<div class="admin-tab" id="tab-centros" style="display:none;">
+    <div class="panel panel-accent" style="max-width:580px;">
+      <h3>Centros / locales</h3>
+      <p class="muted" style="margin-bottom:12px;">Renombra tus establecimientos. El nombre aparece en toda la aplicación.</p>
+      <table class="table">
+        <thead><tr><th style="width:50px">ID</th><th>Nombre</th><th></th></tr></thead>
+        <tbody>
+          {% for c in centers %}
+          <tr>
+            <td style="color:var(--muted);">{{c.id}}</td>
+            <td>
+              <form method="post" action="/center/{{c.id}}/update_name_form" class="rowform">
+                <input name="name" value="{{c.name}}" required>
+                <button class="btn" type="submit">Guardar</button>
+              </form>
+            </td>
+            <td></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>

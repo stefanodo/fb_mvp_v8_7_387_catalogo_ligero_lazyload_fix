@@ -1,0 +1,59 @@
+System MAC · v8_7_269 · Operativa UI + voz IA + responsive
+
+Base: v8_7_268_operativa_intencion_responsable_ia_macfix
+
+Cambios aplicados:
+
+1) Operativa rápida · interfaz visual
+- Se refuerza la cabecera del bloque Operativa rápida para que se lea sobre fondo oscuro.
+- Se elimina la duplicidad visual de botones pequeños Pedido/Producción/Merma que confundían con el selector principal.
+- Se dejan ejemplos como texto guiado, no como botones de acción.
+- Se refuerzan botones principales: Dictar/grabar, Interpretar y Crear propuesta.
+- Se refuerza el panel de modo único: Auto, Pedido, Producción, Merma.
+- Se iluminan los paneles correspondientes cuando la intención detectada es Pedido, Producción o Merma.
+
+2) Móvil/escritorio
+- En móvil se mantiene la voz como flujo principal.
+- En ordenador se marca el dictado como opcional y se prioriza la escritura como modo más fiable.
+- Inputs y textarea pasan a 16px mínimo en móvil para evitar zoom automático de Safari al enfocar campos.
+- Viewport más cerrado: maximum-scale=1 y user-scalable=no para comportamiento más parecido a app.
+
+3) Voz con IA real configurable
+- Se añade endpoint /api/operativa/transcribe para enviar audio grabado al backend.
+- Se añade función transcribe_audio_bytes() con soporte opcional para OpenAI audio transcription.
+- Variables:
+  OPERATIVA_STT_MODE=openai
+  OPENAI_API_KEY=...
+  OPERATIVA_STT_MODEL=gpt-4o-mini-transcribe
+  OPERATIVA_STT_TIMEOUT=20
+- Si no está configurado, no inventa transcripción: devuelve aviso y mantiene fallback con dictado del navegador o micrófono del teclado del iPhone.
+
+4) Interpretación de voz/texto
+- Se mejora parser local de pedidos, producciones y mermas.
+- Se mejora reconocimiento de unidades y puntuación: "2 kilos," ya se interpreta como kg.
+- Se corrige caso de merma con cantidad posterior al producto: "merma de salsa de tomate, 2 kilos, por fermentada".
+- Se añaden más sinónimos operativos para pedido, producción y merma.
+- Se mejora matching contra base de datos con búsqueda por tokens, para nombres tipo "salsa tomate" contra "salsa de tomate".
+
+5) Seguridad operativa
+- No se confirma stock automáticamente.
+- No se cierran pedidos automáticamente.
+- No se confirman producciones automáticamente.
+- Todo sigue quedando como propuesta pendiente para validación humana.
+
+Validaciones realizadas:
+- Compilación Python backend/app y app/backend/app: OK.
+- Import FastAPI: OK.
+- Smoke test Inicio/Operativa/Pedidos/Producciones/Mermas: OK.
+- /api/operativa/interpret: OK.
+- /api/operativa/transcribe sin clave: devuelve aviso controlado, no rompe.
+- Prueba simulada de creación de línea operativa y limpieza posterior: OK.
+
+Pruebas de frases:
+- "Soy Juan, agrega 2 kilos de zanahoria y medio kilo de cebolla al pedido" -> Pedido, 2 líneas, responsable Juan.
+- "Soy Pedro, quiero producir 12 raciones de lasaña de verduras" -> Producción, 12 raciones, responsable Pedro.
+- "Hay una merma de salsa de tomate, 2 kilos, por fermentada" -> Merma, 2 kg, motivo fermentada.
+
+Pendiente recomendado:
+- Añadir cálculo de suficiencia: stock actual + pedido pendiente - producciones pendientes - min/max.
+- Conectar faltantes de cola de producción al carrito compartido de pedido.

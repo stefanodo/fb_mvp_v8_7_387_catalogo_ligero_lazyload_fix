@@ -1,0 +1,32 @@
+HOTFIX PEDIDOS v8_7_262
+
+Fallo real corregido:
+- La pantalla de Pedidos sí intentaba construir el listado manual por bloque, pero en la carga principal de la página no estaba ejecutando ensure_columns() sobre la conexión usada para ese detalle.
+- Eso hacía que helpers como _suggest_supplier_id fallaran silenciosamente por columnas/tablas aún no garantizadas en runtime.
+- Como el bloque estaba envuelto en try/except por línea, terminaba descartando todos los artículos y la tabla quedaba vacía: “No hay artículos visibles en este bloque”.
+
+Qué corregí:
+- Añadí ensure_columns(curx) en la carga del detalle de pedido dentro de backend/app/main.py.
+- Blindé la resolución de proveedor preferente para que, si esa parte falla, el artículo no desaparezca del listado manual.
+- Sincronicé el mismo cambio en app/backend/app/main.py para evitar divergencias de runtime.
+
+Archivos tocados:
+- backend/app/main.py
+- app/backend/app/main.py
+
+Lógica final de filtrado:
+- Fuente real: tabla items
+- Bloque principal: stock_area normalizado
+- Subgrupo de frescos: clasificación determinista por nombre (verduras, pescados, carnes, huevos, lacteos)
+
+Validación interna:
+- Frescos cargando 93 artículos
+- Verduras: 60
+- Pescados: 11
+- Carnes: 14
+- Huevos: 1
+- Lácteos: 7
+- Congelados: 7
+- Secos: 71
+- Limpieza: 5
+- El HTML del bloque manual ya renderiza filas reales por categoría en lugar del mensaje vacío
