@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 PRODUCTION_GROUPS = [
     "Calientes", "Fríos", "Postres", "Salsas", "Guarniciones",
     "Bases", "Masas", "Pastelería", "Porcionados", "Otros",

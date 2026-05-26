@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ==============================================================================
 # BLOQUE OCR ENGINE · Parsers por proveedor, OCR, lectura de imágenes
 # Separado del main para aislar memoria y facilitar mantenimiento.

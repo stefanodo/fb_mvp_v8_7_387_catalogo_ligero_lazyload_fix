@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # ==============================================================================
 # F&B MVP · main.py — Punto de entrada limpio
 # Versión modular v8.7.175

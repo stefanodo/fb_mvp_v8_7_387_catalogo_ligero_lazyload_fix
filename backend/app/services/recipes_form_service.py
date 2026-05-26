@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.core import _parse_scope, _parse_float
 from app.services.units_service import canonical_unit
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections import OrderedDict
 
 from app.core import production_with_lines, _collect_recipe_production_inputs

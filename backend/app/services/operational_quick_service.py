@@ -23,7 +23,7 @@ def _load_operativa_env_files(override: bool = False) -> None:
     """
     here = Path(__file__).resolve()
     candidates = []
-    for parent in [Path.cwd(), *here.parents[:8]]:
+    for parent in [Path.cwd(), *list(here.parents)[:8]]:
         candidates.append(parent / ".env")
         candidates.append(parent / "backend" / ".env")
     seen = set()

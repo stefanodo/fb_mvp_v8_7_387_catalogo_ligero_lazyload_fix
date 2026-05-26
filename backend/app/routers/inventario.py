@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Form
 from fastapi.responses import RedirectResponse
 from datetime import datetime

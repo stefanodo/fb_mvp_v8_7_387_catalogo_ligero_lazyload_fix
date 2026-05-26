@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from app.core import ensure_columns, get_unit_factor, _parse_float
 from app.services.productions_service import get_draft_production, resolve_line_payload
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from app.core import ensure_columns, _parse_float
 from app.productions_panel import create_batch_productions
