@@ -1,5 +1,44 @@
 #!/usr/bin/env python3
 import sqlite3, re, unicodedata, os, shutil, sys, datetime
+try:
+    from app.core import get_table_columns_from_cursor as _core_get_cols
+except Exception:
+    _core_get_cols = None
+
+
+def _get_table_columns(conn_or_cur, table):
+    """Return a set of column names for `table`.
+
+    Accepts either a sqlite3 connection/cursor or a Postgres adapter cursor/connection.
+    Prefers `app.core.get_table_columns_from_cursor` when available; falls back
+    to `PRAGMA table_info(...)` for SQLite.
+    """
+    cur = None
+    try:
+        # Normalize to a cursor-like object
+        if hasattr(conn_or_cur, 'cursor') and callable(getattr(conn_or_cur, 'cursor')):
+            cur = conn_or_cur.cursor()
+        else:
+            cur = conn_or_cur
+        # Prefer core helper when available (works with PG adapter cursors)
+        if _core_get_cols:
+            try:
+                return _core_get_cols(cur, table)
+            except Exception:
+                pass
+        # Fallback: PRAGMA for sqlite
+        try:
+            cur.execute(f'PRAGMA table_info({table})')
+            rows = cur.fetchall()
+            return {r[1] for r in rows}
+        except Exception:
+            return set()
+    finally:
+        try:
+            if cur is not None and hasattr(cur, 'close'):
+                cur.close()
+        except Exception:
+            pass
 from pathlib import Path
 
 PREP_EXACT_OR_PREFIX = {'AGUACHILE','AGUACHILES','FONDO BLANCO','FONDO OSCURO','DEMI GLACE','DEMI-GLACE','CALDO/STOCK LIQUIDO','CALDO STOCK LIQUIDO','SALSA BASE COCINA CENTRAL'}
@@ -84,7 +123,7 @@ def classify(name, old_area=''):
     return typ, area, cat
 
 def coladd(cur, table, name, decl):
-    cols={r[1] for r in cur.execute(f'pragma table_info({table})').fetchall()}
+    cols = _get_table_columns(cur, table)
     if name not in cols:
         cur.execute(f'alter table {table} add column {name} {decl}')
 
