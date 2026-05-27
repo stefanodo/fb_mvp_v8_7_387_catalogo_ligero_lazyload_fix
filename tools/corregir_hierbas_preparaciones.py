@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sqlite3, sys, shutil, re, unicodedata, datetime
 from pathlib import Path
-
+from tools.db_helper import get_table_columns
 DB = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else Path('backend/runtime/fb_mvp_v8.db')
 if not DB.exists():
     print(f'No existe la base: {DB}')
@@ -24,7 +24,7 @@ herbs = {
 con = sqlite3.connect(DB)
 con.row_factory = sqlite3.Row
 cur = con.cursor()
-cols = {r['name'] for r in cur.execute('PRAGMA table_info(items)').fetchall()}
+cols = get_table_columns(cur, 'items')
 changed = 0
 for r in cur.execute('SELECT id,name FROM items').fetchall():
     n = norm(r['name'])
