@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sqlite3, re, unicodedata, os, shutil, sys, datetime
 from pathlib import Path
+from tools.db_helper import get_table_columns
 
 PREP_EXACT_OR_PREFIX = {'AGUACHILE','AGUACHILES','FONDO BLANCO','FONDO OSCURO','DEMI GLACE','DEMI-GLACE','CALDO/STOCK LIQUIDO','CALDO STOCK LIQUIDO','SALSA BASE COCINA CENTRAL'}
 # Default estimated market prices by product/family, visible €/kg or €/ud.
@@ -89,7 +90,7 @@ def classify(name, old_area=''):
     return typ, area, cat
 
 def coladd(cur, table, name, decl):
-    cols={r[1] for r in cur.execute(f'pragma table_info({table})').fetchall()}
+    cols = get_table_columns(cur, table)
     if name not in cols:
         cur.execute(f'alter table {table} add column {name} {decl}')
 
