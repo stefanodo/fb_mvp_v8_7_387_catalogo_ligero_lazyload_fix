@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from typing import Any
 
-from app.core import db, ensure_columns, _unit_factor, normalize_stock_area
+from app.core import db, ensure_columns, _unit_factor, normalize_stock_area, db_coalesce_text
 
 
 def _rowdict(row) -> dict[str, Any]:
@@ -207,11 +207,11 @@ def build_monthly_direction_dashboard(center_id: int | None = None, year: int | 
               LEFT JOIN warehouses w ON w.id=ic.warehouse_id
               LEFT JOIN items i ON i.id=ic.item_id
              WHERE UPPER(COALESCE(s.status,''))='CLOSED'
-               AND date(COALESCE(s.created_at,'')) >= date(?)
-               AND date(COALESCE(s.created_at,'')) < date(?)
+               AND date(COALESCE({db_coalesce_text('s.created_at', cur_or_conn=cur)},'')) >= date(?)
+               AND date(COALESCE({db_coalesce_text('s.created_at', cur_or_conn=cur)},'')) < date(?)
                AND COALESCE(ic.is_checked,0)=1
                {center_clause}
-             ORDER BY c.name COLLATE NOCASE, ic.item_name COLLATE NOCASE
+             ORDER BY LOWER(COALESCE(c.name,'')), LOWER(COALESCE(ic.item_name,''))
             """,
             tuple(params),
         ).fetchall()

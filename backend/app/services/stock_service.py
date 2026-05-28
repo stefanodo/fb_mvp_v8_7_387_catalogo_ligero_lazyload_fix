@@ -1,4 +1,4 @@
-from app.core import db, normalize_minmax_qty_for_base
+from app.core import db, normalize_minmax_qty_for_base, safe_insert_returning
 from datetime import datetime
 from typing import Optional
 
@@ -27,12 +27,16 @@ def create_stock_movement(cur, center_id: int, warehouse_id: int, item_id: int, 
         return {'ok': False, 'error': 'Tipo de movimiento inválido', '_status': 400}
 
     created_at = datetime.now().isoformat(timespec='seconds')
-    cur.execute(
-        """INSERT INTO movements(center_id,warehouse_id,item_id,movement_type,qty,unit,created_at,note)
-           VALUES(?,?,?,?,?,?,?,?)""",
-        (center_id, warehouse_id, item_id, mt, qty_base, base_unit, created_at, note)
-    )
-    movement_id = int(cur.lastrowid or 0)
+    # Insert movement (DB-agnostic)
+    sqlite_sql = """INSERT INTO movements(center_id,warehouse_id,item_id,movement_type,qty,unit,created_at,note)
+           VALUES(?,?,?,?,?,?,?,?)"""
+    pg_sql = sqlite_sql.replace('?', '%s')
+    movement_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (center_id, warehouse_id, item_id, mt, qty_base, base_unit, created_at, note),
+        pg_sql=pg_sql,
+    ) or 0
     signed = "CASE WHEN upper(movement_type) IN ('ENTRADA','IN') THEN qty WHEN upper(movement_type) IN ('SALIDA','OUT') THEN -qty ELSE 0 END"
     stock_after = cur.execute(
         f"SELECT COALESCE(SUM({signed}),0) stock_qty FROM movements WHERE center_id=? AND warehouse_id=? AND item_id=?",
@@ -77,13 +81,15 @@ def save_item_minmax(item_id: int, min_qty: float, max_qty: float, min_unit: str
         if not wh or int(wh['center_id'] or 0) != int(center_id or 0):
             conn.close()
             raise ValueError('Almacén incoherente para el local')
-        cur.execute(
-            """INSERT INTO item_location_prefs(center_id,warehouse_id,item_id,min_qty,max_qty)
+        sqlite_sql = """INSERT INTO item_location_prefs(center_id,warehouse_id,item_id,min_qty,max_qty)
                VALUES(?,?,?,?,?)
                ON CONFLICT(center_id,warehouse_id,item_id)
-               DO UPDATE SET min_qty=excluded.min_qty,max_qty=excluded.max_qty""",
-            (int(center_id), int(warehouse_id), item_id, min_base, max_base)
-        )
+               DO UPDATE SET min_qty=excluded.min_qty,max_qty=excluded.max_qty"""
+        pg_sql = sqlite_sql.replace('?', '%s')
+        if getattr(cur, '_is_postgres', False):
+            cur.execute(pg_sql, (int(center_id), int(warehouse_id), item_id, min_base, max_base))
+        else:
+            cur.execute(sqlite_sql, (int(center_id), int(warehouse_id), item_id, min_base, max_base))
     else:
         cur.execute('UPDATE items SET min_qty=?, max_qty=? WHERE id=?', (min_base, max_base, item_id))
     conn.commit()

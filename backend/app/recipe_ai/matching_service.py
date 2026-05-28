@@ -3,6 +3,7 @@ import difflib, sqlite3
 from dataclasses import dataclass, asdict
 from typing import Optional
 from .models import ImportedIngredient, ImportedIngredientStatus
+from app.core import table_exists as core_table_exists
 
 @dataclass
 class MatchCandidate:
@@ -34,7 +35,8 @@ def normalize_name(v):
 def similarity(a,b):
     a,b = normalize_name(a), normalize_name(b)
     return 0.0 if not a or not b else difflib.SequenceMatcher(None,a,b).ratio()
-def table_exists(conn, table): return conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() is not None
+def table_exists(conn, table):
+    return core_table_exists(conn, table)
 def load_catalog_for_matching(conn):
     for table,idc,namec in [("articulos","id","nombre"),("items","id","name"),("catalog_items","id","name")]:
         if table_exists(conn, table):

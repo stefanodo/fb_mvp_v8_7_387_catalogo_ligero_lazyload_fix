@@ -1,98 +1,75 @@
 from __future__ import annotations
 import json, sqlite3
 from typing import Optional, Any
+from datetime import datetime, timedelta
 from .models import ImportedRecipeDraft, ImportedIngredient, LaborInfo, CatalogCandidate, RecipeImportStatus, ImportedIngredientStatus, RecipeCostStatus, validate_imported_recipe_draft
+from app.core import get_table_columns_from_cursor, safe_insert_returning
 
-RECIPE_AI_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS recipe_import_drafts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    recipe_name TEXT NOT NULL,
-    recipe_type TEXT DEFAULT 'RECETA',
-    category TEXT DEFAULT 'OTRO',
-    subcategory TEXT,
-    service_family TEXT DEFAULT 'OTRO',
-    yield_quantity REAL,
-    yield_unit TEXT DEFAULT 'kg',
-    portions INTEGER,
-    elaboration_steps_json TEXT,
-    allergens_json TEXT,
-    labor_json TEXT,
-    import_status TEXT DEFAULT 'BORRADOR_IA',
-    cost_status TEXT DEFAULT 'NO_CALCULADO',
-    confidence REAL DEFAULT 0,
-    warnings_json TEXT,
-    source_type TEXT,
-    raw_input_text TEXT,
-    raw_ia_json TEXT,
-    ia_provider TEXT,
-    ia_model TEXT,
-    process_time_s REAL,
-    created_by TEXT,
-    validated_by TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    validated_at DATETIME,
-    review_at DATETIME,
-    converted_recipe_id INTEGER
-);
-CREATE TABLE IF NOT EXISTS recipe_import_ingredients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    draft_id INTEGER NOT NULL REFERENCES recipe_import_drafts(id) ON DELETE CASCADE,
-    original_text TEXT,
-    normalized_name TEXT NOT NULL,
-    ingredient_type TEXT DEFAULT 'ARTICULO',
-    quantity_net REAL,
-    unit TEXT,
-    waste_percent REAL DEFAULT 0,
-    quantity_gross REAL,
-    match_status TEXT DEFAULT 'PENDIENTE_ALTA',
-    matched_item_id INTEGER,
-    matched_item_name TEXT,
-    matched_subrecipe_id INTEGER,
-    matched_subrecipe_name TEXT,
-    candidates_json TEXT,
-    needs_admin_validation INTEGER DEFAULT 1,
-    notes TEXT,
-    original_quantity REAL,
-    original_unit TEXT,
-    conversion_status TEXT DEFAULT 'NO_REQUIERE_CONVERSION',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS recipe_import_audit_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    draft_id INTEGER,
-    ingredient_id INTEGER,
-    action TEXT NOT NULL,
-    actor TEXT,
-    previous_value_json TEXT,
-    new_value_json TEXT,
-    notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_recipe_import_drafts_status ON recipe_import_drafts(import_status);
-CREATE INDEX IF NOT EXISTS idx_recipe_import_ingredients_draft ON recipe_import_ingredients(draft_id);
-CREATE INDEX IF NOT EXISTS idx_recipe_import_ingredients_status ON recipe_import_ingredients(match_status);
-"""
+# Recipe AI schema is now managed by backend/migrate.py.
+# For production deployments rely on `backend/migrate.py` to create and alter tables.
 
-def get_connection(db_path: str) -> sqlite3.Connection:
+def get_connection(db_path: str):
+    # In production we use the shared DB connection provided by app.db_config
+    try:
+        from app.db_config import IS_PRODUCTION, get_db_connection
+    except Exception:
+        IS_PRODUCTION = False
+        get_db_connection = None
+    if IS_PRODUCTION and callable(get_db_connection):
+        return get_db_connection()
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    # Apply centralized sqlite pragmas when available; skip for Postgres adapters
+    try:
+        if not getattr(conn, "_is_postgres", False):
+            try:
+                from app.db_config import ensure_sqlite_pragmas
+            except Exception:
+                ensure_sqlite_pragmas = None
+            if ensure_sqlite_pragmas:
+                try:
+                    ensure_sqlite_pragmas(conn)
+                except Exception:
+                    pass
+            else:
+                # No centralized helper available; skip executing PRAGMA directly.
+                # Standalone tools may rely on their own PRAGMA handling when needed.
+                pass
+    except Exception:
+        pass
     return conn
 
 def init_recipe_ai_storage(db_path: str) -> None:
-    with get_connection(db_path) as conn:
-        conn.executescript(RECIPE_AI_SCHEMA_SQL)
-        # Migración segura: versiones anteriores no tenían review_at.
-        try:
-            cols = {r["name"] for r in conn.execute("PRAGMA table_info(recipe_import_drafts)").fetchall()}
-            if "review_at" not in cols:
-                conn.execute("ALTER TABLE recipe_import_drafts ADD COLUMN review_at DATETIME")
-            conn.execute("UPDATE recipe_import_drafts SET review_at=COALESCE(review_at, created_at, CURRENT_TIMESTAMP) WHERE import_status='PENDIENTE_REVISION'")
-        except Exception:
-            pass
-        conn.commit()
+    # In production the Postgres schema is created at build-time by backend/migrate.py.
+    try:
+        from app.db_config import IS_PRODUCTION
+    except Exception:
+        IS_PRODUCTION = False
+    if IS_PRODUCTION:
+        return
+    # Schema creation/alterations are performed by backend/migrate.py.
+    # Keep a lightweight compatibility step for local DBs (no CREATEs here).
+    try:
+        with get_connection(db_path) as conn:
+            # If an older local DB exists, add the `review_at` column safely.
+            try:
+                cols = get_table_columns_from_cursor(conn, "recipe_import_drafts")
+                if "review_at" not in cols:
+                    conn.execute("ALTER TABLE recipe_import_drafts ADD COLUMN review_at DATETIME")
+                try:
+                    conn.execute("UPDATE recipe_import_drafts SET review_at=COALESCE(review_at, created_at, CURRENT_TIMESTAMP) WHERE import_status='PENDIENTE_REVISION'")
+                except Exception:
+                    pass
+            except Exception:
+                # Table may not exist in fresh environments; migrations should be applied instead.
+                pass
+            try:
+                conn.commit()
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 def json_dumps(value: Any) -> str: return json.dumps(value, ensure_ascii=False)
 def json_loads(value: Optional[str], fallback):
@@ -110,14 +87,27 @@ def save_imported_ingredient_row(conn, draft_id: int, ingredient: ImportedIngred
         if ingredient.match_status not in {ImportedIngredientStatus.PENDIENTE_REVISION, ImportedIngredientStatus.COINCIDENCIA_SUGERIDA}:
             ingredient.match_status = ImportedIngredientStatus.PENDIENTE_ALTA
         ingredient.needs_admin_validation = True
-        if not ingredient.notes: ingredient.add_note("Ingrediente nuevo pendiente de alta en Catálogo.")
+        if not ingredient.notes:
+            ingredient.add_note("Ingrediente nuevo pendiente de alta en Catálogo.")
     candidates = [c.to_dict() if hasattr(c, "to_dict") else c for c in ingredient.candidates]
-    cur = conn.execute("""
-        INSERT INTO recipe_import_ingredients
-        (draft_id, original_text, normalized_name, ingredient_type, quantity_net, unit, waste_percent, quantity_gross, match_status, matched_item_id, matched_item_name, matched_subrecipe_id, matched_subrecipe_name, candidates_json, needs_admin_validation, notes, original_quantity, original_unit, conversion_status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (draft_id, ingredient.original_text, ingredient.normalized_name, ingredient.ingredient_type, ingredient.quantity_net, ingredient.unit, ingredient.waste_percent, ingredient.quantity_gross, ingredient.match_status, ingredient.matched_item_id, ingredient.matched_item_name, ingredient.matched_subrecipe_id, ingredient.matched_subrecipe_name, json_dumps(candidates), 1 if ingredient.needs_admin_validation else 0, ingredient.notes, ingredient.original_quantity, ingredient.original_unit, ingredient.conversion_status))
-    return int(cur.lastrowid)
+
+    cur = conn.cursor()
+    sqlite_sql = """
+            INSERT INTO recipe_import_ingredients
+            (draft_id, original_text, normalized_name, ingredient_type, quantity_net, unit, waste_percent, quantity_gross, match_status, matched_item_id, matched_item_name, matched_subrecipe_id, matched_subrecipe_name, candidates_json, needs_admin_validation, notes, original_quantity, original_unit, conversion_status)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """
+    params = (
+        draft_id, ingredient.original_text, ingredient.normalized_name, ingredient.ingredient_type,
+        ingredient.quantity_net, ingredient.unit, ingredient.waste_percent, ingredient.quantity_gross,
+        ingredient.match_status, ingredient.matched_item_id, ingredient.matched_item_name,
+        ingredient.matched_subrecipe_id, ingredient.matched_subrecipe_name, json_dumps(candidates),
+        1 if ingredient.needs_admin_validation else 0, ingredient.notes, ingredient.original_quantity,
+        ingredient.original_unit, ingredient.conversion_status,
+    )
+    pg_sql = sqlite_sql.replace('?', '%s')
+    iid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
+    return int(iid or 0)
 
 
 def _find_recent_empty_duplicate(conn, draft: ImportedRecipeDraft) -> Optional[int]:
@@ -125,24 +115,51 @@ def _find_recent_empty_duplicate(conn, draft: ImportedRecipeDraft) -> Optional[i
     Regla conservadora: mismo origen + mismo nombre + 0 ingredientes + revisión reciente.
     """
     try:
+        # If there are any ingredients, it's not an "empty" draft: skip duplicate check.
         if draft.ingredients:
             return None
-        row = conn.execute(
-            """
-            SELECT d.id
-              FROM recipe_import_drafts d
-              LEFT JOIN recipe_import_ingredients i ON i.draft_id=d.id
-             WHERE UPPER(TRIM(d.recipe_name))=UPPER(TRIM(?))
-               AND COALESCE(d.source_type,'')=COALESCE(?, '')
-               AND d.import_status='PENDIENTE_REVISION'
-               AND datetime(COALESCE(d.created_at,CURRENT_TIMESTAMP)) >= datetime('now','-2 hours')
-             GROUP BY d.id
-            HAVING COUNT(i.id)=0
-             ORDER BY d.created_at DESC
-             LIMIT 1
-            """,
-            (draft.recipe_name or "RECETA PENDIENTE DE REVISION", draft.source_type or "")
-        ).fetchone()
+
+        # Prefer a param-driven cutoff for portability (avoid sqlite-only datetime('now','-2 hours')).
+        cutoff = (datetime.utcnow() - timedelta(hours=2)).isoformat()
+        try:
+            row = conn.execute(
+                """
+                SELECT d.id
+                  FROM recipe_import_drafts d
+                  LEFT JOIN recipe_import_ingredients i ON i.draft_id=d.id
+                 WHERE UPPER(TRIM(d.recipe_name))=UPPER(TRIM(?))
+                   AND COALESCE(d.source_type,'')=COALESCE(?, '')
+                   AND d.import_status='PENDIENTE_REVISION'
+                   AND COALESCE(d.created_at,CURRENT_TIMESTAMP) >= ?
+                 GROUP BY d.id
+                HAVING COUNT(i.id)=0
+                 ORDER BY d.created_at DESC
+                 LIMIT 1
+                """,
+                (draft.recipe_name or "RECETA PENDIENTE DE REVISION", draft.source_type or "", cutoff),
+            ).fetchone()
+        except Exception:
+            # Fallback: perform a safe time comparison in Python when SQL dialect features fail.
+            try:
+                cutoff_dt = datetime.utcnow() - timedelta(hours=2)
+                rows = conn.execute(
+                    "SELECT d.id,d.created_at FROM recipe_import_drafts d LEFT JOIN recipe_import_ingredients i ON i.draft_id=d.id WHERE UPPER(TRIM(d.recipe_name))=UPPER(TRIM(?)) AND COALESCE(d.source_type,'')=COALESCE(?, '') AND d.import_status='PENDIENTE_REVISION' GROUP BY d.id HAVING COUNT(i.id)=0 ORDER BY d.created_at DESC LIMIT 10",
+                    (draft.recipe_name or "RECETA PENDIENTE DE REVISION", draft.source_type or ""),
+                ).fetchall()
+                row = None
+                for r in rows:
+                    try:
+                        created = r.get("created_at") if isinstance(r, dict) or hasattr(r, 'get') else r[1]
+                        if created:
+                            created_dt = datetime.fromisoformat(created.replace('Z', '+00:00')) if isinstance(created, str) else None
+                            if created_dt and created_dt >= cutoff_dt:
+                                row = r
+                                break
+                    except Exception:
+                        continue
+            except Exception:
+                row = None
+
         return int(row["id"]) if row else None
     except Exception:
         return None
@@ -156,14 +173,45 @@ def save_imported_recipe_draft(db_path: str, draft: ImportedRecipeDraft, actor: 
             add_audit_log(conn, existing_id, "BORRADOR_IA_DUPLICADO_EVITADO", actor or draft.created_by, new_value=draft.to_dict(), notes="Se evitó duplicar un borrador vacío reciente.")
             conn.commit()
             return existing_id
+
         review_at_expr = "CURRENT_TIMESTAMP" if draft.import_status == RecipeImportStatus.PENDIENTE_REVISION else "NULL"
-        cur = conn.execute(f"""
-            INSERT INTO recipe_import_drafts
-            (recipe_name, recipe_type, category, subcategory, service_family, yield_quantity, yield_unit, portions, elaboration_steps_json, allergens_json, labor_json, import_status, cost_status, confidence, warnings_json, source_type, raw_input_text, raw_ia_json, ia_provider, ia_model, process_time_s, created_by, review_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {review_at_expr})
-        """, (draft.recipe_name, draft.recipe_type, draft.category, draft.subcategory, draft.service_family, draft.yield_quantity, draft.yield_unit, draft.portions, json_dumps(draft.elaboration_steps), json_dumps(draft.allergens), json_dumps(draft.labor.to_dict()), draft.import_status, draft.cost_status, draft.confidence, json_dumps(draft.warnings), draft.source_type, draft.raw_input_text, json_dumps(draft.raw_ia_json) if draft.raw_ia_json else None, draft.ia_provider, draft.ia_model, draft.process_time_s, draft.created_by or actor))
-        draft_id = int(cur.lastrowid)
-        for i in draft.ingredients: save_imported_ingredient_row(conn, draft_id, i)
+        cols = [
+            "recipe_name", "recipe_type", "category", "subcategory", "service_family", "yield_quantity",
+            "yield_unit", "portions", "elaboration_steps_json", "allergens_json", "labor_json", "import_status",
+            "cost_status", "confidence", "warnings_json", "source_type", "raw_input_text", "raw_ia_json",
+            "ia_provider", "ia_model", "process_time_s", "created_by",
+        ]
+        placeholders_q = ", ".join("?" for _ in cols)
+        placeholders_pct = ", ".join("%s" for _ in cols)
+        params = (
+            draft.recipe_name, draft.recipe_type, draft.category, draft.subcategory, draft.service_family, draft.yield_quantity,
+            draft.yield_unit, draft.portions, json_dumps(draft.elaboration_steps), json_dumps(draft.allergens), json_dumps(draft.labor.to_dict()), draft.import_status,
+            draft.cost_status, draft.confidence, json_dumps(draft.warnings), draft.source_type, draft.raw_input_text, json_dumps(draft.raw_ia_json) if draft.raw_ia_json else None,
+            draft.ia_provider, draft.ia_model, draft.process_time_s, draft.created_by or actor,
+        )
+
+        sqlite_sql = f"INSERT INTO recipe_import_drafts ({', '.join(cols)}, review_at) VALUES ({placeholders_q}, {review_at_expr})"
+        try:
+            cur2 = conn.cursor()
+            pg_sql = sqlite_sql.replace('?', '%s')
+            draft_id = safe_insert_returning(cur2, sqlite_sql, params, pg_sql=pg_sql) or 0
+        except Exception:
+            # Retry with an explicit cursor through the safe helper (avoid raw INSERT+SELECT fallbacks)
+            try:
+                cur_alt = conn.cursor()
+                pg_sql = sqlite_sql.replace('?', '%s')
+                draft_id = safe_insert_returning(cur_alt, sqlite_sql, params, pg_sql=pg_sql) or 0
+            except Exception:
+                # Last resort deterministic lookup by recipe_name + created_by
+                try:
+                    created_by = params[-1] if len(params) > 0 else None
+                    row = conn.execute("SELECT id FROM recipe_import_drafts WHERE recipe_name=? AND created_by=? ORDER BY id DESC LIMIT 1", (params[0], created_by)).fetchone()
+                    draft_id = int(row['id']) if row else 0
+                except Exception:
+                    draft_id = 0
+
+        for i in draft.ingredients:
+            save_imported_ingredient_row(conn, draft_id, i)
         add_audit_log(conn, draft_id, "CREAR_BORRADOR_IA", actor or draft.created_by, new_value=draft.to_dict(), notes="Borrador creado desde IA/voz/foto/texto.")
         conn.commit()
     return draft_id

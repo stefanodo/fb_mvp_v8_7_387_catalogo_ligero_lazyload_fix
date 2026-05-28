@@ -246,7 +246,7 @@ def search_items(q: str = "", limit: int = 50, block: str = "", fresh_group: str
         lim = max(1, min(int(limit or 50), 250))
     except Exception:
         lim = 50
-    rows = cur.execute("SELECT id,name,unit,COALESCE(stock_area,'') stock_area FROM items ORDER BY name COLLATE NOCASE").fetchall()
+    rows = cur.execute("SELECT id,name,unit,COALESCE(stock_area,'') stock_area FROM items ORDER BY LOWER(name)").fetchall()
     conn.close()
     items = []
     for r in rows:

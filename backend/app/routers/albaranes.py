@@ -27,6 +27,7 @@ from app.core import (
     _refresh_ocr_summary, cleanup_receipt_photos,
     UPLOADS_DIR, _cache_bust_token,
 )
+from app.core import safe_insert_returning
 
 router = APIRouter()
 
@@ -238,20 +239,26 @@ async def receipt_new_form(request: Request):
             if hit:
                 sid = int(hit["id"])
             else:
-                cur2.execute(
-                    "INSERT INTO suppliers(name,phone,email,tax_id,address,is_active) VALUES(?,?,?,?,?,1)",
-                    (new_supplier_name, new_supplier_phone or None, new_supplier_email or None,
-                     new_supplier_tax_id or None, new_supplier_address or None))
-                sid = int(cur2.lastrowid)
+                sqlite_sql = "INSERT INTO suppliers(name,phone,email,tax_id,address,is_active) VALUES(?,?,?,?,?,1)"
+                pg_sql = sqlite_sql.replace('?', '%s')
+                sid = safe_insert_returning(
+                    cur2,
+                    sqlite_sql,
+                    (new_supplier_name, new_supplier_phone or None, new_supplier_email or None, new_supplier_tax_id or None, new_supplier_address or None),
+                    pg_sql=pg_sql,
+                ) or 0
         if sid <= 0:
             sid = _ensure_pending_supplier(cur2)
             local_note = (local_note + (" | " if local_note else "") + "Proveedor pendiente de revisar por OCR").strip()
-        cur2.execute(
-            """INSERT INTO receipts(center_id,warehouse_id,supplier_id,status,doc_number,doc_date,note,created_at)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (int(center_id), int(warehouse_id), int(sid), "PENDING",
-             doc_number or None, doc_date or None, local_note, now))
-        rid = int(cur2.lastrowid)
+            sqlite_sql = """INSERT INTO receipts(center_id,warehouse_id,supplier_id,status,doc_number,doc_date,note,created_at)
+                    VALUES(?,?,?,?,?,?,?,?)"""
+            pg_sql = sqlite_sql.replace('?', '%s')
+            rid = safe_insert_returning(
+                cur2,
+                sqlite_sql,
+                (int(center_id), int(warehouse_id), int(sid), "PENDING", doc_number or None, doc_date or None, local_note, now),
+                pg_sql=pg_sql,
+            ) or 0
         if upload_blobs:
             target_dir = UPLOADS_DIR / "receipts" / str(rid)
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -659,9 +666,15 @@ def receipt_ocr_line_accept(
             if exact2:
                 resolved_item_id = int(exact2["id"]); matched_name = exact2["name"]; base_unit = exact2["unit"] or base_unit
             else:
-                cur2.execute("INSERT INTO items(name,unit,min_qty,max_qty,current_price) VALUES(?,?,?,?,?)",
-                             (raw_name, base_unit, 0.0, 0.0, 0.0))
-                resolved_item_id = int(cur2.lastrowid); matched_name = raw_name
+                sqlite_sql = "INSERT INTO items(name,unit,min_qty,max_qty,current_price) VALUES(?,?,?,?,?)"
+                pg_sql = sqlite_sql.replace('?', '%s')
+                resolved_item_id = safe_insert_returning(
+                    cur2,
+                    sqlite_sql,
+                    (raw_name, base_unit, 0.0, 0.0, 0.0),
+                    pg_sql=pg_sql,
+                ) or 0
+                matched_name = raw_name
         if not resolved_item_id:
             raise sqlite3.OperationalError("resolve_item_failed")
 

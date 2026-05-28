@@ -11,7 +11,7 @@ import unicodedata
 from datetime import date
 from typing import Any
 
-from app.core import db, ensure_columns, _convert_qty
+from app.core import db, ensure_columns, _convert_qty, db_coalesce_text
 
 
 def _rowdict(row) -> dict[str, Any]:
@@ -43,109 +43,9 @@ def normalize_modifier_name(value: str) -> str:
 
 def ensure_pos_modifier_tables(cur) -> None:
     """Migración aditiva; se puede llamar varias veces."""
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS recipe_modifiers(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      code TEXT NOT NULL DEFAULT '',
-      name TEXT NOT NULL DEFAULT '',
-      modifier_type TEXT NOT NULL DEFAULT 'REVIEW',
-      action TEXT NOT NULL DEFAULT 'REVIEW',
-      item_id INTEGER NOT NULL DEFAULT 0,
-      subrecipe_id INTEGER NOT NULL DEFAULT 0,
-      qty_delta_base REAL NOT NULL DEFAULT 0,
-      unit_base TEXT NOT NULL DEFAULT 'g',
-      price_extra REAL NOT NULL DEFAULT 0,
-      affects_stock INTEGER NOT NULL DEFAULT 1,
-      confidence TEXT NOT NULL DEFAULT 'MANUAL',
-      notes TEXT NOT NULL DEFAULT '',
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_modifier_map(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      provider_name TEXT NOT NULL DEFAULT '',
-      business_type TEXT NOT NULL DEFAULT '',
-      pos_modifier_name TEXT NOT NULL DEFAULT '',
-      normalized_code TEXT NOT NULL DEFAULT '',
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      modifier_id INTEGER NOT NULL DEFAULT 0,
-      action_status TEXT NOT NULL DEFAULT 'ACTIVE',
-      notes TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_sales_modifier_daily(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      recipe_name TEXT NOT NULL DEFAULT '',
-      pos_item_code TEXT NOT NULL DEFAULT '',
-      pos_item_name TEXT NOT NULL DEFAULT '',
-      pos_modifier_name TEXT NOT NULL DEFAULT '',
-      normalized_modifier_code TEXT NOT NULL DEFAULT '',
-      modifier_id INTEGER NOT NULL DEFAULT 0,
-      qty_sold REAL NOT NULL DEFAULT 0,
-      channel TEXT NOT NULL DEFAULT '',
-      business_type TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'REQUIERE_MAPEO',
-      confidence TEXT NOT NULL DEFAULT 'LOW',
-      source TEXT NOT NULL DEFAULT 'manual',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_modifier_consumption_audit(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      modifier_id INTEGER NOT NULL DEFAULT 0,
-      item_id INTEGER NOT NULL DEFAULT 0,
-      subrecipe_id INTEGER NOT NULL DEFAULT 0,
-      qty_delta_base REAL NOT NULL DEFAULT 0,
-      unit_base TEXT NOT NULL DEFAULT 'g',
-      status TEXT NOT NULL DEFAULT 'PREVIEW',
-      reason TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_modifier_review_queue(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL DEFAULT (date('now')),
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      recipe_name TEXT NOT NULL DEFAULT '',
-      pos_item_name TEXT NOT NULL DEFAULT '',
-      raw_customer_note TEXT NOT NULL DEFAULT '',
-      normalized_note TEXT NOT NULL DEFAULT '',
-      suggested_status TEXT NOT NULL DEFAULT 'REQUIERE_MAPEO',
-      suggested_action TEXT NOT NULL DEFAULT '',
-      suggested_delta_json TEXT NOT NULL DEFAULT '',
-      confidence_score REAL NOT NULL DEFAULT 0,
-      review_status TEXT NOT NULL DEFAULT 'PENDIENTE',
-      learned_modifier_id INTEGER NOT NULL DEFAULT 0,
-      notes TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    # Índices ligeros para dashboard/mes sin bloquear versiones antiguas.
-    for sql in [
-        "CREATE INDEX IF NOT EXISTS idx_recipe_modifiers_recipe ON recipe_modifiers(recipe_id,is_active)",
-        "CREATE INDEX IF NOT EXISTS idx_pos_modifier_map_norm ON pos_modifier_map(normalized_code,recipe_id,action_status)",
-        "CREATE INDEX IF NOT EXISTS idx_pos_sales_modifier_period ON pos_sales_modifier_daily(sale_date,center_id,recipe_id)",
-        "CREATE INDEX IF NOT EXISTS idx_pos_modifier_review_status ON pos_modifier_review_queue(review_status,recipe_id,created_at)",
-    ]:
-        try:
-            cur.execute(sql)
-        except Exception:
-            pass
+    # Schema for POS modifiers is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def _month_bounds(year: int | None = None, month: int | None = None) -> tuple[str, str, str]:
@@ -428,13 +328,17 @@ def register_modifier_review_from_note(cur, recipe_id: int, note: str, center_id
     ensure_pos_modifier_tables(cur)
     interp = interpret_free_pos_modifier_note(cur, recipe_id, note, center_id=center_id)
     import json
-    cur.execute(
-        """
-        INSERT INTO pos_modifier_review_queue(
-            center_id, recipe_id, recipe_name, pos_item_name, raw_customer_note, normalized_note,
-            suggested_status, suggested_action, suggested_delta_json, confidence_score, review_status, notes
-        ) VALUES(?,?,?,?,?,?,?,?,?,?, 'PENDIENTE', ?)
-        """,
+    # Insert review queue entry and return id in a DB-agnostic way
+    sqlite_sql = """
+            INSERT INTO pos_modifier_review_queue(
+                center_id, recipe_id, recipe_name, pos_item_name, raw_customer_note, normalized_note,
+                suggested_status, suggested_action, suggested_delta_json, confidence_score, review_status, notes
+            ) VALUES(?,?,?,?,?,?,?,?,?,?, 'PENDIENTE', ?)
+            """
+    pg_sql = sqlite_sql.replace('?', '%s')
+    return safe_insert_returning(
+        cur,
+        sqlite_sql,
         (
             int(center_id or 0), int(recipe_id or 0), (recipe_name or "")[:160], (pos_item_name or "")[:160],
             (note or "")[:500], normalize_modifier_name(note or ""), interp.get("status") or "REQUIERE_MAPEO",
@@ -442,8 +346,8 @@ def register_modifier_review_from_note(cur, recipe_id: int, note: str, center_id
             max([_safe_float(x.get("confidence")) for x in interp.get("fragments") or []] or [0.0]),
             "Creado desde nota libre TPV para aprendizaje supervisado.",
         ),
-    )
-    return int(cur.lastrowid)
+        pg_sql=pg_sql,
+    ) or 0
 
 def build_monthly_modifier_dashboard(center_id: int | None = None, year: int | None = None, month: int | None = None) -> dict[str, Any]:
     """Resumen mensual de modificadores TPV y riesgo de stock realista."""
@@ -481,8 +385,8 @@ def build_monthly_modifier_dashboard(center_id: int | None = None, year: int | N
               LEFT JOIN recipes r ON r.id=pm.recipe_id
               LEFT JOIN recipes sr ON sr.id=rm.subrecipe_id
               LEFT JOIN items i ON i.id=rm.item_id
-             WHERE date(COALESCE(pm.sale_date,'')) >= date(?)
-               AND date(COALESCE(pm.sale_date,'')) < date(?)
+                         WHERE date(COALESCE({db_coalesce_text('pm.sale_date', cur_or_conn=cur)},'')) >= date(?)
+                             AND date(COALESCE({db_coalesce_text('pm.sale_date', cur_or_conn=cur)},'')) < date(?)
                {center_clause}
              GROUP BY COALESCE(pm.recipe_id,0), COALESCE(pm.normalized_modifier_code,''), COALESCE(pm.modifier_id,0),
                       COALESCE(pm.channel,''), COALESCE(pm.business_type,'')
@@ -655,21 +559,25 @@ def create_recipe_modifier(
     except Exception:
         q_base, unit_base = q, u
     code = normalize_modifier_name(safe_name)
-    cur.execute(
-        """
+    # Insert modifier and return id in a DB-agnostic way
+    sqlite_sql = """
         INSERT INTO recipe_modifiers(
             recipe_id, code, name, modifier_type, action, item_id, subrecipe_id,
             qty_delta_base, unit_base, price_extra, affects_stock, confidence, notes, is_active
         ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1)
-        """,
+        """
+    pg_sql = sqlite_sql.replace('?', '%s')
+    return safe_insert_returning(
+        cur,
+        sqlite_sql,
         (
             int(recipe_id or 0), code, safe_name, safe_type, safe_action,
             int(item_id or 0), int(subrecipe_id or 0), float(q_base or 0), unit_base,
             _safe_float(price_extra), 1 if int(affects_stock or 0) else 0, "MANUAL",
             (notes or "").strip()[:500],
         ),
-    )
-    return int(cur.lastrowid)
+        pg_sql=pg_sql,
+    ) or 0
 
 
 def create_pos_modifier_map(
@@ -690,19 +598,23 @@ def create_pos_modifier_map(
     if not mod:
         raise ValueError("Modificador interno no encontrado")
     norm = normalize_modifier_name(safe_pos)
-    cur.execute(
-        """
+    # Insert mapping and return id in a DB-agnostic way
+    sqlite_sql = """
         INSERT INTO pos_modifier_map(
             provider_name,business_type,pos_modifier_name,normalized_code,recipe_id,modifier_id,action_status,notes
         ) VALUES(?,?,?,?,?,?, 'ACTIVE', ?)
-        """,
+        """
+    pg_sql = sqlite_sql.replace('?', '%s')
+    return safe_insert_returning(
+        cur,
+        sqlite_sql,
         (
             (provider_name or "").strip()[:80],
             (business_type or "").strip()[:80],
             safe_pos, norm, int(recipe_id or mod["recipe_id"] or 0), mid, (notes or "").strip()[:500],
         ),
-    )
-    return int(cur.lastrowid)
+        pg_sql=pg_sql,
+    ) or 0
 
 
 def deactivate_recipe_modifier(cur, modifier_id: int) -> None:

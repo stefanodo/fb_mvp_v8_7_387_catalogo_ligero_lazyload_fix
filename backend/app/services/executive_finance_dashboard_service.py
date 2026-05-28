@@ -59,7 +59,7 @@ def _center_rows() -> list[dict[str, Any]]:
     conn = db()
     try:
         cur = conn.cursor()
-        rows = cur.execute("SELECT id,name FROM centers ORDER BY name COLLATE NOCASE").fetchall()
+        rows = cur.execute("SELECT id,name FROM centers ORDER BY LOWER(name)").fetchall()
         return [{"id": int(r["id"] or 0), "name": r["name"] or f"Local {r['id']}"} for r in rows]
     finally:
         conn.close()

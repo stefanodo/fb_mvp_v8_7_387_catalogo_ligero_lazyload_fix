@@ -28,6 +28,8 @@ from app.core import (
     db, _norm_text, _norm_name, fmt_num, _parse_float,
     _resolve_supplier_id_by_name, _insert_supplier_compatible,
     UPLOADS_DIR, _ocr_lock_path,
+    get_table_columns_from_cursor,
+    safe_insert_returning,
 )
 
 
@@ -881,15 +883,15 @@ def _extract_receipt_lines_with_template(text: str, img_path: Path | None = None
     key = template.get("provider_key")
     if key == "pescaderia_palacio":
         return _extract_receipt_lines_pescaderia_palacio(text)
-    if key == "mammafiore":
+    elif key == "mammafiore":
         return _extract_receipt_lines_mammafiore(text)
-    if key == "pollerias_herrero":
+    elif key == "pollerias_herrero":
         return _extract_receipt_lines_pollerias_herrero(text)
-    if key == "la_huerta":
+    elif key == "la_huerta":
         return _extract_receipt_lines_la_huerta(text)
-    if key == "negrini":
+    elif key == "negrini":
         return _extract_receipt_lines_negrini(text)
-    if key == "central_carnes":
+    elif key == "central_carnes":
         special = []
         if img_path is not None:
             try:
@@ -899,15 +901,15 @@ def _extract_receipt_lines_with_template(text: str, img_path: Path | None = None
         if not special:
             special = _extract_receipt_lines_central_carnes(text)
         return special
-    if key == "beef_on_food":
+    elif key == "beef_on_food":
         return _extract_receipt_lines_beef_on_food(text)
-    if key == "tierra_y_mar":
+    elif key == "tierra_y_mar":
         return _extract_receipt_lines_tierra_y_mar(text)
-    if key == "garimori":
+    elif key == "garimori":
         return _extract_receipt_lines_garimori(text)
-    if key == "antonio_de_miguel":
+    elif key == "antonio_de_miguel":
         return _extract_receipt_lines_antonio_de_miguel(text)
-    if key == "izquierdo":
+    elif key == "izquierdo":
         return _extract_receipt_lines_izquierdo(text)
     return []
 
@@ -2989,7 +2991,11 @@ def _build_receipt_ocr_stub(cur, receipt_id: int) -> int:
         else:
             summary = f"{len(photos)} foto(s) preparadas para OCR" if photos else "Sin fotos cargadas"
 
-    run_cols = {r["name"] for r in cur.execute("PRAGMA table_info(receipt_ocr_runs)").fetchall()}
+    try:
+        run_cols = get_table_columns_from_cursor(cur, 'receipt_ocr_runs')
+    except Exception:
+        run_cols = set()
+
     base_map = {
         'receipt_id': int(receipt_id),
         'status': state,
@@ -3004,10 +3010,14 @@ def _build_receipt_ocr_stub(cur, receipt_id: int) -> int:
         'created_at': now,
     }
     use_cols = [c for c in ['receipt_id','status','supplier_raw','doc_number_raw','doc_date_raw','supplier_phone_raw','supplier_email_raw','supplier_tax_id_raw','supplier_address_raw','summary','created_at'] if c in run_cols]
-    placeholders = ','.join(['?'] * len(use_cols))
-    sql = f"INSERT INTO receipt_ocr_runs({','.join(use_cols)}) VALUES({placeholders})"
-    cur.execute(sql, tuple(base_map[c] for c in use_cols))
-    run_id = int(cur.lastrowid)
+    if not use_cols:
+        # nothing to insert
+        run_id = 0
+    else:
+        sqlite_sql = f"INSERT INTO receipt_ocr_runs({','.join(use_cols)}) VALUES({','.join(['?']*len(use_cols))})"
+        params = tuple(base_map[c] for c in use_cols)
+        pg_sql = sqlite_sql.replace('?', '%s')
+        run_id = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql) or 0
 
     existing = cur.execute(
         """SELECT rl.id, i.name item_name, rl.qty_input, rl.input_unit, rl.price_unit

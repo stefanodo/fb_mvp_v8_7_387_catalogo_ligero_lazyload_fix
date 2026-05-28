@@ -14,6 +14,8 @@ from app.core import (
     _suggest_supplier_id, order_with_lines, human_qty, fmt_dt, status_label,
     normalize_stock_area, normalize_minmax_qty_for_base,
 )
+from app.core import safe_insert_returning
+from app.core import db_truthy_sql
 from app.services.orders_service import order_page_url, normalize_order_note, parse_optional_int, infer_order_block
 
 router = APIRouter()
@@ -280,7 +282,8 @@ def _order_responsible_row(cur, user_id: int):
     rid = int(user_id or 0)
     if rid <= 0:
         return None
-    rows = cur.execute("SELECT id,name FROM users WHERE COALESCE(is_active,1)=1 ORDER BY id").fetchall()
+    active_clause = db_truthy_sql('is_active', cur)
+    rows = cur.execute(f"SELECT id,name FROM users WHERE {active_clause} ORDER BY id").fetchall()
     if not rows:
         return None
     non_admin = [r for r in rows if (str(r['name'] or '').strip().upper() != 'ADMIN GENERAL')]
@@ -303,9 +306,11 @@ def order_new_form(center_id: int = Form(...), responsible_user_id: int = Form(0
         conn.close()
         return RedirectResponse(url=order_page_url(center_id=center_id, ord_msg='responsible_required', anchor=''), status_code=303)
     now = datetime.utcnow().isoformat()
-    cur.execute("INSERT INTO orders(center_id,status,created_at,note,responsible_user_id,responsible_name) VALUES(?,'DRAFT',?,?,?,?)",
-                (center_id, now, normalize_order_note(note), int(resp['id']), (resp['name'] or '').strip()))
-    oid = cur.lastrowid
+    # Insert order in DB-agnostic way and obtain id
+    sqlite_sql = "INSERT INTO orders(center_id,status,created_at,note,responsible_user_id,responsible_name) VALUES(?,'DRAFT',?,?,?,?)"
+    params = (center_id, now, normalize_order_note(note), int(resp['id']), (resp['name'] or '').strip())
+    pg_sql = sqlite_sql.replace('?', '%s')
+    oid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql) or 0
     conn.commit(); conn.close()
     return RedirectResponse(url=order_page_url(center_id=center_id, oid=oid),
                             status_code=303)
@@ -882,17 +887,7 @@ def order_free_note_form(order_id: int, text: str = Form(''), target_date: str =
     if not txt:
         conn.close()
         return RedirectResponse(url=order_page_url(center_id=int(o['center_id']), oid=order_id, err=1, anchor='orderAddLine'), status_code=303)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS order_free_notes(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          order_id INTEGER NOT NULL DEFAULT 0,
-          center_id INTEGER NOT NULL DEFAULT 0,
-          text TEXT NOT NULL DEFAULT '',
-          target_date TEXT NOT NULL DEFAULT '',
-          status TEXT NOT NULL DEFAULT 'IDEA',
-          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
+        # Schema for `order_free_notes` is managed by `backend/migrate.py`.
     cur.execute("INSERT INTO order_free_notes(order_id,center_id,text,target_date,status,created_at) VALUES(?,?,?,?,?,?)",
                 (int(order_id), int(o['center_id']), txt, (target_date or '').strip(), 'IDEA', datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
     conn.commit(); conn.close()

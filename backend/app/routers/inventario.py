@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form
 from fastapi.responses import RedirectResponse
 from datetime import datetime
 
-from app.core import db, ensure_columns, _unit_factor
+from app.core import db, ensure_columns, _unit_factor, get_table_columns_from_cursor, safe_insert_returning
 
 router = APIRouter()
 
@@ -110,33 +110,26 @@ def _ensure_inventory_audit_schema(cur) -> None:
         "modified_count": "INTEGER NOT NULL DEFAULT 0",
     }
     try:
-        existing = {r[1] for r in cur.execute("PRAGMA table_info(inventory_counts)").fetchall()}
+        from app.db_config import IS_PRODUCTION
+    except Exception:
+        IS_PRODUCTION = False
+    if IS_PRODUCTION:
+        return
+    try:
+        if getattr(cur, "_is_postgres", False):
+            return
+    except Exception:
+        pass
+
+    try:
+        existing = set(get_table_columns_from_cursor(cur, "inventory_counts"))
         for col, ddl in audit_cols.items():
             if col not in existing:
                 cur.execute(f"ALTER TABLE inventory_counts ADD COLUMN {col} {ddl}")
     except Exception:
         pass
-    try:
-        cur.execute("""CREATE TABLE IF NOT EXISTS inventory_count_audit(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER NOT NULL DEFAULT 0,
-            inventory_count_id INTEGER NOT NULL DEFAULT 0,
-            item_id INTEGER NOT NULL DEFAULT 0,
-            item_name TEXT NOT NULL DEFAULT '',
-            source_type TEXT NOT NULL DEFAULT '',
-            family_key TEXT NOT NULL DEFAULT '',
-            warehouse_id INTEGER NOT NULL DEFAULT 0,
-            previous_physical_qty REAL,
-            previous_count_unit TEXT NOT NULL DEFAULT '',
-            new_physical_qty REAL,
-            new_count_unit TEXT NOT NULL DEFAULT '',
-            changed_by_user_id INTEGER NOT NULL DEFAULT 0,
-            changed_by_name TEXT NOT NULL DEFAULT '',
-            changed_at TEXT NOT NULL DEFAULT '',
-            note TEXT NOT NULL DEFAULT ''
-        )""")
-    except Exception:
-        pass
+
+    # Schema for `inventory_count_audit` is managed by `backend/migrate.py`.
 
 
 def _count_changed(existing, pqty: float, cunit: str, checked: int, note: str) -> bool:
@@ -181,11 +174,16 @@ def inventory_session_create_form(
         conn.close()
         return _redirect(0, center_id, 'materias_primas', 'verduras', 'responsible_required')
     warehouse_id = _normalize_inventory_warehouse_id(cur, warehouse_id, center_id)
-    cur.execute(
-        "INSERT INTO inventory_sessions(center_id,warehouse_id,session_type,status,created_at,note,responsible_user_id,responsible_name) VALUES(?,?,?,?,?,?,?,?)",
-        (int(center_id or 0), int(warehouse_id or 0), (session_type or 'MIXTO').upper()[:20], 'DRAFT', datetime.utcnow().isoformat(), (note or '').strip(), rid, (resp['name'] or '').strip()),
+    sqlite_sql = "INSERT INTO inventory_sessions(center_id,warehouse_id,session_type,status,created_at,note,responsible_user_id,responsible_name) VALUES(?,?,?,?,?,?,?,?)"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    sid = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (
+            int(center_id or 0), int(warehouse_id or 0), (session_type or 'MIXTO').upper()[:20], 'DRAFT', datetime.utcnow().isoformat(), (note or '').strip(), rid, (resp['name'] or '').strip()
+        ),
+        pg_sql=pg_sql,
     )
-    sid = int(cur.lastrowid or 0)
     conn.commit(); conn.close()
     return _redirect(sid, center_id, 'materias_primas', 'verduras', 'session_created')
 

@@ -30,7 +30,7 @@ from app.core import (
     # Formato y utilidades
     human_qty, fmt_dt, status_label, fmt_num, fmt_price,
     display_price_from_base, preferred_price_unit, preferred_display_qty,
-    _ocr_state_label, _parse_float, _cache_bust_token, _norm_text,
+    _ocr_state_label, _parse_float, _cache_bust_token, _norm_text, safe_insert_returning,
     # Datos del dashboard
     get_dashboard_data, recipe_visible_in_center,
     STOCK_AREAS, stock_area_label, normalize_stock_area, normalize_minmax_qty_for_base,
@@ -597,10 +597,22 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
             current_session = {k: row[k] for k in row.keys()}
     if current_session is None:
         warehouse_id = 0
-        cur.execute("INSERT INTO inventory_sessions(center_id,warehouse_id,session_type,status,created_at,note) VALUES(?,?,?,?,datetime('now'),'')", (int(center_id or 0), int(warehouse_id or 0), 'MIXTO', 'DRAFT'))
+        sqlite_sql = "INSERT INTO inventory_sessions(center_id,warehouse_id,session_type,status,created_at,note) VALUES(?,?,?,?,datetime('now'),'')"
+        pg_sql = sqlite_sql.replace('?', '%s')
+        sid = safe_insert_returning(cur, sqlite_sql, (int(center_id or 0), int(warehouse_id or 0), 'MIXTO', 'DRAFT'), pg_sql=pg_sql)
         conn.commit()
-        row = cur.execute("SELECT * FROM inventory_sessions WHERE id=?", (int(cur.lastrowid),)).fetchone()
-        current_session = {k: row[k] for k in row.keys()}
+        if sid:
+            row = cur.execute("SELECT * FROM inventory_sessions WHERE id=?", (int(sid),)).fetchone()
+            current_session = {k: row[k] for k in row.keys()} if row else None
+        else:
+            # Deterministic lookup when no id was returned
+            try:
+                row = cur.execute("SELECT id FROM inventory_sessions WHERE center_id=? AND warehouse_id=? AND session_type=? AND status=? ORDER BY id DESC LIMIT 1", (int(center_id or 0), int(warehouse_id or 0), 'MIXTO', 'DRAFT')).fetchone()
+                last_id = int(row['id']) if row else 0
+            except Exception:
+                last_id = 0
+            row = cur.execute("SELECT * FROM inventory_sessions WHERE id=?", (int(last_id),)).fetchone()
+            current_session = {k: row[k] for k in row.keys()} if row else None
     conn.close()
 
     # Si la vista entra sin inv_session_id explícito, no preseleccionar responsable en la UI.
@@ -1179,7 +1191,7 @@ def print_monthly_direction_report(request: Request, center_id: Optional[int] = 
                 break
         except Exception:
             pass
-    return templates.TemplateResponse("reports/monthly_direction_inventory.html", {
+    return templates.TemplateResponse(request, "reports/monthly_direction_inventory.html", {
         "request": request,
         "report": report,
         "center_id": center_id or 0,
@@ -1211,7 +1223,7 @@ def print_monthly_supplier_report(request: Request, center_id: Optional[int] = N
                 break
         except Exception:
             pass
-    return templates.TemplateResponse("reports/monthly_supplier_direction.html", {
+    return templates.TemplateResponse(request, "reports/monthly_supplier_direction.html", {
         "request": request,
         "report": report,
         "center_id": center_id or 0,
@@ -1245,7 +1257,7 @@ def print_monthly_recipe_sales_report(request: Request, center_id: Optional[int]
                 break
         except Exception:
             pass
-    return templates.TemplateResponse("reports/monthly_recipe_sales.html", {
+    return templates.TemplateResponse(request, "reports/monthly_recipe_sales.html", {
         "request": request,
         "report": report,
         "center_id": center_id or 0,
@@ -1277,7 +1289,7 @@ def print_monthly_recipe_modifiers_report(request: Request, center_id: Optional[
                 break
         except Exception:
             pass
-    return templates.TemplateResponse("reports/monthly_recipe_modifiers.html", {
+    return templates.TemplateResponse(request, "reports/monthly_recipe_modifiers.html", {
         "request": request,
         "report": report,
         "center_id": center_id or 0,
@@ -2109,7 +2121,7 @@ def home(request: Request, center_id: Optional[int] = None):
                     _ol["display_name"] = _display
     connr.close()
 
-    resp = templates.TemplateResponse("index.html", {
+    resp = templates.TemplateResponse(request, "index.html", {
         "request": request,
         "page": page,
         "centers": [{k: c[k] for k in c.keys()} for c in centers],

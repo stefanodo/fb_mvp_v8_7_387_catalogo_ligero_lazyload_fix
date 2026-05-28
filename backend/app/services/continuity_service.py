@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict
 
-from app.core import db, ensure_columns
+from app.core import db, ensure_columns, safe_insert_returning
 
 
 def _now() -> str:
@@ -18,69 +18,9 @@ def _j(value: Any) -> str:
 
 
 def ensure_continuity_schema(cur) -> None:
-    ensure_columns(cur)
-    cur.execute('''CREATE TABLE IF NOT EXISTS connectivity_status_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        status TEXT,
-        detected_at TEXT,
-        source TEXT,
-        details_json TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS offline_event_queue(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_uuid TEXT UNIQUE,
-        local_device_id TEXT,
-        restaurant_id INTEGER,
-        user_id INTEGER,
-        responsible_name TEXT,
-        module TEXT,
-        event_type TEXT,
-        payload_json TEXT,
-        local_created_at TEXT,
-        server_received_at TEXT,
-        sync_status TEXT,
-        retry_count INTEGER DEFAULT 0,
-        last_error TEXT,
-        deduplication_hash TEXT,
-        priority INTEGER DEFAULT 50,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS sync_conflicts(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        offline_event_id INTEGER,
-        module TEXT,
-        conflict_type TEXT,
-        local_payload_json TEXT,
-        server_payload_json TEXT,
-        resolution_status TEXT,
-        resolution_notes TEXT,
-        resolved_by TEXT,
-        resolved_at TEXT,
-        created_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS sync_devices(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        local_device_id TEXT UNIQUE,
-        device_name TEXT,
-        restaurant_id INTEGER,
-        device_type TEXT,
-        last_seen_at TEXT,
-        last_sync_at TEXT,
-        active INTEGER DEFAULT 1,
-        notes TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS sync_runs(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        started_at TEXT,
-        finished_at TEXT,
-        status TEXT,
-        events_attempted INTEGER DEFAULT 0,
-        events_synced INTEGER DEFAULT 0,
-        events_failed INTEGER DEFAULT 0,
-        conflicts_created INTEGER DEFAULT 0,
-        details_json TEXT
-    )''')
+    # Schema for continuity/offline queues is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def enqueue_offline_event(module: str, event_type: str, payload: Dict[str, Any], restaurant_id: int = 0, responsible_name: str = 'LAB', device_id: str = 'lab-device', priority: int = 50) -> Dict[str, Any]:
@@ -92,12 +32,37 @@ def enqueue_offline_event(module: str, event_type: str, payload: Dict[str, Any],
     if existing:
         conn.close()
         return {'ok': True, 'duplicate': True, 'event_id': int(existing['id']), 'event_uuid': existing['event_uuid'], 'message': 'Evento offline duplicado detectado.'}
-    cur.execute('''INSERT INTO offline_event_queue(event_uuid,local_device_id,restaurant_id,user_id,responsible_name,module,event_type,payload_json,local_created_at,server_received_at,sync_status,retry_count,last_error,deduplication_hash,priority,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                (event_uuid, device_id, int(restaurant_id or 0), 0, responsible_name, module, event_type, _j(payload), now, '', 'pendiente', 0, '', h, int(priority or 50), now, now))
-    event_id = int(cur.lastrowid or 0)
-    cur.execute('INSERT OR IGNORE INTO sync_devices(local_device_id,device_name,restaurant_id,device_type,last_seen_at,last_sync_at,active,notes) VALUES(?,?,?,?,?,?,?,?)',
-                (device_id, 'Dispositivo LAB', int(restaurant_id or 0), 'otro', now, '', 1, 'Simulador continuidad'))
+    # Insert offline event (DB-agnostic)
+    sqlite_sql = '''INSERT INTO offline_event_queue(event_uuid,local_device_id,restaurant_id,user_id,responsible_name,module,event_type,payload_json,local_created_at,server_received_at,sync_status,retry_count,last_error,deduplication_hash,priority,created_at,updated_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
+    pg_sql = sqlite_sql.replace('?', '%s')
+    event_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (
+            event_uuid, device_id, int(restaurant_id or 0), 0, responsible_name, module, event_type, _j(payload), now, '', 'pendiente', 0, '', h, int(priority or 50), now, now,
+        ),
+        pg_sql=pg_sql,
+    ) or 0
+    # Try a single UPSERT across DBs; fall back to SELECT+INSERT when not supported.
+    # Run a DB-agnostic UPSERT for `sync_devices`. Use Postgres placeholders when available.
+    sqlite_sql = 'INSERT INTO sync_devices(local_device_id,device_name,restaurant_id,device_type,last_seen_at,last_sync_at,active,notes) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT (local_device_id) DO NOTHING'
+    pg_sql = sqlite_sql.replace('?', '%s')
+    try:
+        if getattr(cur, '_is_postgres', False):
+            cur.execute(pg_sql, (device_id, 'Dispositivo LAB', int(restaurant_id or 0), 'otro', now, '', 1, 'Simulador continuidad'))
+        else:
+            try:
+                cur.execute(sqlite_sql, (device_id, 'Dispositivo LAB', int(restaurant_id or 0), 'otro', now, '', 1, 'Simulador continuidad'))
+            except Exception:
+                # Fallback: emulate UPSERT with SELECT+INSERT
+                exists = cur.execute('SELECT 1 FROM sync_devices WHERE local_device_id=?', (device_id,)).fetchone()
+                if not exists:
+                    cur.execute('INSERT INTO sync_devices(local_device_id,device_name,restaurant_id,device_type,last_seen_at,last_sync_at,active,notes) VALUES(?,?,?,?,?,?,?,?)',
+                                (device_id, 'Dispositivo LAB', int(restaurant_id or 0), 'otro', now, '', 1, 'Simulador continuidad'))
+    except Exception:
+        # best-effort: ignore errors creating a sync device record
+        pass
     conn.commit(); conn.close()
     return {'ok': True, 'duplicate': False, 'event_id': event_id, 'event_uuid': event_uuid, 'sync_status': 'pendiente', 'message': 'Evento offline guardado en cola. No aplica stock real.'}
 

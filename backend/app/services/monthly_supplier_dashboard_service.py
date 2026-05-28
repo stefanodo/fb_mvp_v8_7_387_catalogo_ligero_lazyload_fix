@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from app.core import db, ensure_columns, recipe_with_calc
+from app.core import db, ensure_columns, recipe_with_calc, db_coalesce_text
 
 
 def _rowdict(row) -> dict[str, Any]:
@@ -148,7 +148,7 @@ def _recipes_using_item(cur, item_id: int, limit: int = 8) -> list[dict[str, Any
               FROM recipe_ingredients ri
               JOIN recipes r ON r.id=ri.recipe_id
              WHERE ri.item_id=?
-             ORDER BY r.name COLLATE NOCASE
+             ORDER BY LOWER(COALESCE(r.name,''))
              LIMIT ?
             """,
             (int(item_id or 0), int(limit)),
@@ -194,8 +194,8 @@ def _month_qty_for_item_supplier(cur, item_id: int, supplier_id: int, start: str
               FROM receipt_lines rl
               JOIN receipts r ON r.id=rl.receipt_id
              WHERE rl.item_id=? AND r.supplier_id=?
-               AND date(COALESCE(r.doc_date,r.validated_at,r.created_at,'')) >= date(?)
-               AND date(COALESCE(r.doc_date,r.validated_at,r.created_at,'')) < date(?)
+               AND date(COALESCE({db_coalesce_text('r.doc_date','r.validated_at','r.created_at', cur_or_conn=cur)},'')) >= date(?)
+               AND date(COALESCE({db_coalesce_text('r.doc_date','r.validated_at','r.created_at', cur_or_conn=cur)},'')) < date(?)
                {center_clause}
             """,
             tuple(params),
@@ -326,18 +326,18 @@ def build_monthly_supplier_dashboard(center_id: int | None = None, year: int | N
                    COALESCE(rl.price_unit,0) price_unit,
                    COALESCE(rl.qty_base,0) qty_base,
                    COALESCE(rl.line_total,0) line_total,
-                   COALESCE(r.doc_date,r.validated_at,r.created_at,'') event_date,
+                   COALESCE({db_coalesce_text('r.doc_date','r.validated_at','r.created_at', cur_or_conn=cur)},'') event_date,
                    r.doc_number, r.id receipt_id
               FROM receipt_lines rl
               JOIN receipts r ON r.id=rl.receipt_id
               LEFT JOIN items i ON i.id=rl.item_id
               LEFT JOIN suppliers s ON s.id=r.supplier_id
               LEFT JOIN centers c ON c.id=r.center_id
-             WHERE date(COALESCE(r.doc_date,r.validated_at,r.created_at,'')) >= date(?)
-               AND date(COALESCE(r.doc_date,r.validated_at,r.created_at,'')) < date(?)
+                         WHERE date(COALESCE({db_coalesce_text('r.doc_date','r.validated_at','r.created_at', cur_or_conn=cur)},'')) >= date(?)
+                             AND date(COALESCE({db_coalesce_text('r.doc_date','r.validated_at','r.created_at', cur_or_conn=cur)},'')) < date(?)
                AND COALESCE(rl.price_unit,0) > 0
                {center_clause}
-             ORDER BY supplier_name COLLATE NOCASE, item_name COLLATE NOCASE, event_date
+             ORDER BY LOWER(COALESCE(supplier_name,'')), LOWER(COALESCE(item_name,'')), event_date
             """,
             tuple(params),
         ).fetchall()
@@ -365,15 +365,15 @@ def build_monthly_supplier_dashboard(center_id: int | None = None, year: int | N
             prev = cur.execute(
                 f"""
                 SELECT COALESCE(pl.price_unit,0) price_unit,
-                       COALESCE(pr.doc_date,pr.validated_at,pr.created_at,'') event_date,
+                       COALESCE({db_coalesce_text('pr.doc_date','pr.validated_at','pr.created_at', cur_or_conn=cur)},'') event_date,
                        pr.id receipt_id, pr.doc_number
                   FROM receipt_lines pl
                   JOIN receipts pr ON pr.id=pl.receipt_id
                  WHERE pl.item_id=? AND pr.supplier_id=?
                    AND COALESCE(pl.price_unit,0) > 0
-                   AND date(COALESCE(pr.doc_date,pr.validated_at,pr.created_at,'')) < date(?)
+                   AND date(COALESCE({db_coalesce_text('pr.doc_date','pr.validated_at','pr.created_at', cur_or_conn=cur)},'')) < date(?)
                    {prev_center_clause}
-                 ORDER BY date(COALESCE(pr.doc_date,pr.validated_at,pr.created_at,'')) DESC, pr.id DESC
+                 ORDER BY date(COALESCE({db_coalesce_text('pr.doc_date','pr.validated_at','pr.created_at', cur_or_conn=cur)},'')) DESC, pr.id DESC
                  LIMIT 1
                 """,
                 tuple(prev_params),

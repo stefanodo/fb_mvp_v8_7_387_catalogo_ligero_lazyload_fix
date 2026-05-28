@@ -346,6 +346,6 @@ def pos_modifier_review_create_form(
 @router.post("/pos_modifier_review/{review_id}/archive_form")
 def pos_modifier_review_archive_form(review_id: int):
     conn = db(); cur = conn.cursor(); ensure_pos_modifier_tables(cur)
-    cur.execute("UPDATE pos_modifier_review_queue SET review_status='ARCHIVADO', updated_at=datetime('now') WHERE id=?", (int(review_id or 0),))
+    cur.execute("UPDATE pos_modifier_review_queue SET review_status='ARCHIVADO', updated_at=CURRENT_TIMESTAMP WHERE id=?", (int(review_id or 0),))
     conn.commit(); conn.close()
     return redirect_admin(center_id=0, ok="modifier_review_archived")

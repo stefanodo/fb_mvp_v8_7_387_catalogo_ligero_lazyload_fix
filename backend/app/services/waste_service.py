@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
-from app.core import db, ensure_columns, UPLOADS_DIR, normalize_stock_area, stock_area_label
+from app.core import db, ensure_columns, UPLOADS_DIR, normalize_stock_area, stock_area_label, get_table_columns_from_cursor, safe_insert_returning, db_truthy_sql
 from app.services.units_service import to_base_qty
 
 WASTE_REASONS = [
@@ -29,55 +29,9 @@ def norm_text(value: str) -> str:
 
 
 def ensure_waste_schema(cur) -> None:
-    ensure_columns(cur)
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS waste_records(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      warehouse_id INTEGER NOT NULL DEFAULT 0,
-      responsible_user_id INTEGER NOT NULL DEFAULT 0,
-      responsible_name TEXT NOT NULL DEFAULT '',
-      source_type TEXT NOT NULL DEFAULT 'manual',
-      item_type TEXT NOT NULL DEFAULT 'unknown',
-      article_id INTEGER NOT NULL DEFAULT 0,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      item_name_detected TEXT NOT NULL DEFAULT '',
-      qty REAL NOT NULL DEFAULT 0,
-      unit TEXT NOT NULL DEFAULT 'ud',
-      qty_base REAL NOT NULL DEFAULT 0,
-      base_unit TEXT NOT NULL DEFAULT '',
-      reason TEXT NOT NULL DEFAULT '',
-      notes TEXT NOT NULL DEFAULT '',
-      photo_path TEXT NOT NULL DEFAULT '',
-      voice_text_raw TEXT NOT NULL DEFAULT '',
-      image_text_raw TEXT NOT NULL DEFAULT '',
-      confidence REAL NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'REVIEW',
-      unit_cost_snapshot REAL NOT NULL DEFAULT 0,
-      total_cost_snapshot REAL NOT NULL DEFAULT 0,
-      movement_id INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      confirmed_at TEXT,
-      confirmed_by TEXT NOT NULL DEFAULT ''
-    )
-    ''')
-    cols = {r['name'] for r in cur.execute('PRAGMA table_info(waste_records)').fetchall()}
-    for col, defn in [
-        ('warehouse_id', 'INTEGER NOT NULL DEFAULT 0'),
-        ('responsible_user_id', 'INTEGER NOT NULL DEFAULT 0'),
-        ('recipe_id', 'INTEGER NOT NULL DEFAULT 0'),
-        ('qty_base', 'REAL NOT NULL DEFAULT 0'),
-        ('base_unit', "TEXT NOT NULL DEFAULT ''"),
-        ('unit_cost_snapshot', 'REAL NOT NULL DEFAULT 0'),
-        ('total_cost_snapshot', 'REAL NOT NULL DEFAULT 0'),
-        ('movement_id', 'INTEGER NOT NULL DEFAULT 0'),
-        ('confirmed_by', "TEXT NOT NULL DEFAULT ''"),
-    ]:
-        if col not in cols:
-            try:
-                cur.execute(f'ALTER TABLE waste_records ADD COLUMN {col} {defn}')
-            except Exception:
-                pass
+    # Schema creation for waste_records is managed by backend/migrate.py.
+    # Avoid executing DDL at runtime; migrations should be run as a separate step.
+    return
 
 
 
@@ -139,7 +93,7 @@ def match_item_or_recipe(cur, text: str) -> dict[str, Any]:
     best = {'item_type': 'unknown', 'article_id': 0, 'recipe_id': 0, 'name': '', 'unit': 'ud', 'current_price': 0.0, 'confidence': 0.0}
     if not q:
         return best
-    rows = cur.execute('SELECT id,name,unit,current_price,stock_area FROM items ORDER BY name COLLATE NOCASE').fetchall()
+    rows = cur.execute('SELECT id,name,unit,current_price,stock_area FROM items ORDER BY LOWER(name)').fetchall()
     for r in rows:
         score = _candidate_score(q, norm_text(r['name'] or ''))
         if score > float(best['confidence'] or 0):
@@ -148,7 +102,8 @@ def match_item_or_recipe(cur, text: str) -> dict[str, Any]:
                 'name': r['name'] or '', 'unit': r['unit'] or 'ud',
                 'current_price': float(r['current_price'] or 0), 'confidence': float(score),
             }
-    recipes = cur.execute('SELECT id,name,is_subrecipe FROM recipes WHERE COALESCE(is_active,1)=1 ORDER BY name COLLATE NOCASE').fetchall()
+    active_clause = db_truthy_sql('is_active', cur)
+    recipes = cur.execute(f'SELECT id,name,is_subrecipe FROM recipes WHERE {active_clause} ORDER BY LOWER(name)').fetchall()
     for r in recipes:
         score = _candidate_score(q, norm_text(r['name'] or ''))
         if score > float(best['confidence'] or 0):
@@ -304,19 +259,24 @@ def create_waste_record(*, center_id: int, warehouse_id: int = 0, responsible_us
     qty_base, base_unit, unit_cost, total_cost = _compute_base_and_cost(cur, int(article_id or 0), float(qty or 0), unit or 'ud')
     if float(confidence or 0) < 80 or int(article_id or 0) <= 0 or float(qty or 0) <= 0:
         status = 'REVIEW'
-    cur.execute('''
-      INSERT INTO waste_records(center_id,warehouse_id,responsible_user_id,responsible_name,source_type,item_type,
-        article_id,recipe_id,item_name_detected,qty,unit,qty_base,base_unit,reason,notes,photo_path,
-        voice_text_raw,image_text_raw,confidence,status,unit_cost_snapshot,total_cost_snapshot,created_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    ''', (
-        int(center_id or 0), int(warehouse_id or 0), int(responsible_user_id or 0), responsible_name.strip(),
-        source_type, item_type, int(article_id or 0), int(recipe_id or 0), item_name_detected.strip(),
-        float(qty or 0), unit or 'ud', float(qty_base or 0), base_unit or '', reason.strip(), notes.strip(), photo_path or '',
-        voice_text_raw or '', image_text_raw or '', float(confidence or 0), status,
-        float(unit_cost or 0), float(total_cost or 0), datetime.now().isoformat(timespec='seconds')
-    ))
-    wid = int(cur.lastrowid)
+        # Prefer RETURNING on Postgres for the new waste record id
+        sqlite_sql = '''INSERT INTO waste_records(center_id,warehouse_id,responsible_user_id,responsible_name,source_type,item_type,
+                article_id,recipe_id,item_name_detected,qty,unit,qty_base,base_unit,reason,notes,photo_path,
+                voice_text_raw,image_text_raw,confidence,status,unit_cost_snapshot,total_cost_snapshot,created_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
+        pg_sql = sqlite_sql.replace('?', '%s')
+        wid = safe_insert_returning(
+            cur,
+            sqlite_sql,
+            (
+                int(center_id or 0), int(warehouse_id or 0), int(responsible_user_id or 0), responsible_name.strip(),
+                source_type, item_type, int(article_id or 0), int(recipe_id or 0), item_name_detected.strip(),
+                float(qty or 0), unit or 'ud', float(qty_base or 0), base_unit or '', reason.strip(), notes.strip(), photo_path or '',
+                voice_text_raw or '', image_text_raw or '', float(confidence or 0), status,
+                float(unit_cost or 0), float(total_cost or 0), datetime.now().isoformat(timespec='seconds')
+            ),
+            pg_sql=pg_sql,
+        ) or 0
     conn.commit(); conn.close()
     return wid
 
@@ -371,10 +331,14 @@ def confirm_waste_record(record_id: int, confirmed_by: str = '') -> dict[str, An
     if not wh or int(wh['center_id'] or 0) != int(d.get('center_id') or 0):
         conn.close(); return {'ok': False, 'error_code': 'waste_warehouse', 'error': 'El almacén no pertenece al local seleccionado.'}
     note = f"MERMA #{int(record_id)} · {d.get('reason') or 'Sin motivo'} · Resp: {d.get('responsible_name') or confirmed_by or 'Sin responsable'}"
-    cur.execute('''INSERT INTO movements(center_id,warehouse_id,item_id,movement_type,qty,unit,note,created_at)
-                   VALUES(?,?,?,?,?,?,?,?)''',
-                (int(d['center_id']), int(d['warehouse_id']), int(d['article_id']), 'OUT', float(d['qty_base']), d.get('base_unit') or d.get('unit') or 'ud', note, datetime.now().isoformat(timespec='seconds')))
-    movement_id = int(cur.lastrowid)
+    sqlite_sql = '''INSERT INTO movements(center_id,warehouse_id,item_id,movement_type,qty,unit,note,created_at) VALUES(?,?,?,?,?,?,?,?)'''
+    pg_sql = sqlite_sql.replace('?', '%s')
+    movement_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (int(d['center_id']), int(d['warehouse_id']), int(d['article_id']), 'OUT', float(d['qty_base']), d.get('base_unit') or d.get('unit') or 'ud', note, datetime.now().isoformat(timespec='seconds')),
+        pg_sql=pg_sql,
+    ) or 0
     cur.execute('''UPDATE waste_records SET status='CONFIRMED', movement_id=?, confirmed_at=?, confirmed_by=? WHERE id=?''',
                 (movement_id, datetime.now().isoformat(timespec='seconds'), confirmed_by or d.get('responsible_name') or '', int(record_id)))
     conn.commit(); conn.close()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from app.core import db, recipe_with_calc
+from app.core import db, recipe_with_calc, get_table_columns_from_cursor, table_exists, db_coalesce_text
 
 
 def _f(v: Any, default: float = 0.0) -> float:
@@ -16,13 +16,16 @@ def _f(v: Any, default: float = 0.0) -> float:
 
 
 def _has_table(cur, name: str) -> bool:
-    return cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+    try:
+        return table_exists(cur, name)
+    except Exception:
+        return False
 
 
 def _cols(cur, table: str) -> set[str]:
     if not _has_table(cur, table):
         return set()
-    return {r["name"] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()}
+    return get_table_columns_from_cursor(cur, table)
 
 
 def _today_str() -> str:
@@ -181,7 +184,7 @@ def build_daily_business_dashboard(center_id: int | None = None, start_date: str
 
         # Fallback/direct LAB POS line cost.
         if _has_table(cur, "tpv_sale_lines") and _has_table(cur, "tpv_sales"):
-            where = ["substr(COALESCE(s.business_date, s.sale_datetime),1,10) BETWEEN ? AND ?"]
+            where = [f"substr({db_coalesce_text('s.business_date','s.sale_datetime', cur_or_conn=cur)},1,10) BETWEEN ? AND ?"]
             params = [start, end]
             if center_id:
                 where.append("COALESCE(s.restaurant_id,0) IN (0, ?)")
@@ -205,7 +208,7 @@ def build_daily_business_dashboard(center_id: int | None = None, start_date: str
 
         # Purchases/validated receipts for kitchen.
         if _has_table(cur, "receipts") and _has_table(cur, "receipt_lines"):
-            where = ["substr(COALESCE(r.doc_date, r.validated_at, r.created_at),1,10) BETWEEN ? AND ?"]
+            where = [f"substr({db_coalesce_text('r.doc_date','r.validated_at','r.created_at', cur_or_conn=cur)},1,10) BETWEEN ? AND ?"]
             params = [start, end]
             if center_id:
                 where.append("r.center_id=?")
@@ -217,21 +220,20 @@ def build_daily_business_dashboard(center_id: int | None = None, start_date: str
                 params,
             ).fetchone()
             areas["cocina"]["purchases"] += _f(row["total"] if row else 0.0)
-
         # Purchases/entries for bar demo/stock. Uses movement value estimated from item unit cost.
         if _has_table(cur, "bar_stock_movements") and _has_table(cur, "bar_items"):
-            rows = cur.execute(
-                """SELECT SUM(m.qty * COALESCE(i.cost_per_base_unit_2026,0)) total
-                   FROM bar_stock_movements m JOIN bar_items i ON i.id=m.bar_item_id
-                   WHERE lower(COALESCE(m.movement_type,'')) IN ('entrada','in')
-                     AND substr(COALESCE(m.movement_datetime,m.created_at),1,10) BETWEEN ? AND ?""",
+            row = cur.execute(
+                f"""SELECT SUM(m.qty * COALESCE(i.cost_per_base_unit_2026,0)) total
+                     FROM bar_stock_movements m JOIN bar_items i ON i.id=m.bar_item_id
+                     WHERE lower(COALESCE(m.movement_type,'')) IN ('entrada','in')
+                         AND substr({db_coalesce_text('m.movement_datetime','m.created_at', cur_or_conn=cur)},1,10) BETWEEN ? AND ?""",
                 (start, end),
             ).fetchone()
-            areas["barra"]["purchases"] += _f(row := (rows["total"] if rows else 0.0))
+            areas["barra"]["purchases"] += _f(row["total"] if row else 0.0)
 
         # Waste.
         if _has_table(cur, "waste_records"):
-            where = ["substr(COALESCE(confirmed_at, created_at),1,10) BETWEEN ? AND ?"]
+            where = [f"substr({db_coalesce_text('confirmed_at','created_at', cur_or_conn=cur)},1,10) BETWEEN ? AND ?"]
             params = [start, end]
             if center_id:
                 where.append("center_id=?")

@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from app.core import db, ensure_columns, recipe_with_calc
+from app.core import db, ensure_columns, recipe_with_calc, table_exists as core_table_exists, db_coalesce_text
 from app.services.pos_modifiers_service import build_monthly_modifier_dashboard
 
 
@@ -42,11 +42,7 @@ def _month_bounds(year: int | None = None, month: int | None = None) -> tuple[st
 
 
 def _table_exists(cur, name: str) -> bool:
-    try:
-        r = cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
-        return bool(r)
-    except Exception:
-        return False
+    return core_table_exists(cur, name)
 
 
 def _recipe_cost(cur, recipe_id: int) -> dict[str, Any]:
@@ -132,8 +128,8 @@ def build_monthly_recipe_sales_dashboard(center_id: int | None = None, year: int
               FROM pos_sales_item_daily ps
               LEFT JOIN recipes r ON r.id=ps.recipe_id
               LEFT JOIN centers c ON c.id=ps.center_id
-             WHERE date(COALESCE(ps.sale_date,'')) >= date(?)
-               AND date(COALESCE(ps.sale_date,'')) < date(?)
+                         WHERE date(COALESCE({db_coalesce_text('ps.sale_date', cur_or_conn=cur)},'')) >= date(?)
+                             AND date(COALESCE({db_coalesce_text('ps.sale_date', cur_or_conn=cur)},'')) < date(?)
                {center_clause}
              GROUP BY COALESCE(ps.recipe_id,0), COALESCE(ps.recipe_name, r.name, 'Venta sin receta vinculada'),
                       COALESCE(ps.channel,''), COALESCE(ps.business_type,''), COALESCE(ps.center_id,0)

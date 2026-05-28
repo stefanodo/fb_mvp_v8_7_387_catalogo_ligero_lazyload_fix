@@ -5,7 +5,7 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from datetime import datetime
 
-from app.core import db, ensure_columns, _provider_has_links, _provider_archive_name, display_price_from_base, fmt_num
+from app.core import db, ensure_columns, _provider_has_links, _provider_archive_name, display_price_from_base, fmt_num, safe_insert_returning
 
 
 def _item_has_links(cur, item_id: int) -> bool:
@@ -58,7 +58,7 @@ def api_admin_items_page(q: str = "", limit: int = 50, offset: int = 0):
                COALESCE(price_status,'') price_status,COALESCE(price_confidence,'') price_confidence
           FROM items
           {where}
-         ORDER BY name COLLATE NOCASE
+         ORDER BY LOWER(name)
          LIMIT ? OFFSET ?
         """,
         params + [limit, offset],
@@ -106,7 +106,7 @@ def api_admin_supplier_prices_page(q: str = "", limit: int = 80, offset: int = 0
           JOIN suppliers s ON s.id=sp.supplier_id
           JOIN items i ON i.id=sp.item_id
           {where}
-         ORDER BY s.name COLLATE NOCASE,i.name COLLATE NOCASE
+         ORDER BY LOWER(COALESCE(s.name,'')), LOWER(COALESCE(i.name,''))
          LIMIT ? OFFSET ?
         """,
         params + [limit, offset],
@@ -143,9 +143,9 @@ def item_create_form(
         conn.close()
         return RedirectResponse(url="/?page=admin&err=item_dup", status_code=303)
 
-    cur.execute("INSERT INTO items(name,unit,min_qty,max_qty,current_price,waste_default_pct,stock_area,order_category,item_type,price_status,price_source,price_confidence,price_reference_year,price_operational_unit,price_operational_value,price_notes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (payload["name"], payload["unit"], 0, 0, payload["current_price"], payload["waste_default_pct"], payload["stock_area"], payload["order_category"], payload["item_type"], 'PRECIO_MANUAL_PENDIENTE_CONFIRMAR', 'MANUAL', 'media', 'manual', payload["unit"], float(payload["current_price"] or 0), 'Alta manual: revisar si el precio está confirmado por proveedor/albarán.'))
-    item_id = int(cur.lastrowid or 0)
+    sqlite_sql = "INSERT INTO items(name,unit,min_qty,max_qty,current_price,waste_default_pct,stock_area,order_category,item_type,price_status,price_source,price_confidence,price_reference_year,price_operational_unit,price_operational_value,price_notes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    item_id = safe_insert_returning(cur, sqlite_sql, (payload["name"], payload["unit"], 0, 0, payload["current_price"], payload["waste_default_pct"], payload["stock_area"], payload["order_category"], payload["item_type"], 'PRECIO_MANUAL_PENDIENTE_CONFIRMAR', 'MANUAL', 'media', 'manual', payload["unit"], float(payload["current_price"] or 0), 'Alta manual: revisar si el precio está confirmado por proveedor/albarán.'), pg_sql=pg_sql) or 0
 
     if int(supplier_id or 0) > 0 and item_id > 0:
         now = datetime.utcnow().isoformat()

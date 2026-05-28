@@ -11,7 +11,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any
 
-from app.core import db, ensure_columns
+from app.core import db, ensure_columns, safe_insert_returning
 
 
 def _now() -> str:
@@ -36,114 +36,21 @@ def _f(value: Any, default: float = 0.0) -> float:
 
 
 def ensure_critical_flow_schema(cur: sqlite3.Cursor) -> None:
-    ensure_columns(cur)
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS critical_flow_drafts(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            flow_type TEXT NOT NULL,
-            source_channel TEXT NOT NULL DEFAULT 'mobile',
-            status TEXT NOT NULL DEFAULT 'draft_preview',
-            title TEXT NOT NULL DEFAULT '',
-            payload_json TEXT NOT NULL DEFAULT '{}',
-            impact_json TEXT NOT NULL DEFAULT '{}',
-            created_by TEXT NOT NULL DEFAULT 'Sistema Demo',
-            created_at TEXT NOT NULL,
-            requires_confirmation INTEGER NOT NULL DEFAULT 1,
-            confirmed_by TEXT DEFAULT '',
-            confirmed_at TEXT DEFAULT '',
-            confirmation_note TEXT DEFAULT '',
-            demo_data INTEGER NOT NULL DEFAULT 1,
-            non_productive_demo INTEGER NOT NULL DEFAULT 1
-        )"""
-    )
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS critical_flow_audit(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            draft_id INTEGER,
-            flow_type TEXT,
-            action TEXT NOT NULL,
-            actor TEXT NOT NULL DEFAULT 'Sistema Demo',
-            note TEXT DEFAULT '',
-            before_json TEXT DEFAULT '{}',
-            after_json TEXT DEFAULT '{}',
-            created_at TEXT NOT NULL,
-            demo_data INTEGER NOT NULL DEFAULT 1,
-            non_productive_demo INTEGER NOT NULL DEFAULT 1
-        )"""
-    )
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS order_suggestion_review_runs(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'draft_preview',
-            source_channel TEXT NOT NULL DEFAULT 'mobile',
-            created_by TEXT NOT NULL DEFAULT 'Sistema Demo',
-            created_at TEXT NOT NULL,
-            demo_data INTEGER NOT NULL DEFAULT 1,
-            non_productive_demo INTEGER NOT NULL DEFAULT 1
-        )"""
-    )
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS order_suggestion_review_lines(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            run_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            area TEXT NOT NULL DEFAULT 'cocina',
-            supplier_name TEXT DEFAULT '',
-            suggested_qty REAL NOT NULL DEFAULT 0,
-            final_qty REAL NOT NULL DEFAULT 0,
-            unit TEXT NOT NULL DEFAULT 'kg',
-            priority TEXT DEFAULT 'normal',
-            note TEXT DEFAULT '',
-            accepted INTEGER NOT NULL DEFAULT 1,
-            was_modified INTEGER NOT NULL DEFAULT 0,
-            modification_reason TEXT DEFAULT '',
-            demo_data INTEGER NOT NULL DEFAULT 1,
-            non_productive_demo INTEGER NOT NULL DEFAULT 1
-        )"""
-    )
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS portioning_batches(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            origin_item_name TEXT NOT NULL,
-            gross_qty REAL NOT NULL DEFAULT 0,
-            unit TEXT NOT NULL DEFAULT 'kg',
-            waste_qty REAL NOT NULL DEFAULT 0,
-            net_qty REAL NOT NULL DEFAULT 0,
-            total_cost REAL NOT NULL DEFAULT 0,
-            cost_per_net_unit REAL NOT NULL DEFAULT 0,
-            lot_code TEXT DEFAULT '',
-            responsible TEXT DEFAULT 'Sistema Demo',
-            status TEXT NOT NULL DEFAULT 'draft_preview',
-            source_channel TEXT NOT NULL DEFAULT 'mobile',
-            created_at TEXT NOT NULL,
-            demo_data INTEGER NOT NULL DEFAULT 1,
-            non_productive_demo INTEGER NOT NULL DEFAULT 1
-        )"""
-    )
-    cur.execute(
-        """CREATE TABLE IF NOT EXISTS portioning_outputs(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            batch_id INTEGER NOT NULL,
-            destination_name TEXT NOT NULL,
-            destination_type TEXT DEFAULT 'preparacion',
-            qty REAL NOT NULL DEFAULT 0,
-            unit TEXT NOT NULL DEFAULT 'kg',
-            cost_assigned REAL NOT NULL DEFAULT 0,
-            linked_recipe_name TEXT DEFAULT '',
-            demo_data INTEGER NOT NULL DEFAULT 1,
-            non_productive_demo INTEGER NOT NULL DEFAULT 1
-        )"""
-    )
+    # Schema for critical mobile ALFI flows is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def _insert_draft(cur, flow_type: str, title: str, payload: dict, impact: dict, source_channel: str = "mobile", actor: str = "Sistema Demo") -> int:
-    cur.execute(
-        """INSERT INTO critical_flow_drafts(flow_type,source_channel,status,title,payload_json,impact_json,created_by,created_at)
-           VALUES(?,?,?,?,?,?,?,?)""",
+    sqlite_sql = """INSERT INTO critical_flow_drafts(flow_type,source_channel,status,title,payload_json,impact_json,created_by,created_at)
+           VALUES(?,?,?,?,?,?,?,?)"""
+    pg_sql = sqlite_sql.replace('?', '%s')
+    draft_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
         (flow_type, source_channel, "draft_preview", title, json.dumps(payload, ensure_ascii=False), json.dumps(impact, ensure_ascii=False), actor, _now()),
-    )
-    draft_id = int(cur.lastrowid or 0)
+        pg_sql=pg_sql,
+    ) or 0
     cur.execute(
         """INSERT INTO critical_flow_audit(draft_id,flow_type,action,actor,note,before_json,after_json,created_at)
            VALUES(?,?,?,?,?,?,?,?)""",
@@ -171,11 +78,14 @@ def simulate_validation_correction(cur, actor: str = "Sistema Demo", source_chan
 
 
 def simulate_order_suggestions(cur, actor: str = "Sistema Demo", source_channel: str = "mobile") -> dict[str, Any]:
-    cur.execute(
-        "INSERT INTO order_suggestion_review_runs(title,status,source_channel,created_by,created_at) VALUES(?,?,?,?,?)",
+    sqlite_sql = "INSERT INTO order_suggestion_review_runs(title,status,source_channel,created_by,created_at) VALUES(?,?,?,?,?)"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    run_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
         ("Revisión pedido sugerido editable LAB", "draft_preview", source_channel, actor, _now()),
-    )
-    run_id = int(cur.lastrowid or 0)
+        pg_sql=pg_sql,
+    ) or 0
     lines = [
         {"item_name": "Tomate", "area": "cocina", "supplier_name": "Proveedor Demo", "suggested_qty": 16, "final_qty": 20, "unit": "kg", "priority": "alta", "note": "fin de semana fuerte", "was_modified": 1, "modification_reason": "Ajuste por previsión de ventas"},
         {"item_name": "Lima", "area": "barra", "supplier_name": "Proveedor Demo", "suggested_qty": 4.2, "final_qty": 4.2, "unit": "kg", "priority": "normal", "note": "pedido consolidable", "was_modified": 0, "modification_reason": ""},
@@ -200,12 +110,15 @@ def simulate_portioning(cur, actor: str = "Sistema Demo", source_channel: str = 
     total_cost = 180.0
     cost_per_kg = total_cost / net if net else 0
     lot = "ATUN-LAB-" + datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    cur.execute(
-        """INSERT INTO portioning_batches(origin_item_name,gross_qty,unit,waste_qty,net_qty,total_cost,cost_per_net_unit,lot_code,responsible,status,source_channel,created_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+    sqlite_sql = """INSERT INTO portioning_batches(origin_item_name,gross_qty,unit,waste_qty,net_qty,total_cost,cost_per_net_unit,lot_code,responsible,status,source_channel,created_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"""
+    pg_sql = sqlite_sql.replace('?', '%s')
+    batch_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
         ("Atún pieza", gross, "kg", waste, net, total_cost, cost_per_kg, lot, actor, "draft_preview", source_channel, _now()),
-    )
-    batch_id = int(cur.lastrowid or 0)
+        pg_sql=pg_sql,
+    ) or 0
     outputs = [
         {"destination_name": "Tataki", "qty": 4.0, "linked_recipe_name": "Tataki de atún"},
         {"destination_name": "Tartar", "qty": 3.0, "linked_recipe_name": "Tartar de atún"},

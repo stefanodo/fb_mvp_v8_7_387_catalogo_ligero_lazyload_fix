@@ -4,7 +4,7 @@ from fastapi import APIRouter, Form, UploadFile, File
 from fastapi.responses import RedirectResponse, JSONResponse
 from typing import Optional
 
-from app.core import db, ensure_columns
+from app.core import db, ensure_columns, db_truthy_sql
 from app.services.waste_service import (
     WASTE_REASONS, ensure_waste_schema, parse_voice_text, match_item_or_recipe,
     create_waste_record, update_waste_record, confirm_waste_record, save_waste_photo,
@@ -30,7 +30,7 @@ def _resolve_responsible(cur, responsible_user_id: int, responsible_name: str) -
     rid = int(responsible_user_id or 0)
     name = (responsible_name or '').strip()
     if rid > 0:
-        row = cur.execute('SELECT id,name FROM users WHERE id=? AND COALESCE(is_active,1)=1', (rid,)).fetchone()
+        row = cur.execute(f"SELECT id,name FROM users WHERE id=? AND {db_truthy_sql('is_active', cur)}", (rid,)).fetchone()
         if row:
             return int(row['id']), (row['name'] or '').strip()
     return 0, name
@@ -166,8 +166,9 @@ def waste_cancel(record_id: int, center_id: int = Form(0)):
 def waste_search(q: str = '', limit: int = 20):
     conn = db(); cur = conn.cursor(); ensure_waste_schema(cur)
     ql = f"%{(q or '').strip()}%"
-    rows = cur.execute('SELECT id,name,unit,current_price,stock_area FROM items WHERE name LIKE ? ORDER BY name COLLATE NOCASE LIMIT ?', (ql, int(limit or 20))).fetchall()
-    recipes = cur.execute('SELECT id,name,is_subrecipe FROM recipes WHERE COALESCE(is_active,1)=1 AND name LIKE ? ORDER BY name COLLATE NOCASE LIMIT ?', (ql, int(limit or 20))).fetchall()
+    rows = cur.execute('SELECT id,name,unit,current_price,stock_area FROM items WHERE name LIKE ? ORDER BY LOWER(name) LIMIT ?', (ql, int(limit or 20))).fetchall()
+    active_clause = db_truthy_sql('is_active', cur)
+    recipes = cur.execute(f'SELECT id,name,is_subrecipe FROM recipes WHERE {active_clause} AND name LIKE ? ORDER BY LOWER(name) LIMIT ?', (ql, int(limit or 20))).fetchall()
     conn.close()
     return JSONResponse({
         'items': [{k: r[k] for k in r.keys()} for r in rows],

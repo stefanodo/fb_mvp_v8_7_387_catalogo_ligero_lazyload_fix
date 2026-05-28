@@ -11,11 +11,13 @@ from datetime import datetime
 from difflib import SequenceMatcher
 
 from app.core import (
-    db, _retry_db_write, _parse_float, _resolve_item_id, _resolve_item_id_strict,
+    db, _retry_db_write, _is_db_locked_error, _parse_float, _resolve_item_id, _resolve_item_id_strict,
     _unit_factor, _canonical_unit, _parse_scope, recipe_with_calc, next_recipe_code,
     CATEGORY_CODES, ALLERGENS_UE, SUBCATEGORIES, APP_DIR,
     fmt_num, fmt_dt, status_label, human_qty,
     _normalize_uploaded_image_bytes_to_jpeg,
+    safe_insert_returning,
+    db_truthy_sql,
 )
 
 from app.services.recipes_service import build_recipe_create_payload
@@ -38,7 +40,7 @@ def api_recipes_search(q: str = "", limit: int = 8, subrecipes_only: int = 0):
         lim = 8
     only_sub = int(subrecipes_only or 0) == 1
     conn = db(); cur = conn.cursor()
-    where = ["COALESCE(is_active,1)=1"]
+    where = [db_truthy_sql("is_active", cur)]
     params = []
     if only_sub:
         where.append("COALESCE(is_subrecipe,0)=1")
@@ -100,31 +102,9 @@ def recipe_print(recipe_id: int, request: Request, mode: str = "staff"):
     rec = rd
     calc = (rd.get("calc") or {})
     ingredients = rec.get("ingredients") or []
-
-    def esc(s):
-        return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-    def ing_qty_str(ing):
-        base = (ing.get("unit") or "").strip()
-        iu = (ing.get("input_unit") or base).strip()
-        q = float(ing.get("display_gross") if ing.get("display_gross") is not None else ing.get("qty_gross") or 0)
-        # Visual humano en impresión: g grandes a kg, g pequeños sin 3 decimales.
-        if iu == "g" and abs(q) >= 1000:
-            return f"{q/1000.0:.3f}".rstrip("0").rstrip(".") + " kg"
-        if iu == "g":
-            return f"{q:.2f}".rstrip("0").rstrip(".") + " g"
-        s = f"{q:.3f}".rstrip("0").rstrip(".")
-        return f"{s} {esc(iu)}"
-
-    def price_used_str(ing):
-        uc = float(ing.get("unit_cost") or 0)
-        base = (ing.get("unit") or "").strip() or "ud"
-        if uc <= 0:
-            return "<span class='warn-text'>SIN PRECIO</span>"
-        if base == "g":
-            return f"{uc*1000:.2f} €/kg"
-        return f"{uc:.2f} €/{esc(base)}"
-
+    # For printing an existing recipe we already have `recipe_id` and `rd`.
+    # Ensure `rid` is set for downstream rendering; do not run DDL/insert here.
+    rid = int(recipe_id or 0)
     def cost_line_str(ing):
         lc = float(ing.get("line_cost") or 0)
         if lc <= 0 and float(ing.get("unit_cost") or 0) <= 0:
@@ -280,35 +260,45 @@ def create_recipe_form(
         target_margin_pct=target_margin_pct, manual_price=manual_price, cost_supplier_id=cost_supplier_id,
         scope_global=scope_global, scope_centers=scope_centers
     )
-    dup = cur.execute("SELECT id FROM recipes WHERE lower(trim(name))=lower(trim(?)) AND COALESCE(is_active,1)=1",
+    dup = cur.execute(f"SELECT id FROM recipes WHERE lower(trim(name))=lower(trim(?)) AND {db_truthy_sql('is_active', cur)}",
                       (name,)).fetchone()
     if dup:
         conn.close()
         return RedirectResponse(url=recipe_page_url(center_id=center_id, new=True, err='dup', anchor='newRecipePanel'),
                                 status_code=303)
-    cur.execute(
-        """INSERT INTO recipes(code,name,category,subcategory,is_subrecipe,yield_final_qty,yield_final_unit,
-           waste_pct,contingency_pct,prep_steps,allergens,target_food_cost_pct,target_margin_pct,
-           manual_price,suggested_price,cost_supplier_id,scope_global,scope_centers,
-           prep_time_min,cook_time_min,rest_time_min,labor_people,labor_hourly_cost,
-           indirect_sales_base,indirect_rent_amount,indirect_rent_tax_mode,
-           indirect_services_amount,indirect_services_tax_mode,indirect_admin_amount,indirect_admin_tax_mode,
-           indirect_marketing_amount,indirect_marketing_tax_mode,indirect_other_amount,indirect_other_tax_mode,
-           salary_cost_amount,created_at,updated_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)""",
-        (payload['code'], payload['name'], payload['category'], payload['subcategory'], payload['is_subrecipe'],
-         payload['yield_final_qty'], payload['yield_final_unit'], payload['waste_pct'], payload['contingency_pct'],
-         payload['prep_steps'], payload['allergens'], payload['target_food_cost_pct'],
-         payload['target_margin_pct'], payload['manual_price'], 0.0, payload['cost_supplier_id'], payload['scope_global'], payload['scope_centers'],
-         _parse_float(prep_time_min,0.0), _parse_float(cook_time_min,0.0), _parse_float(rest_time_min,0.0),
-         _parse_float(labor_people,0.0), _parse_float(labor_hourly_cost,0.0),
-         _parse_float(indirect_sales_base,0.0), _parse_float(indirect_rent_amount,0.0), _tax_mode_value(indirect_rent_tax_mode),
-         _parse_float(indirect_services_amount,0.0), _tax_mode_value(indirect_services_tax_mode),
-         _parse_float(indirect_admin_amount,0.0), _tax_mode_value(indirect_admin_tax_mode),
-         _parse_float(indirect_marketing_amount,0.0), _tax_mode_value(indirect_marketing_tax_mode),
-         _parse_float(indirect_other_amount,0.0), _tax_mode_value(indirect_other_tax_mode),
-         _parse_float(salary_cost_amount,0.0)))
-    rid = cur.lastrowid
+    sqlite_sql = """INSERT INTO recipes(code,name,category,subcategory,is_subrecipe,yield_final_qty,yield_final_unit,
+               waste_pct,contingency_pct,prep_steps,allergens,target_food_cost_pct,target_margin_pct,
+               manual_price,suggested_price,cost_supplier_id,scope_global,scope_centers,
+               prep_time_min,cook_time_min,rest_time_min,labor_people,labor_hourly_cost,
+               indirect_sales_base,indirect_rent_amount,indirect_rent_tax_mode,
+               indirect_services_amount,indirect_services_tax_mode,indirect_admin_amount,indirect_admin_tax_mode,
+               indirect_marketing_amount,indirect_marketing_tax_mode,indirect_other_amount,indirect_other_tax_mode,
+               salary_cost_amount,created_at,updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"""
+    pg_sql = """INSERT INTO recipes(code,name,category,subcategory,is_subrecipe,yield_final_qty,yield_final_unit,
+               waste_pct,contingency_pct,prep_steps,allergens,target_food_cost_pct,target_margin_pct,
+               manual_price,suggested_price,cost_supplier_id,scope_global,scope_centers,
+               prep_time_min,cook_time_min,rest_time_min,labor_people,labor_hourly_cost,
+               indirect_sales_base,indirect_rent_amount,indirect_rent_tax_mode,
+               indirect_services_amount,indirect_services_tax_mode,indirect_admin_amount,indirect_admin_tax_mode,
+               indirect_marketing_amount,indirect_marketing_tax_mode,indirect_other_amount,indirect_other_tax_mode,
+               salary_cost_amount,created_at,updated_at)
+               VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id"""
+    params = (
+        payload['code'], payload['name'], payload['category'], payload['subcategory'], payload['is_subrecipe'],
+        payload['yield_final_qty'], payload['yield_final_unit'], payload['waste_pct'], payload['contingency_pct'],
+        payload['prep_steps'], payload['allergens'], payload['target_food_cost_pct'],
+        payload['target_margin_pct'], payload['manual_price'], 0.0, payload['cost_supplier_id'], payload['scope_global'], payload['scope_centers'],
+        _parse_float(prep_time_min,0.0), _parse_float(cook_time_min,0.0), _parse_float(rest_time_min,0.0),
+        _parse_float(labor_people,0.0), _parse_float(labor_hourly_cost,0.0),
+        _parse_float(indirect_sales_base,0.0), _parse_float(indirect_rent_amount,0.0), _tax_mode_value(indirect_rent_tax_mode),
+        _parse_float(indirect_services_amount,0.0), _tax_mode_value(indirect_services_tax_mode),
+        _parse_float(indirect_admin_amount,0.0), _tax_mode_value(indirect_admin_tax_mode),
+        _parse_float(indirect_marketing_amount,0.0), _tax_mode_value(indirect_marketing_tax_mode),
+        _parse_float(indirect_other_amount,0.0), _tax_mode_value(indirect_other_tax_mode),
+        _parse_float(salary_cost_amount,0.0)
+    )
+    rid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql) or 0
     conn.commit()
     conn.close()
     return RedirectResponse(url=recipe_page_url(center_id=center_id, recipe_id=rid),
@@ -393,10 +383,12 @@ def update_recipe_form(
 
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
-        return RedirectResponse(
-            url=recipe_page_url(center_id=center_id, recipe_id=recipe_id, err='dblock'),
-            status_code=303)
+    except Exception as exc:
+        if _is_db_locked_error(exc):
+            return RedirectResponse(
+                url=recipe_page_url(center_id=center_id, recipe_id=recipe_id, err='dblock'),
+                status_code=303)
+        raise
     return RedirectResponse(
         url=recipe_page_url(center_id=center_id, recipe_id=recipe_id),
         status_code=303)
@@ -409,9 +401,11 @@ def delete_recipe_form(recipe_id: int, center_id: int = Form(0)):
         curx.execute("DELETE FROM recipes WHERE id=?", (int(recipe_id),))
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
-        return RedirectResponse(
-            url=f"/?page=recetas&center_id={int(center_id or 0)}&err=dblock#newRecipePanel", status_code=303)
+    except Exception as exc:
+        if _is_db_locked_error(exc):
+            return RedirectResponse(
+                url=f"/?page=recetas&center_id={int(center_id or 0)}&err=dblock#newRecipePanel", status_code=303)
+        raise
     return RedirectResponse(
         url=f"/?page=recetas&center_id={int(center_id or 0)}&del_ok=1#newRecipePanel", status_code=303)
 
@@ -455,14 +449,16 @@ async def upload_recipe_photo(recipe_id: int, request: Request, photo: UploadFil
 
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
+    except Exception as exc:
         try:
             if out_path.exists():
                 out_path.unlink()
         except Exception:
             pass
-        return RedirectResponse(
-            url=f"/?page=recetas&center_id={center_id}&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+        if _is_db_locked_error(exc):
+            return RedirectResponse(
+                url=f"/?page=recetas&center_id={center_id}&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+        raise
     try:
         if old_rel and str(old_rel).startswith("/static/uploads/recipes/") and str(old_rel) != rel:
             old_path = APP_DIR / str(old_rel).lstrip("/")
@@ -486,10 +482,12 @@ def remove_recipe_photo(recipe_id: int, center_id: int = Form(0)):
 
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
-        return RedirectResponse(
-            url=f"/?page=recetas&center_id={int(center_id or 0)}&rid={recipe_id}&err=dblock#recipePanel",
-            status_code=303)
+    except Exception as exc:
+        if _is_db_locked_error(exc):
+            return RedirectResponse(
+                url=f"/?page=recetas&center_id={int(center_id or 0)}&rid={recipe_id}&err=dblock#recipePanel",
+                status_code=303)
+        raise
     try:
         if old_rel and str(old_rel).startswith("/static/uploads/recipes/"):
             fpath = APP_DIR / str(old_rel).lstrip("/")
@@ -650,8 +648,10 @@ def add_recipe_ingredient_form(
 
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
-        return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+    except Exception as exc:
+        if _is_db_locked_error(exc):
+            return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+        raise
     return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&ing_ok=1#recipePanel", status_code=303)
 
 
@@ -662,8 +662,10 @@ def delete_recipe_ingredient_form(recipe_id: int, ing_id: int):
         curx.execute("UPDATE recipes SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (recipe_id,))
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
-        return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+    except Exception as exc:
+        if _is_db_locked_error(exc):
+            return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+        raise
     return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&ing_ok=1#recipePanel", status_code=303)
 
 
@@ -734,8 +736,10 @@ def update_recipe_ingredient_form(
 
     try:
         _retry_db_write(_writer, attempts=8, delay=0.45)
-    except sqlite3.OperationalError:
-        return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+    except Exception as exc:
+        if _is_db_locked_error(exc):
+            return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&err=dblock#recipePanel", status_code=303)
+        raise
     return RedirectResponse(url=f"/?page=recetas&rid={recipe_id}&ing_ok=1#recipePanel", status_code=303)
 
 
@@ -763,13 +767,14 @@ def create_recipe_api(
     conn = db()
     cur = conn.cursor()
     code = next_recipe_code(cur, category)
-    cur.execute(
-        """INSERT INTO recipes(code,name,category,subcategory,waste_pct,contingency_pct,
+    sqlite_sql = """INSERT INTO recipes(code,name,category,subcategory,waste_pct,contingency_pct,
            target_food_cost_pct,target_margin_pct,manual_price,suggested_price,prep_steps,allergens,created_at,updated_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)""",
-        (code, name, category, subcategory, waste_pct, contingency_pct,
-         target_food_cost_pct, target_margin_pct, manual_price, 0, prep_steps, allergens))
-    rid = cur.lastrowid
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"""
+    pg_sql = """INSERT INTO recipes(code,name,category,subcategory,waste_pct,contingency_pct,
+           target_food_cost_pct,target_margin_pct,manual_price,suggested_price,prep_steps,allergens,created_at,updated_at)
+           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) RETURNING id"""
+    params = (code, name, category, subcategory, waste_pct, contingency_pct, target_food_cost_pct, target_margin_pct, manual_price, 0, prep_steps, allergens)
+    rid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql) or 0
     conn.commit()
     recipe = recipe_with_calc(cur, int(rid))
     conn.close()

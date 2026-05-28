@@ -280,6 +280,28 @@ def migrate_to_postgresql():
             cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS confirmed_at TEXT")
             cur.execute("ALTER TABLE waste_records ALTER COLUMN confirmed_at TYPE TEXT USING confirmed_at::text")
             cur.execute("ALTER TABLE waste_records ALTER COLUMN created_at TYPE TEXT USING created_at::text")
+            # Ensure other columns expected by application code exist
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS warehouse_id INTEGER")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS responsible_user_id INTEGER")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS responsible_name TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS source_type TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS item_type TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS article_id INTEGER")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS recipe_id INTEGER")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS item_name_detected TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS unit TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS qty_base NUMERIC")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS base_unit TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS notes TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS photo_path TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS voice_text_raw TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS image_text_raw TEXT")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'DRAFT'")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS unit_cost_snapshot DOUBLE PRECISION NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS total_cost_snapshot DOUBLE PRECISION NOT NULL DEFAULT 0")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS movement_id INTEGER")
+            cur.execute("ALTER TABLE waste_records ADD COLUMN IF NOT EXISTS confirmed_by TEXT")
         except Exception:
             pass
         cur.execute("""
@@ -312,6 +334,57 @@ def migrate_to_postgresql():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Operational quick queue: items and contributions
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS operational_queue_items (
+                id SERIAL PRIMARY KEY,
+                center_id INTEGER NOT NULL DEFAULT 0,
+                task_type TEXT NOT NULL DEFAULT 'ORDER',
+                item_name TEXT NOT NULL DEFAULT '',
+                item_name_norm TEXT NOT NULL DEFAULT '',
+                item_ref_id INTEGER NOT NULL DEFAULT 0,
+                qty_total NUMERIC NOT NULL DEFAULT 0,
+                unit TEXT NOT NULL DEFAULT 'ud',
+                status TEXT NOT NULL DEFAULT 'REVIEW',
+                requested_by TEXT,
+                source TEXT,
+                voice_text TEXT,
+                notes TEXT,
+                decision_note TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                confidence NUMERIC DEFAULT 0,
+                intent_source TEXT,
+                raw_json JSONB
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS operational_queue_contributions (
+                id SERIAL PRIMARY KEY,
+                line_id INTEGER REFERENCES operational_queue_items(id) ON DELETE CASCADE,
+                requested_by TEXT,
+                qty_requested NUMERIC,
+                unit TEXT,
+                voice_text TEXT,
+                source TEXT,
+                decision TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                raw_json JSONB
+            )
+        """)
+
+        # Helpful indexes for queue queries
+        for sql in [
+            "CREATE INDEX IF NOT EXISTS idx_operational_queue_status ON operational_queue_items(status,center_id)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_queue_item_norm ON operational_queue_items(item_name_norm)",
+            "CREATE INDEX IF NOT EXISTS idx_operational_queue_contrib_line ON operational_queue_contributions(line_id)",
+        ]:
+            try:
+                cur.execute(sql)
+            except Exception:
+                pass
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS pos_integrations (
@@ -357,15 +430,38 @@ def migrate_to_postgresql():
             )
         """)
 
-        # Recipe AI import tables
+        # Recipe AI import tables (mirrors recipe_ai storage schema)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS recipe_import_drafts (
                 id SERIAL PRIMARY KEY,
-                source VARCHAR(50),
-                title VARCHAR(255),
-                raw_content TEXT,
-                status VARCHAR(50) DEFAULT 'BORRADOR_IA',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                recipe_name TEXT NOT NULL,
+                recipe_type TEXT DEFAULT 'RECETA',
+                category TEXT DEFAULT 'OTRO',
+                subcategory TEXT,
+                service_family TEXT DEFAULT 'OTRO',
+                yield_quantity NUMERIC,
+                yield_unit TEXT DEFAULT 'kg',
+                portions INTEGER,
+                elaboration_steps_json JSONB,
+                allergens_json JSONB,
+                labor_json JSONB,
+                import_status TEXT DEFAULT 'BORRADOR_IA',
+                cost_status TEXT DEFAULT 'NO_CALCULADO',
+                confidence NUMERIC DEFAULT 0,
+                warnings_json JSONB,
+                source_type TEXT,
+                raw_input_text TEXT,
+                raw_ia_json JSONB,
+                ia_provider TEXT,
+                ia_model TEXT,
+                process_time_s NUMERIC,
+                created_by TEXT,
+                validated_by TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                validated_at TIMESTAMP,
+                review_at TIMESTAMP,
+                converted_recipe_id INTEGER
             )
         """)
 
@@ -373,11 +469,53 @@ def migrate_to_postgresql():
             CREATE TABLE IF NOT EXISTS recipe_import_ingredients (
                 id SERIAL PRIMARY KEY,
                 draft_id INTEGER REFERENCES recipe_import_drafts(id) ON DELETE CASCADE,
-                name VARCHAR(255),
-                amount VARCHAR(100),
+                original_text TEXT,
+                normalized_name TEXT NOT NULL,
+                ingredient_type TEXT DEFAULT 'ARTICULO',
+                quantity_net NUMERIC,
+                unit TEXT,
+                waste_percent NUMERIC DEFAULT 0,
+                quantity_gross NUMERIC,
+                match_status TEXT DEFAULT 'PENDIENTE_ALTA',
+                matched_item_id INTEGER,
+                matched_item_name TEXT,
+                matched_subrecipe_id INTEGER,
+                matched_subrecipe_name TEXT,
+                candidates_json JSONB,
+                needs_admin_validation INTEGER DEFAULT 1,
+                notes TEXT,
+                original_quantity NUMERIC,
+                original_unit TEXT,
+                conversion_status TEXT DEFAULT 'NO_REQUIERE_CONVERSION',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS recipe_import_audit_log (
+                id SERIAL PRIMARY KEY,
+                draft_id INTEGER,
+                ingredient_id INTEGER,
+                action TEXT NOT NULL,
+                actor TEXT,
+                previous_value_json JSONB,
+                new_value_json JSONB,
+                notes TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # Indexes for efficient queries
+        for sql in [
+            "CREATE INDEX IF NOT EXISTS idx_recipe_import_drafts_status ON recipe_import_drafts(import_status)",
+            "CREATE INDEX IF NOT EXISTS idx_recipe_import_ingredients_draft ON recipe_import_ingredients(draft_id)",
+            "CREATE INDEX IF NOT EXISTS idx_recipe_import_ingredients_status ON recipe_import_ingredients(match_status)",
+        ]:
+            try:
+                cur.execute(sql)
+            except Exception:
+                pass
         # POS / Modifiers tables (converted from SQLite schema)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS recipe_modifiers(
@@ -1223,3 +1361,356 @@ def migrate_to_postgresql():
 
 if __name__ == "__main__":
     migrate_to_postgresql()
+
+
+def ensure_sqlite_schema(conn_or_cur):
+        """Create the SQLite schema used for local development.
+
+        This consolidates the CREATE TABLE / CREATE INDEX statements previously
+        scattered across `backend/app/core.py` and `init_db()` into a single
+        location. The function is idempotent and safe to call multiple times.
+        """
+        try:
+                # If the provided object is a Postgres-adapter cursor/connection, skip.
+                if getattr(conn_or_cur, "_is_postgres", False):
+                        return
+        except Exception:
+                pass
+
+        # Obtain a cursor-like object that supports executescript/execute.
+        cur = conn_or_cur
+        try:
+                if hasattr(conn_or_cur, "cursor") and callable(getattr(conn_or_cur, "cursor")):
+                        # conn_or_cur may be a connection; try to use its executescript if available
+                        try:
+                                # sqlite3.Connection supports executescript
+                                if hasattr(conn_or_cur, "executescript"):
+                                        conn_or_cur.executescript(_SQLITE_SCHEMA)
+                                        return
+                        except Exception:
+                                pass
+                        try:
+                                cur = conn_or_cur.cursor()
+                        except Exception:
+                                cur = conn_or_cur
+        except Exception:
+                cur = conn_or_cur
+
+        # Fallback: execute statements one-by-one
+        try:
+                for stmt in _SQLITE_SCHEMA.split(";"):
+                        s = stmt.strip()
+                        if not s:
+                                continue
+                        try:
+                                cur.execute(s)
+                        except Exception:
+                                # best-effort: ignore errors for idempotency
+                                pass
+        except Exception:
+                pass
+
+
+# Consolidated SQLite schema (copied from core.init_db and ensure_columns)
+_SQLITE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS centers(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'RESTAURANT');
+CREATE TABLE IF NOT EXISTS warehouses(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
+    name TEXT NOT NULL, FOREIGN KEY(center_id) REFERENCES centers(id));
+CREATE TABLE IF NOT EXISTS items(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, unit TEXT NOT NULL,
+    min_qty REAL NOT NULL DEFAULT 0, max_qty REAL NOT NULL DEFAULT 0,
+    current_price REAL NOT NULL DEFAULT 0, waste_default_pct REAL NOT NULL DEFAULT 0,
+    stock_area TEXT NOT NULL DEFAULT '');
+CREATE TABLE IF NOT EXISTS suppliers(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+    phone TEXT, email TEXT, is_active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS supplier_item_prices(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, supplier_id INTEGER NOT NULL,
+    item_id INTEGER NOT NULL, center_id INTEGER,
+    price_per_purchase REAL NOT NULL, purchase_unit TEXT NOT NULL,
+    purchase_to_base_factor REAL NOT NULL, is_preferred INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(supplier_id) REFERENCES suppliers(id),
+    FOREIGN KEY(item_id) REFERENCES items(id));
+CREATE TABLE IF NOT EXISTS movements(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, movement_type TEXT NOT NULL,
+    item_id INTEGER NOT NULL, center_id INTEGER NOT NULL, warehouse_id INTEGER NOT NULL,
+    qty REAL NOT NULL, unit TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
+    FOREIGN KEY(item_id) REFERENCES items(id));
+CREATE TABLE IF NOT EXISTS item_location_prefs(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
+    warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL,
+    min_qty REAL NOT NULL DEFAULT 0, max_qty REAL NOT NULL DEFAULT 0,
+    UNIQUE(center_id, warehouse_id, item_id));
+CREATE TABLE IF NOT EXISTS recipes(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, name TEXT NOT NULL,
+    category TEXT, subcategory TEXT, cost_supplier_id INTEGER,
+    waste_pct REAL NOT NULL DEFAULT 0, yield_portions REAL NOT NULL DEFAULT 1,
+    yield_final_qty REAL NOT NULL DEFAULT 0, yield_final_unit TEXT NOT NULL DEFAULT 'g',
+    contingency_pct REAL NOT NULL DEFAULT 0, target_food_cost_pct REAL NOT NULL DEFAULT 30,
+    target_margin_pct REAL NOT NULL DEFAULT 70, manual_price REAL NOT NULL DEFAULT 0,
+    suggested_price REAL NOT NULL DEFAULT 0, prep_steps TEXT, allergens TEXT,
+    is_subrecipe INTEGER NOT NULL DEFAULT 0, is_producible INTEGER NOT NULL DEFAULT 0, produced_item_id INTEGER NOT NULL DEFAULT 0, recipe_photo_path TEXT,
+    prep_time_min REAL NOT NULL DEFAULT 0, cook_time_min REAL NOT NULL DEFAULT 0,
+    rest_time_min REAL NOT NULL DEFAULT 0, labor_people REAL NOT NULL DEFAULT 0,
+    labor_hourly_cost REAL NOT NULL DEFAULT 0,
+    indirect_sales_base REAL NOT NULL DEFAULT 0,
+    indirect_rent_amount REAL NOT NULL DEFAULT 0, indirect_rent_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
+    indirect_services_amount REAL NOT NULL DEFAULT 0, indirect_services_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
+    indirect_admin_amount REAL NOT NULL DEFAULT 0, indirect_admin_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
+    indirect_marketing_amount REAL NOT NULL DEFAULT 0, indirect_marketing_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
+    indirect_other_amount REAL NOT NULL DEFAULT 0, indirect_other_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
+    salary_cost_amount REAL NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS recipe_ingredients(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL,
+    item_name TEXT NOT NULL, qty_gross REAL NOT NULL, qty_net REAL NOT NULL,
+    unit TEXT NOT NULL, item_id INTEGER, input_unit TEXT,
+    waste_pct_ing REAL NOT NULL DEFAULT 0, subrecipe_id INTEGER,
+    FOREIGN KEY(recipe_id) REFERENCES recipes(id));
+CREATE TABLE IF NOT EXISTS productions(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
+    warehouse_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'DRAFT',
+    created_at TEXT NOT NULL, note TEXT);
+CREATE TABLE IF NOT EXISTS production_lines(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, production_id INTEGER NOT NULL,
+    line_type TEXT NOT NULL, item_id INTEGER NOT NULL, qty_base REAL NOT NULL,
+    input_unit TEXT NOT NULL, qty_input REAL NOT NULL,
+    FOREIGN KEY(production_id) REFERENCES productions(id));
+CREATE TABLE IF NOT EXISTS orders(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'DRAFT', created_at TEXT NOT NULL, note TEXT);
+CREATE TABLE IF NOT EXISTS order_free_notes(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id INTEGER NOT NULL DEFAULT 0,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    text TEXT NOT NULL DEFAULT '',
+    target_date TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'IDEA',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS inventory_sessions(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    warehouse_id INTEGER NOT NULL DEFAULT 0,
+    session_type TEXT NOT NULL DEFAULT 'MIXTO',
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    created_at TEXT NOT NULL,
+    note TEXT);
+CREATE TABLE IF NOT EXISTS inventory_counts(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    source_type TEXT NOT NULL DEFAULT 'raw',
+    item_id INTEGER NOT NULL DEFAULT 0,
+    item_name TEXT,
+    family_key TEXT NOT NULL DEFAULT '',
+    warehouse_id INTEGER NOT NULL DEFAULT 0,
+    theoretical_qty REAL NOT NULL DEFAULT 0,
+    physical_qty REAL NOT NULL DEFAULT 0,
+    count_unit TEXT NOT NULL DEFAULT 'ud',
+    is_checked INTEGER NOT NULL DEFAULT 0,
+    note TEXT,
+    unit_cost_snapshot REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(session_id) REFERENCES inventory_sessions(id));
+CREATE TABLE IF NOT EXISTS order_lines(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL,
+    warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL,
+    qty_base REAL NOT NULL, input_unit TEXT NOT NULL, qty_input REAL NOT NULL,
+    supplier_id INTEGER,
+    FOREIGN KEY(order_id) REFERENCES orders(id));
+CREATE TABLE IF NOT EXISTS receipts(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
+    warehouse_id INTEGER NOT NULL, supplier_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING', doc_number TEXT, doc_date TEXT,
+    note TEXT, created_at TEXT NOT NULL, validated_at TEXT);
+CREATE TABLE IF NOT EXISTS receipt_lines(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL,
+    item_id INTEGER NOT NULL, qty_input REAL NOT NULL, input_unit TEXT NOT NULL,
+    factor REAL NOT NULL, qty_base REAL NOT NULL, price_unit REAL, line_total REAL,
+    FOREIGN KEY(receipt_id) REFERENCES receipts(id));
+CREATE TABLE IF NOT EXISTS receipt_photos(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL, created_at TEXT NOT NULL,
+    FOREIGN KEY(receipt_id) REFERENCES receipts(id));
+CREATE TABLE IF NOT EXISTS receipt_ocr_runs(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'PENDING', supplier_raw TEXT,
+    doc_number_raw TEXT, doc_date_raw TEXT, supplier_phone_raw TEXT,
+    supplier_email_raw TEXT, supplier_tax_id_raw TEXT, supplier_address_raw TEXT,
+    summary TEXT, created_at TEXT NOT NULL,
+    FOREIGN KEY(receipt_id) REFERENCES receipts(id));
+CREATE TABLE IF NOT EXISTS receipt_ocr_lines(
+    id INTEGER PRIMARY KEY AUTOINCREMENT, ocr_run_id INTEGER NOT NULL,
+    source_text TEXT, item_name_raw TEXT, qty_raw TEXT, unit_raw TEXT,
+    price_raw TEXT, amount_raw TEXT, discount_raw TEXT, vat_raw TEXT,
+    qty_basis_raw TEXT, qty_aux_raw TEXT, matched_item_id INTEGER,
+    matched_item_name TEXT, review_status TEXT NOT NULL DEFAULT 'PENDING',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(ocr_run_id) REFERENCES receipt_ocr_runs(id));
+
+# POS / modifiers
+CREATE TABLE IF NOT EXISTS pos_integrations(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    provider_name TEXT NOT NULL DEFAULT '',
+    business_type TEXT NOT NULL DEFAULT 'restaurant',
+    status TEXT NOT NULL DEFAULT 'PLANNED',
+    config_json TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS pos_sales_daily(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    sale_date TEXT NOT NULL,
+    business_type TEXT NOT NULL DEFAULT 'restaurant',
+    channel TEXT NOT NULL DEFAULT '',
+    tickets INTEGER NOT NULL DEFAULT 0,
+    covers INTEGER NOT NULL DEFAULT 0,
+    net_sales REAL NOT NULL DEFAULT 0,
+    gross_sales REAL NOT NULL DEFAULT 0,
+    source TEXT NOT NULL DEFAULT 'manual',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS pos_sales_item_daily(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    sale_date TEXT NOT NULL,
+    recipe_id INTEGER NOT NULL DEFAULT 0,
+    recipe_name TEXT NOT NULL DEFAULT '',
+    pos_item_code TEXT NOT NULL DEFAULT '',
+    pos_item_name TEXT NOT NULL DEFAULT '',
+    qty_sold REAL NOT NULL DEFAULT 0,
+    net_sales REAL NOT NULL DEFAULT 0,
+    gross_sales REAL NOT NULL DEFAULT 0,
+    channel TEXT NOT NULL DEFAULT '',
+    business_type TEXT NOT NULL DEFAULT 'restaurant',
+    source TEXT NOT NULL DEFAULT 'manual',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS recipe_modifiers(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipe_id INTEGER NOT NULL DEFAULT 0,
+    code TEXT NOT NULL DEFAULT '',
+    name TEXT NOT NULL DEFAULT '',
+    modifier_type TEXT NOT NULL DEFAULT 'REVIEW',
+    action TEXT NOT NULL DEFAULT 'REVIEW',
+    item_id INTEGER NOT NULL DEFAULT 0,
+    subrecipe_id INTEGER NOT NULL DEFAULT 0,
+    qty_delta_base REAL NOT NULL DEFAULT 0,
+    unit_base TEXT NOT NULL DEFAULT 'g',
+    price_extra REAL NOT NULL DEFAULT 0,
+    affects_stock INTEGER NOT NULL DEFAULT 1,
+    confidence TEXT NOT NULL DEFAULT 'MANUAL',
+    notes TEXT NOT NULL DEFAULT '',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS pos_modifier_map(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_name TEXT NOT NULL DEFAULT '',
+    business_type TEXT NOT NULL DEFAULT '',
+    pos_modifier_name TEXT NOT NULL DEFAULT '',
+    normalized_code TEXT NOT NULL DEFAULT '',
+    recipe_id INTEGER NOT NULL DEFAULT 0,
+    modifier_id INTEGER NOT NULL DEFAULT 0,
+    action_status TEXT NOT NULL DEFAULT 'ACTIVE',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS pos_sales_modifier_daily(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    sale_date TEXT NOT NULL,
+    recipe_id INTEGER NOT NULL DEFAULT 0,
+    recipe_name TEXT NOT NULL DEFAULT '',
+    pos_item_code TEXT NOT NULL DEFAULT '',
+    pos_item_name TEXT NOT NULL DEFAULT '',
+    pos_modifier_name TEXT NOT NULL DEFAULT '',
+    normalized_modifier_code TEXT NOT NULL DEFAULT '',
+    modifier_id INTEGER NOT NULL DEFAULT 0,
+    qty_sold REAL NOT NULL DEFAULT 0,
+    channel TEXT NOT NULL DEFAULT '',
+    business_type TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'REQUIERE_MAPEO',
+    confidence TEXT NOT NULL DEFAULT 'LOW',
+    source TEXT NOT NULL DEFAULT 'manual',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE TABLE IF NOT EXISTS pos_modifier_consumption_audit(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    sale_date TEXT NOT NULL,
+    recipe_id INTEGER NOT NULL DEFAULT 0,
+    modifier_id INTEGER NOT NULL DEFAULT 0,
+    item_id INTEGER NOT NULL DEFAULT 0,
+    subrecipe_id INTEGER NOT NULL DEFAULT 0,
+    qty_delta_base REAL NOT NULL DEFAULT 0,
+    unit_base TEXT NOT NULL DEFAULT 'g',
+    status TEXT NOT NULL DEFAULT 'PREVIEW',
+    reason TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE INDEX IF NOT EXISTS idx_recipe_modifiers_recipe ON recipe_modifiers(recipe_id,is_active);
+CREATE INDEX IF NOT EXISTS idx_pos_modifier_map_norm ON pos_modifier_map(normalized_code,recipe_id,action_status);
+CREATE INDEX IF NOT EXISTS idx_pos_sales_modifier_period ON pos_sales_modifier_daily(sale_date,center_id,recipe_id);
+# Documentos proveedor / conciliacion / pagos futuros
+CREATE TABLE IF NOT EXISTS supplier_documents(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL DEFAULT 0,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    doc_type TEXT NOT NULL DEFAULT 'albaran',
+    doc_number TEXT NOT NULL DEFAULT '',
+    doc_date TEXT NOT NULL DEFAULT '',
+    period_month TEXT NOT NULL DEFAULT '',
+    original_filename TEXT NOT NULL DEFAULT '',
+    stored_path TEXT NOT NULL DEFAULT '',
+    file_sha256 TEXT NOT NULL DEFAULT '',
+    ocr_status TEXT NOT NULL DEFAULT 'PENDING',
+    reconciliation_status TEXT NOT NULL DEFAULT 'PENDING',
+    accounting_status TEXT NOT NULL DEFAULT 'PENDING',
+    payment_status TEXT NOT NULL DEFAULT 'NOT_APPLICABLE',
+    base_amount REAL NOT NULL DEFAULT 0,
+    vat_amount REAL NOT NULL DEFAULT 0,
+    total_amount REAL NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS supplier_document_reconciliations(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    receipt_document_id INTEGER NOT NULL DEFAULT 0,
+    invoice_document_id INTEGER NOT NULL DEFAULT 0,
+    supplier_id INTEGER NOT NULL DEFAULT 0,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    base_diff REAL NOT NULL DEFAULT 0,
+    vat_diff REAL NOT NULL DEFAULT 0,
+    total_diff REAL NOT NULL DEFAULT 0,
+    warnings_json TEXT NOT NULL DEFAULT '[]',
+    approved_by TEXT NOT NULL DEFAULT '',
+    approved_at TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS supplier_payment_proposals(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL DEFAULT 0,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    invoice_document_id INTEGER NOT NULL DEFAULT 0,
+    reconciliation_id INTEGER NOT NULL DEFAULT 0,
+    due_date TEXT NOT NULL DEFAULT '',
+    amount REAL NOT NULL DEFAULT 0,
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    payment_method TEXT NOT NULL DEFAULT '',
+    supplier_iban_masked TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'PROPOSED',
+    human_approval_required INTEGER NOT NULL DEFAULT 1,
+    approved_by TEXT NOT NULL DEFAULT '',
+    approved_at TEXT NOT NULL DEFAULT '',
+    bank_execution_ref TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS accounting_export_batches(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    center_id INTEGER NOT NULL DEFAULT 0,
+    period_from TEXT NOT NULL DEFAULT '',
+    period_to TEXT NOT NULL DEFAULT '',
+    supplier_id INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'DRAFT',
+    file_path TEXT NOT NULL DEFAULT '',
+    summary_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by TEXT NOT NULL DEFAULT '');
+"""

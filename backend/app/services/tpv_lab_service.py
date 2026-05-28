@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from typing import Any, Dict, List
 
-from app.core import db, ensure_columns, _norm_text, get_unit_factor
+from app.core import db, ensure_columns, _norm_text, get_unit_factor, get_table_columns_from_cursor, safe_insert_returning, db_truthy_sql
 
 
 def _now() -> str:
@@ -48,126 +48,10 @@ def _unique_lab_id(prefix: str) -> str:
 
 
 def ensure_tpv_lab_schema(cur) -> None:
-    ensure_columns(cur)
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_sources(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        type TEXT,
-        provider_name TEXT,
-        api_mode TEXT,
-        active INTEGER DEFAULT 1,
-        config_json TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_sales_raw(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tpv_source_id INTEGER,
-        raw_payload_json TEXT,
-        received_at TEXT,
-        import_status TEXT,
-        error_message TEXT,
-        hash_deduplication TEXT UNIQUE,
-        created_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_sales(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tpv_source_id INTEGER,
-        external_sale_id TEXT,
-        external_ticket_id TEXT,
-        restaurant_id INTEGER,
-        sale_datetime TEXT,
-        business_date TEXT,
-        shift TEXT,
-        channel TEXT,
-        table_number TEXT,
-        waiter_name TEXT,
-        total_amount REAL DEFAULT 0,
-        payment_method TEXT,
-        sale_status TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_sale_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tpv_sale_id INTEGER,
-        external_line_id TEXT,
-        product_name_raw TEXT,
-        product_code_raw TEXT,
-        matched_recipe_id INTEGER,
-        matched_item_id INTEGER,
-        quantity REAL DEFAULT 0,
-        unit_price REAL DEFAULT 0,
-        discount_amount REAL DEFAULT 0,
-        tax_rate REAL DEFAULT 0,
-        total_line_amount REAL DEFAULT 0,
-        line_status TEXT,
-        mapping_status TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_product_mappings(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tpv_source_id INTEGER,
-        product_name_raw TEXT,
-        product_code_raw TEXT,
-        matched_recipe_id INTEGER,
-        matched_item_id INTEGER,
-        confidence REAL DEFAULT 0,
-        active INTEGER DEFAULT 1,
-        created_by TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_modifiers(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tpv_sale_line_id INTEGER,
-        modifier_text_raw TEXT,
-        modifier_name TEXT,
-        modifier_type TEXT,
-        interpreted_action TEXT,
-        affects_stock TEXT,
-        linked_item_id INTEGER,
-        linked_recipe_id INTEGER,
-        qty_delta REAL,
-        unit TEXT,
-        confidence REAL DEFAULT 0,
-        review_status TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_modifier_rules(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        rule_text TEXT,
-        normalized_text TEXT,
-        modifier_type TEXT,
-        linked_item_id INTEGER,
-        linked_recipe_id INTEGER,
-        qty_delta REAL,
-        unit TEXT,
-        affects_stock TEXT,
-        confidence_default REAL DEFAULT 0,
-        active INTEGER DEFAULT 1,
-        created_by TEXT,
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS tpv_consumption_events(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tpv_sale_id INTEGER,
-        tpv_sale_line_id INTEGER,
-        recipe_id INTEGER,
-        item_id INTEGER,
-        production_id INTEGER,
-        qty_theoretical REAL DEFAULT 0,
-        unit TEXT,
-        cost_amount REAL DEFAULT 0,
-        source TEXT,
-        confidence REAL DEFAULT 0,
-        review_status TEXT,
-        movement_id INTEGER,
-        created_at TEXT
-    )''')
+    # Schema creation for TPV is now managed by backend/migrate.py.
+    # This function is intentionally a no-op at runtime to avoid executing
+    # DDL during app operation — migrations should be run as a separate step.
+    return
 
 
 def _default_source(cur) -> int:
@@ -175,9 +59,14 @@ def _default_source(cur) -> int:
     if row:
         return int(row['id'])
     now = _now()
-    cur.execute("INSERT INTO tpv_sources(name,type,provider_name,api_mode,active,config_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
-                ('TPV LAB MANUAL','manual','System MAC LAB','manual_test',1,'{}',now,now))
-    return int(cur.lastrowid or 0)
+    sqlite_sql = "INSERT INTO tpv_sources(name,type,provider_name,api_mode,active,config_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    return safe_insert_returning(
+        cur,
+        sqlite_sql,
+        ('TPV LAB MANUAL','manual','System MAC LAB','manual_test',1,'{}',now,now),
+        pg_sql=pg_sql,
+    ) or 0
 
 
 def _normalize_name(value: str) -> str:
@@ -195,7 +84,8 @@ def _find_mapping(cur, source_id: int, name: str, code: str = '') -> Dict[str, A
                          ORDER BY confidence DESC, id DESC LIMIT 1''', (source_id, name)).fetchone()
     if row:
         return {'recipe_id': row['matched_recipe_id'], 'item_id': row['matched_item_id'], 'confidence': float(row['confidence'] or 0), 'status': 'MAPPED_RULE'}
-    recipes = cur.execute("SELECT id,name FROM recipes WHERE COALESCE(is_active,1)=1 ORDER BY name").fetchall()
+    active_clause = db_truthy_sql("is_active", cur)
+    recipes = cur.execute(f"SELECT id,name FROM recipes WHERE {active_clause} ORDER BY name").fetchall()
     best = None
     for r in recipes:
         rn = _normalize_name(r['name'])
@@ -265,7 +155,7 @@ def _recipe_consumption_preview(cur, recipe_id: int, qty: float, consumption_mod
                 portion_info = {'mode': 'racion_sin_rendimiento', 'requested_qty': sale_qty, 'yield_portions': 0, 'scale_factor': sale_qty}
     except Exception:
         pass
-    cols = {r['name'] for r in cur.execute("PRAGMA table_info(recipe_ingredients)").fetchall()}
+    cols = get_table_columns_from_cursor(cur, "recipe_ingredients")
     qty_expr = "COALESCE(ri.qty_gross, ri.qty_net, 0)"
     unit_expr = "COALESCE(NULLIF(ri.input_unit,''), NULLIF(ri.unit,''), i.unit, '')"
     if 'qty_gross' not in cols and 'qty' in cols:
@@ -319,19 +209,37 @@ def simulate_tpv_sale(payload: Dict[str, Any]) -> Dict[str, Any]:
     if duplicate:
         conn.close()
         return {'ok': True, 'duplicate': True, 'message': 'Venta TPV duplicada detectada. No se vuelve a importar.', 'raw_id': int(duplicate['id']), 'normalized': normalized, 'alerts': ['Duplicado por hash.']}
-    cur.execute('INSERT INTO tpv_sales_raw(tpv_source_id,raw_payload_json,received_at,import_status,error_message,hash_deduplication,created_at) VALUES(?,?,?,?,?,?,?)',
-                (source_id, _j(normalized), now, 'preview', '', h, now))
-    raw_id = int(cur.lastrowid or 0)
-    cur.execute('''INSERT INTO tpv_sales(tpv_source_id,external_sale_id,external_ticket_id,restaurant_id,sale_datetime,business_date,shift,channel,table_number,waiter_name,total_amount,payment_method,sale_status,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                (source_id, normalized['external_sale_id'], normalized['ticket_id'], normalized['restaurant_id'], normalized['datetime'], str(normalized['datetime'])[:10], payload.get('shift') or 'otro', normalized['channel'], normalized['table'], normalized['waiter'], total, payload.get('payment_method') or '', status, now, now))
-    sale_id = int(cur.lastrowid or 0)
+    # Insert raw payload and obtain id in a DB-agnostic way
+    sqlite_sql = 'INSERT INTO tpv_sales_raw(tpv_source_id,raw_payload_json,received_at,import_status,error_message,hash_deduplication,created_at) VALUES(?,?,?,?,?,?,?)'
+    pg_sql = sqlite_sql.replace('?', '%s')
+    raw_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (source_id, _j(normalized), now, 'preview', '', h, now),
+        pg_sql=pg_sql,
+    ) or 0
+    # Insert sale header and obtain id in a DB-agnostic way
+    sqlite_sql = '''INSERT INTO tpv_sales(tpv_source_id,external_sale_id,external_ticket_id,restaurant_id,sale_datetime,business_date,shift,channel,table_number,waiter_name,total_amount,payment_method,sale_status,created_at,updated_at)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
+    pg_sql = sqlite_sql.replace('?', '%s')
+    sale_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (source_id, normalized['external_sale_id'], normalized['ticket_id'], normalized['restaurant_id'], normalized['datetime'], str(normalized['datetime'])[:10], payload.get('shift') or 'otro', normalized['channel'], normalized['table'], normalized['waiter'], total, payload.get('payment_method') or '', status, now, now),
+        pg_sql=pg_sql,
+    ) or 0
     mapping = _find_mapping(cur, source_id, product_name, payload.get('product_code') or '')
     mapping_status = mapping['status'] if mapping['confidence'] >= 80 else 'PENDING_MAPPING'
-    cur.execute('''INSERT INTO tpv_sale_lines(tpv_sale_id,external_line_id,product_name_raw,product_code_raw,matched_recipe_id,matched_item_id,quantity,unit_price,discount_amount,tax_rate,total_line_amount,line_status,mapping_status,created_at,updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                (sale_id, '1', product_name, payload.get('product_code') or '', int(mapping.get('recipe_id') or 0), int(mapping.get('item_id') or 0), qty, unit_price, _safe_float(payload.get('discount_amount'), 0.0), _safe_float(payload.get('tax_rate'), 0.0), total, status, mapping_status, now, now))
-    line_id = int(cur.lastrowid or 0)
+    # Insert sale line and obtain id in a DB-agnostic way
+    sqlite_sql = '''INSERT INTO tpv_sale_lines(tpv_sale_id,external_line_id,product_name_raw,product_code_raw,matched_recipe_id,matched_item_id,quantity,unit_price,discount_amount,tax_rate,total_line_amount,line_status,mapping_status,created_at,updated_at)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
+    pg_sql = sqlite_sql.replace('?', '%s')
+    line_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
+        (sale_id, '1', product_name, payload.get('product_code') or '', int(mapping.get('recipe_id') or 0), int(mapping.get('item_id') or 0), qty, unit_price, _safe_float(payload.get('discount_amount'), 0.0), _safe_float(payload.get('tax_rate'), 0.0), total, status, mapping_status, now, now),
+        pg_sql=pg_sql,
+    ) or 0
     interpreted_mods = []
     for m in modifiers:
         im = _interpret_modifier(m)

@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import UploadFile
 
-from app.core import db, UPLOADS_DIR
+from app.core import db, UPLOADS_DIR, get_table_columns_from_cursor, safe_insert_returning
 from app.services.oido_alfi_service import answer_oido_alfi
 from app.services.operational_quick_service import add_operational_command, interpret_operational_command, get_ai_status, normalize_operational_text, force_spanish_operational_text, transcribe_audio_bytes
 
@@ -53,7 +53,7 @@ def _safe_public_intent(value: str) -> str:
 
 def _ensure_col(cur: sqlite3.Cursor, table: str, col: str, ddl: str) -> None:
     try:
-        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        cols = get_table_columns_from_cursor(cur, table)
         if col not in cols:
             cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
     except Exception:
@@ -61,55 +61,9 @@ def _ensure_col(cur: sqlite3.Cursor, table: str, col: str, ddl: str) -> None:
 
 
 def ensure_ai_orchestrator_schema(cur: sqlite3.Cursor) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ai_action_audit(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            center_id INTEGER NOT NULL DEFAULT 0,
-            source TEXT DEFAULT 'oido_alfi',
-            user_text TEXT DEFAULT '',
-            intent TEXT DEFAULT '',
-            action_type TEXT DEFAULT '',
-            module TEXT DEFAULT '',
-            permission_level TEXT DEFAULT 'READ',
-            status TEXT DEFAULT 'PROPOSED',
-            confidence REAL DEFAULT 0,
-            result_message TEXT DEFAULT '',
-            payload_json TEXT DEFAULT '',
-            created_at TEXT DEFAULT ''
-        )
-        """
-    )
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS ai_document_reviews(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            center_id INTEGER NOT NULL DEFAULT 0,
-            doc_type TEXT DEFAULT 'unknown',
-            source_type TEXT DEFAULT 'upload',
-            original_filename TEXT DEFAULT '',
-            stored_path TEXT DEFAULT '',
-            file_sha256 TEXT DEFAULT '',
-            status TEXT DEFAULT 'PENDIENTE_REVISION',
-            confidence REAL DEFAULT 0,
-            extracted_json TEXT DEFAULT '',
-            warnings_json TEXT DEFAULT '[]',
-            created_at TEXT DEFAULT '',
-            review_at TEXT DEFAULT ''
-        )
-        """
-    )
-    for col, ddl in {
-        "module": "TEXT DEFAULT ''",
-        "permission_level": "TEXT DEFAULT 'READ'",
-        "payload_json": "TEXT DEFAULT ''",
-    }.items():
-        _ensure_col(cur, "ai_action_audit", col, ddl)
-    for col, ddl in {
-        "review_at": "TEXT DEFAULT ''",
-        "warnings_json": "TEXT DEFAULT '[]'",
-    }.items():
-        _ensure_col(cur, "ai_document_reviews", col, ddl)
+    # Schema creation for AI orchestrator tables is now handled by backend/migrate.py.
+    # Avoid executing DDL at runtime; run migrations as a separate administrative step.
+    return
 
 
 POLICIES: list[dict[str, Any]] = [
@@ -670,12 +624,16 @@ async def receive_document_for_review(upload: UploadFile, doc_type: str = "unkno
         warnings.append("Formato guardado para revisión. La lectura automática de PDF/factura se integrará por OCR/IA documental supervisada.")
 
     conn = db(); cur = conn.cursor(); ensure_ai_orchestrator_schema(cur)
-    cur.execute(
-        """INSERT INTO ai_document_reviews(center_id,doc_type,source_type,original_filename,stored_path,file_sha256,status,confidence,extracted_json,warnings_json,created_at,review_at)
-           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+    # Insert review record and obtain id DB-agnostically
+    sqlite_sql = """INSERT INTO ai_document_reviews(center_id,doc_type,source_type,original_filename,stored_path,file_sha256,status,confidence,extracted_json,warnings_json,created_at,review_at)
+           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"""
+    pg_sql = sqlite_sql.replace('?', '%s')
+    review_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
         (int(center_id or 0), safe_doc, "upload", fname, str(stored), digest, status, confidence, json.dumps(extracted, ensure_ascii=False), json.dumps(warnings, ensure_ascii=False), now, now),
-    )
-    review_id = cur.lastrowid
+        pg_sql=pg_sql,
+    ) or 0
     conn.commit(); conn.close()
     return {
         "ok": True,

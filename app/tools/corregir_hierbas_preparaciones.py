@@ -24,7 +24,19 @@ herbs = {
 con = sqlite3.connect(DB)
 con.row_factory = sqlite3.Row
 cur = con.cursor()
-cols = {r['name'] for r in cur.execute('PRAGMA table_info(items)').fetchall()}
+try:
+    from app.core import get_table_columns_from_cursor as _get_cols
+except Exception:
+    _get_cols = None
+
+try:
+    if _get_cols:
+        cols = set(_get_cols(cur, "items"))
+    else:
+        cur.execute('PRAGMA table_info(items)')
+        cols = {r['name'] for r in cur.fetchall()}
+except Exception:
+    cols = set()
 changed = 0
 for r in cur.execute('SELECT id,name FROM items').fetchall():
     n = norm(r['name'])

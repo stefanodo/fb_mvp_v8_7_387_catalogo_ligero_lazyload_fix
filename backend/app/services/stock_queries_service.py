@@ -48,7 +48,7 @@ def resolve_item_id_strict(item_id, item_query:str=''):
             row = cur.execute('SELECT id,name FROM items WHERE lower(trim(name))=lower(trim(?)) LIMIT 1', (name,)).fetchone()
         if not row and name:
             qn = _norm_item_name(name)
-            rows = cur.execute('SELECT id,name FROM items ORDER BY name COLLATE NOCASE').fetchall()
+            rows = cur.execute('SELECT id,name FROM items ORDER BY LOWER(name)').fetchall()
             exact = [r for r in rows if _norm_item_name(r['name']) == qn]
             starts = [r for r in rows if _norm_item_name(r['name']).startswith(qn)]
             contains = [r for r in rows if qn and qn in _norm_item_name(r['name'])]

@@ -15,7 +15,11 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from difflib import SequenceMatcher
 
-from PIL import Image, ImageOps
+try:
+    from PIL import Image, ImageOps
+except Exception:
+    Image = None
+    ImageOps = None
 
 try:
     from paddleocr import PaddleOCR  # type: ignore
@@ -74,14 +78,38 @@ ALLERGENS_UE = [
 # ==============================================================================
 
 def db():
-    conn = sqlite3.connect(DB_PATH, timeout=240, isolation_level="DEFERRED", check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    for pragma in ["PRAGMA journal_mode=WAL", "PRAGMA synchronous=NORMAL", "PRAGMA busy_timeout=240000"]:
+    try:
+        # Prefer centralized connection factory which selects PostgreSQL
+        # when `DATABASE_URL` is present, otherwise returns a configured
+        # sqlite3 connection. This avoids duplicate pragma/connection logic
+        # spread across the codebase.
+        from app.db_config import get_db_connection
+        return get_db_connection()
+    except Exception:
+        # Fallback: local sqlite connection (keeps previous behavior when
+        # `app.db_config` is not available for any reason).
+        conn = sqlite3.connect(DB_PATH, timeout=240, isolation_level="DEFERRED", check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        # Apply centralized sqlite pragmas when available (keeps PRAGMA usage in one place)
         try:
-            conn.execute(pragma)
+            try:
+                from app.db_config import ensure_sqlite_pragmas as _ensure_pragmas
+            except Exception:
+                _ensure_pragmas = None
+            if _ensure_pragmas:
+                try:
+                    _ensure_pragmas(conn)
+                except Exception:
+                    pass
+            else:
+                for pragma in ["PRAGMA journal_mode=WAL", "PRAGMA synchronous=NORMAL", "PRAGMA busy_timeout=240000"]:
+                    try:
+                        conn.execute(pragma)
+                    except Exception:
+                        pass
         except Exception:
             pass
-    return conn
+        return conn
 
 
 def _is_db_locked_error(exc: Exception) -> bool:
@@ -124,6 +152,211 @@ def _retry_db_write(write_fn, attempts: int = 10, delay: float = 0.45):
             raise
     if last_exc:
         raise last_exc
+
+
+# ==============================================================================
+# DB-AGNOSTIC HELPERS
+# ==============================================================================
+
+def get_last_insert_id(cur) -> int:
+    """Return the last inserted id in a DB-agnostic way.
+
+    Tries, in order:
+    - `cur.lastrowid` (sqlite3 cursor or PG adapter)
+    - `SELECT LASTVAL()` on a new cursor connected to the same connection
+    Raises RuntimeError if unable to determine an id.
+    """
+    try:
+        lr = getattr(cur, "lastrowid", None)
+        if lr is not None:
+            return int(lr)
+    except Exception:
+        pass
+    try:
+        # Try to derive connection object for auxiliary query
+        conn = None
+        if hasattr(cur, "connection"):
+            conn = cur.connection
+        elif hasattr(cur, "_cursor") and hasattr(cur._cursor, "connection"):
+            conn = cur._cursor.connection
+        elif hasattr(cur, "_conn"):
+            conn = cur._conn
+        if conn is not None:
+            aux = conn.cursor()
+            try:
+                aux.execute('SELECT LASTVAL()')
+                last = aux.fetchone()
+                if last:
+                    if isinstance(last, dict):
+                        for v in last.values():
+                            try:
+                                return int(v)
+                            except Exception:
+                                continue
+                    elif isinstance(last, (list, tuple)):
+                        return int(last[0])
+                    else:
+                        return int(last)
+            finally:
+                try:
+                    aux.close()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    raise RuntimeError("Could not determine last insert id")
+
+
+def get_table_columns_from_cursor(cur_or_conn, table_name: str):
+    """Return a set of column names for `table_name` using the provided
+    sqlite3 cursor/connection or the Postgres adapter cursor/connection.
+    """
+    try:
+        cur = cur_or_conn.cursor() if hasattr(cur_or_conn, "cursor") and callable(getattr(cur_or_conn, "cursor")) else cur_or_conn
+        # Postgres path
+        if getattr(cur, "_is_postgres", False):
+            try:
+                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name=%s", (table_name,))
+                rows = cur.fetchall()
+                cols = set()
+                for r in rows:
+                    try:
+                        if isinstance(r, dict):
+                            cols.add(r.get("column_name") or list(r.values())[0])
+                        else:
+                            cols.add(r[0])
+                    except Exception:
+                        continue
+                return cols
+            except Exception:
+                return set()
+        # SQLite path
+        try:
+            cur.execute(f"PRAGMA table_info({table_name})")
+            rows = cur.fetchall()
+            cols = set()
+            for r in rows:
+                try:
+                    # sqlite Row: name at key 'name'
+                    cols.add(r["name"])
+                except Exception:
+                    try:
+                        # fallback sequence access: name at index 1
+                        cols.add(r[1])
+                    except Exception:
+                        continue
+            return cols
+        except Exception:
+            return set()
+    except Exception:
+        return set()
+
+
+def table_exists(cur_or_conn, table_name: str) -> bool:
+    """Return True if `table_name` exists in the connected database (Postgres or SQLite)."""
+    try:
+        cur = cur_or_conn.cursor() if hasattr(cur_or_conn, "cursor") and callable(getattr(cur_or_conn, "cursor")) else cur_or_conn
+        if getattr(cur, "_is_postgres", False):
+            try:
+                cur.execute("SELECT 1 FROM information_schema.tables WHERE table_name=%s", (table_name,))
+                return cur.fetchone() is not None
+            except Exception:
+                return False
+        try:
+            cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            return cur.fetchone() is not None
+        except Exception:
+            return False
+    except Exception:
+        return False
+
+
+def db_truthy_sql(column: str, cur_or_conn=None) -> str:
+    """Return a DB-agnostic SQL expression that evaluates truthiness for `column`.
+
+    - For Postgres (boolean columns) returns: `(column IS NULL OR column = TRUE)`
+    - For SQLite (integer 0/1 or NULL) returns: `COALESCE(column,1)=1`
+
+    The optional `cur_or_conn` argument may be a cursor/connection with the
+    `_is_postgres` attribute set by the PG adapter. If omitted, a SQLite-style
+    expression is returned for maximum compatibility.
+    """
+    try:
+        # Use a resilient text-based check that works for boolean or integer
+        # columns across Postgres and SQLite. Treat NULL as truthy to preserve
+        # the original semantics (NULL => show/enable).
+        return f"COALESCE(LOWER(CAST({column} AS TEXT)),'1') IN ('1','t','true')"
+    except Exception:
+        return f"COALESCE({column},1)=1"
+
+
+def db_coalesce_text(*columns: str, cur_or_conn=None) -> str:
+    """Return a COALESCE expression that casts operands to text on Postgres.
+
+    Usage: db_coalesce_text('r.doc_date', 'r.validated_at', cur)
+    """
+    try:
+        cur = None
+        if cur_or_conn is not None:
+            cur = cur_or_conn.cursor() if hasattr(cur_or_conn, "cursor") and callable(getattr(cur_or_conn, "cursor")) else cur_or_conn
+        if cur is not None and getattr(cur, "_is_postgres", False):
+            parts = [f"CAST({c} AS TEXT)" for c in columns]
+            return "COALESCE(" + ", ".join(parts) + ")"
+    except Exception:
+        pass
+    return "COALESCE(" + ", ".join(columns) + ")"
+
+
+def safe_insert_returning(cur, sqlite_sql: str, params: tuple = (), pg_sql: Optional[str] = None):
+    """Execute an INSERT in a DB-agnostic way and return the inserted id when available.
+
+    - On Postgres: uses `pg_sql` if provided, otherwise converts qmark-style `sqlite_sql` to
+      `%s` placeholders, ensures a `RETURNING id` clause and attempts to return the id.
+    - On SQLite: executes `sqlite_sql` and returns `get_last_insert_id(cur)`.
+
+    Returns `int` id on success or `None` when it cannot be determined.
+    """
+    try:
+        # Postgres path
+        if getattr(cur, "_is_postgres", False):
+            sql = pg_sql or sqlite_sql.replace("?", "%s")
+            if "RETURNING" not in sql.upper():
+                sql = sql + " RETURNING id"
+            try:
+                cur.execute(sql, params)
+                row = cur.fetchone()
+                if row:
+                    if isinstance(row, dict):
+                        val = row.get("id") or (list(row.values())[0] if row else None)
+                    else:
+                        val = row[0] if isinstance(row, (list, tuple)) else row
+                    return int(val) if val is not None else None
+            except Exception:
+                # Fallback: try a non-returning insert then derive the id
+                try:
+                    sql_no_returning = sql
+                    if " RETURNING " in sql_no_returning.upper():
+                        sql_no_returning = sql_no_returning.rsplit(" RETURNING ", 1)[0]
+                    cur.execute(sql_no_returning, params)
+                except Exception:
+                    pass
+                try:
+                    return get_last_insert_id(cur)
+                except Exception:
+                    return None
+
+        # SQLite path
+        cur.execute(sqlite_sql, params)
+        try:
+            return get_last_insert_id(cur)
+        except Exception:
+            return None
+    except Exception:
+        try:
+            cur.execute(sqlite_sql, params)
+            return get_last_insert_id(cur)
+        except Exception:
+            return None
 
 
 # ==============================================================================
@@ -454,7 +687,7 @@ def _resolve_item_id_strict(cur, item_id, item_query: str):
 # ==============================================================================
 
 def _supplier_columns(cur) -> set:
-    return {r["name"] for r in cur.execute("PRAGMA table_info(suppliers)").fetchall()}
+    return set(get_table_columns_from_cursor(cur, "suppliers"))
 
 
 def _ensure_pending_supplier(cur) -> int:
@@ -470,7 +703,7 @@ def _ensure_pending_supplier(cur) -> int:
             ("Proveedor pendiente OCR", None, None, None, None))
     else:
         cur.execute("INSERT INTO suppliers(name,is_active) VALUES(?,1)", ("Proveedor pendiente OCR",))
-    return int(cur.lastrowid)
+    return get_last_insert_id(cur)
 
 
 def _cleanup_pending_supplier(cur) -> None:
@@ -494,7 +727,7 @@ def _insert_supplier_compatible(cur, name: str, is_active: int = 1, phone=None, 
     placeholders = ",".join(["?"] * len(ordered_cols))
     cur.execute(f"INSERT INTO suppliers({','.join(ordered_cols)}) VALUES({placeholders})",
                 tuple(payload[c] for c in ordered_cols))
-    return int(cur.lastrowid)
+    return get_last_insert_id(cur)
 
 
 def _resolve_supplier_id_by_name(cur, supplier_name: str):
@@ -993,11 +1226,11 @@ def get_dashboard_data(center_id: Optional[int] = None):
     }
     warehouses = cur.execute(
         "SELECT w.id,w.name,w.center_id,c.name center_name FROM warehouses w JOIN centers c ON c.id=w.center_id ORDER BY c.id,w.id").fetchall()
-    items = cur.execute("SELECT *, COALESCE(stock_area,'') stock_area FROM items ORDER BY name COLLATE NOCASE").fetchall()
+    items = cur.execute("SELECT *, COALESCE(stock_area,'') stock_area FROM items ORDER BY LOWER(name)").fetchall()
     if center_id:
         recipes = cur.execute(
             """SELECT * FROM recipes WHERE is_active=1
-               AND (COALESCE(scope_global,1)=1 OR instr(','||COALESCE(scope_centers,'')||',', ','||?||',')>0)
+               AND (COALESCE(scope_global,1)=1 OR (',' || COALESCE(scope_centers,'') || ',') LIKE ('%,' || ? || ',%'))
                ORDER BY id""", (int(center_id),)).fetchall()
     else:
         recipes = cur.execute("SELECT * FROM recipes WHERE is_active=1 ORDER BY id").fetchall()
@@ -1318,17 +1551,33 @@ def stock_area_label(value: str) -> str:
 
 
 def ensure_columns(cur):
+    # In production (Postgres) the schema is provisioned by backend/migrate.py.
+    # Guard runtime DDL here to avoid executing SQLite-specific CREATE/ALTER statements
+    # against a Postgres adapter connection.
+    try:
+        if getattr(cur, "_is_postgres", False):
+            return
+    except Exception:
+        pass
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'OPERATIVO',
-        center_id INTEGER NOT NULL DEFAULT 0,
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
+    # Ensure SQLite schema exists (centralized in backend/migrate.py)
+    try:
+        try:
+            import migrate as _migrate
+        except Exception:
+            try:
+                from backend import migrate as _migrate
+            except Exception:
+                _migrate = None
+        if _migrate and hasattr(_migrate, "ensure_sqlite_schema"):
+            try:
+                _migrate.ensure_sqlite_schema(cur)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # CREATE TABLE `users` moved to backend/migrate.py (ensure_sqlite_schema)
     try:
         cur.execute("ALTER TABLE inventory_sessions ADD COLUMN responsible_user_id INTEGER NOT NULL DEFAULT 0")
     except Exception:
@@ -1345,7 +1594,7 @@ def ensure_columns(cur):
         cur.execute("ALTER TABLE orders ADD COLUMN responsible_name TEXT DEFAULT ''")
     except Exception:
         pass
-    cols_order_lines = {r["name"] for r in cur.execute("PRAGMA table_info(order_lines)").fetchall()}
+    cols_order_lines = set(get_table_columns_from_cursor(cur, "order_lines"))
     if 'is_checked' not in cols_order_lines:
         try:
             cur.execute("ALTER TABLE order_lines ADD COLUMN is_checked INTEGER NOT NULL DEFAULT 0")
@@ -1357,7 +1606,7 @@ def ensure_columns(cur):
         count_users = 0
     if not count_users:
         cur.execute("INSERT INTO users(name,role,center_id,is_active) VALUES('ADMIN GENERAL','ADMIN',0,1)")
-    cols_items = {r["name"] for r in cur.execute("PRAGMA table_info(items)").fetchall()}
+    cols_items = set(get_table_columns_from_cursor(cur, "items"))
     for col, defn in [("max_qty", "REAL NOT NULL DEFAULT 0"),
                       ("current_price", "REAL NOT NULL DEFAULT 0"),
                       ("waste_default_pct", "REAL NOT NULL DEFAULT 0"),
@@ -1378,134 +1627,18 @@ def ensure_columns(cur):
                 pass
     # TPV / ventas normalizadas: tablas neutrales para cualquier proveedor de TPV y tipo de negocio.
     # No conectan ningún TPV todavía; solo preparan el terreno para cargar ventas verificables.
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_integrations(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      provider_name TEXT NOT NULL DEFAULT '',
-      business_type TEXT NOT NULL DEFAULT 'restaurant',
-      status TEXT NOT NULL DEFAULT 'PLANNED',
-      config_json TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_sales_daily(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL,
-      business_type TEXT NOT NULL DEFAULT 'restaurant',
-      channel TEXT NOT NULL DEFAULT '',
-      tickets INTEGER NOT NULL DEFAULT 0,
-      covers INTEGER NOT NULL DEFAULT 0,
-      net_sales REAL NOT NULL DEFAULT 0,
-      gross_sales REAL NOT NULL DEFAULT 0,
-      source TEXT NOT NULL DEFAULT 'manual',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_sales_item_daily(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      recipe_name TEXT NOT NULL DEFAULT '',
-      pos_item_code TEXT NOT NULL DEFAULT '',
-      pos_item_name TEXT NOT NULL DEFAULT '',
-      qty_sold REAL NOT NULL DEFAULT 0,
-      net_sales REAL NOT NULL DEFAULT 0,
-      gross_sales REAL NOT NULL DEFAULT 0,
-      channel TEXT NOT NULL DEFAULT '',
-      business_type TEXT NOT NULL DEFAULT 'restaurant',
-      source TEXT NOT NULL DEFAULT 'manual',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
+        # CREATE TABLE `pos_integrations` moved to backend/migrate.py
+        # CREATE TABLE `pos_sales_daily` moved to backend/migrate.py
+        # CREATE TABLE `pos_sales_item_daily` moved to backend/migrate.py
     # TPV / modificadores: capa neutral para consumo realista por venta.
     # No modifica recetas maestras ni descuenta stock; prepara reglas y auditoría.
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS recipe_modifiers(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      code TEXT NOT NULL DEFAULT '',
-      name TEXT NOT NULL DEFAULT '',
-      modifier_type TEXT NOT NULL DEFAULT 'REVIEW',
-      action TEXT NOT NULL DEFAULT 'REVIEW',
-      item_id INTEGER NOT NULL DEFAULT 0,
-      subrecipe_id INTEGER NOT NULL DEFAULT 0,
-      qty_delta_base REAL NOT NULL DEFAULT 0,
-      unit_base TEXT NOT NULL DEFAULT 'g',
-      price_extra REAL NOT NULL DEFAULT 0,
-      affects_stock INTEGER NOT NULL DEFAULT 1,
-      confidence TEXT NOT NULL DEFAULT 'MANUAL',
-      notes TEXT NOT NULL DEFAULT '',
-      is_active INTEGER NOT NULL DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_modifier_map(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      provider_name TEXT NOT NULL DEFAULT '',
-      business_type TEXT NOT NULL DEFAULT '',
-      pos_modifier_name TEXT NOT NULL DEFAULT '',
-      normalized_code TEXT NOT NULL DEFAULT '',
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      modifier_id INTEGER NOT NULL DEFAULT 0,
-      action_status TEXT NOT NULL DEFAULT 'ACTIVE',
-      notes TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_sales_modifier_daily(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      recipe_name TEXT NOT NULL DEFAULT '',
-      pos_item_code TEXT NOT NULL DEFAULT '',
-      pos_item_name TEXT NOT NULL DEFAULT '',
-      pos_modifier_name TEXT NOT NULL DEFAULT '',
-      normalized_modifier_code TEXT NOT NULL DEFAULT '',
-      modifier_id INTEGER NOT NULL DEFAULT 0,
-      qty_sold REAL NOT NULL DEFAULT 0,
-      channel TEXT NOT NULL DEFAULT '',
-      business_type TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'REQUIERE_MAPEO',
-      confidence TEXT NOT NULL DEFAULT 'LOW',
-      source TEXT NOT NULL DEFAULT 'manual',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS pos_modifier_consumption_audit(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      sale_date TEXT NOT NULL,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      modifier_id INTEGER NOT NULL DEFAULT 0,
-      item_id INTEGER NOT NULL DEFAULT 0,
-      subrecipe_id INTEGER NOT NULL DEFAULT 0,
-      qty_delta_base REAL NOT NULL DEFAULT 0,
-      unit_base TEXT NOT NULL DEFAULT 'g',
-      status TEXT NOT NULL DEFAULT 'PREVIEW',
-      reason TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-    """)
-    for sql in [
-        "CREATE INDEX IF NOT EXISTS idx_recipe_modifiers_recipe ON recipe_modifiers(recipe_id,is_active)",
-        "CREATE INDEX IF NOT EXISTS idx_pos_modifier_map_norm ON pos_modifier_map(normalized_code,recipe_id,action_status)",
-        "CREATE INDEX IF NOT EXISTS idx_pos_sales_modifier_period ON pos_sales_modifier_daily(sale_date,center_id,recipe_id)",
-    ]:
-        try:
-            cur.execute(sql)
-        except Exception:
-            pass
+        # CREATE TABLE `recipe_modifiers` moved to backend/migrate.py
+        # CREATE TABLE `pos_modifier_map` moved to backend/migrate.py
+        # CREATE TABLE `pos_sales_modifier_daily` moved to backend/migrate.py
+        # CREATE TABLE `pos_modifier_consumption_audit` moved to backend/migrate.py
+    # Index creation moved to backend/migrate.py
 
-    cols_sup = {r["name"] for r in cur.execute("PRAGMA table_info(suppliers)").fetchall()}
+    cols_sup = set(get_table_columns_from_cursor(cur, "suppliers"))
     for col, defn in [("tax_id", "TEXT"), ("address", "TEXT"),
                       ("is_active", "INTEGER NOT NULL DEFAULT 1"),
                       ("created_at", "TEXT"),
@@ -1519,7 +1652,7 @@ def ensure_columns(cur):
                 cur.execute(f"ALTER TABLE suppliers ADD COLUMN {col} {defn}")
             except Exception:
                 pass
-    cols_rec = {r["name"] for r in cur.execute("PRAGMA table_info(recipes)").fetchall()}
+    cols_rec = set(get_table_columns_from_cursor(cur, "recipes"))
     for col, defn in [("is_subrecipe", "INTEGER NOT NULL DEFAULT 0"),
                       ("is_producible", "INTEGER NOT NULL DEFAULT 0"),
                       ("produced_item_id", "INTEGER NOT NULL DEFAULT 0"),
@@ -1555,7 +1688,7 @@ def ensure_columns(cur):
                 cur.execute(f"ALTER TABLE recipes ADD COLUMN {col} {defn}")
             except Exception:
                 pass
-    cols_ocr = {r["name"] for r in cur.execute("PRAGMA table_info(receipt_ocr_runs)").fetchall()}
+    cols_ocr = set(get_table_columns_from_cursor(cur, "receipt_ocr_runs"))
     for col, defn in [("supplier_name", "TEXT"), ("date_text", "TEXT"), ("line_count", "INTEGER DEFAULT 0"),
                       ("supplier_phone_raw", "TEXT"), ("supplier_email_raw", "TEXT"),
                       ("supplier_tax_id_raw", "TEXT"), ("supplier_address_raw", "TEXT")]:
@@ -1569,7 +1702,7 @@ def ensure_columns(cur):
         cur.execute("UPDATE recipes SET updated_at=COALESCE(updated_at, created_at, CURRENT_TIMESTAMP) WHERE updated_at IS NULL OR updated_at=''")
     except Exception:
         pass
-    cols_ing = {r["name"] for r in cur.execute("PRAGMA table_info(recipe_ingredients)").fetchall()}
+    cols_ing = set(get_table_columns_from_cursor(cur, "recipe_ingredients"))
     for col, defn in [("input_unit", "TEXT"), ("waste_pct_ing", "REAL NOT NULL DEFAULT 0"),
                       ("subrecipe_id", "INTEGER")]:
         if col not in cols_ing:
@@ -1578,68 +1711,14 @@ def ensure_columns(cur):
             except Exception:
                 pass
 
-    cur.execute("""CREATE TABLE IF NOT EXISTS inventory_sessions(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      warehouse_id INTEGER NOT NULL DEFAULT 0,
-      session_type TEXT NOT NULL DEFAULT 'MIXTO',
-      status TEXT NOT NULL DEFAULT 'DRAFT',
-      created_at TEXT NOT NULL,
-      note TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS inventory_counts(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL,
-      source_type TEXT NOT NULL DEFAULT 'raw',
-      item_id INTEGER NOT NULL DEFAULT 0,
-      item_name TEXT,
-      family_key TEXT NOT NULL DEFAULT '',
-      warehouse_id INTEGER NOT NULL DEFAULT 0,
-      theoretical_qty REAL NOT NULL DEFAULT 0,
-      physical_qty REAL NOT NULL DEFAULT 0,
-      count_unit TEXT NOT NULL DEFAULT 'ud',
-      is_checked INTEGER NOT NULL DEFAULT 0,
-      note TEXT,
-      unit_cost_snapshot REAL NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(session_id) REFERENCES inventory_sessions(id)
-    )""")
+        # CREATE TABLE `inventory_sessions` moved to backend/migrate.py
+        # CREATE TABLE `inventory_counts` moved to backend/migrate.py
 
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS waste_records(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      warehouse_id INTEGER NOT NULL DEFAULT 0,
-      responsible_user_id INTEGER NOT NULL DEFAULT 0,
-      responsible_name TEXT NOT NULL DEFAULT '',
-      source_type TEXT NOT NULL DEFAULT 'manual',
-      item_type TEXT NOT NULL DEFAULT 'unknown',
-      article_id INTEGER NOT NULL DEFAULT 0,
-      recipe_id INTEGER NOT NULL DEFAULT 0,
-      item_name_detected TEXT NOT NULL DEFAULT '',
-      qty REAL NOT NULL DEFAULT 0,
-      unit TEXT NOT NULL DEFAULT 'ud',
-      qty_base REAL NOT NULL DEFAULT 0,
-      base_unit TEXT NOT NULL DEFAULT '',
-      reason TEXT NOT NULL DEFAULT '',
-      notes TEXT NOT NULL DEFAULT '',
-      photo_path TEXT NOT NULL DEFAULT '',
-      voice_text_raw TEXT NOT NULL DEFAULT '',
-      image_text_raw TEXT NOT NULL DEFAULT '',
-      confidence REAL NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'REVIEW',
-      unit_cost_snapshot REAL NOT NULL DEFAULT 0,
-      total_cost_snapshot REAL NOT NULL DEFAULT 0,
-      movement_id INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      confirmed_at TEXT,
-      confirmed_by TEXT NOT NULL DEFAULT ''
-    )
-    """)
+        # CREATE TABLE `waste_records` moved to backend/migrate.py
 
     # productions.production_group (v8.7.198)
-    cols_prod = {r["name"] for r in cur.execute("PRAGMA table_info(productions)").fetchall()} if cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='productions'").fetchone() else set()
+    cols_prod = set(get_table_columns_from_cursor(cur, "productions")) if table_exists(cur, "productions") else set()
     if "production_group" not in cols_prod:
         try:
             cur.execute("ALTER TABLE productions ADD COLUMN production_group TEXT NOT NULL DEFAULT 'Otros'")
@@ -1664,89 +1743,18 @@ def ensure_columns(cur):
         "requires_payment_approval": "INTEGER NOT NULL DEFAULT 1",
     }.items():
         try:
-            cols_suppliers = {r["name"] for r in cur.execute("PRAGMA table_info(suppliers)").fetchall()}
+            cols_suppliers = set(get_table_columns_from_cursor(cur, "suppliers"))
             if col not in cols_suppliers:
                 cur.execute(f"ALTER TABLE suppliers ADD COLUMN {col} {ddl}")
         except Exception:
             pass
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS supplier_documents(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      supplier_id INTEGER NOT NULL DEFAULT 0,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      doc_type TEXT NOT NULL DEFAULT 'albaran',
-      doc_number TEXT NOT NULL DEFAULT '',
-      doc_date TEXT NOT NULL DEFAULT '',
-      period_month TEXT NOT NULL DEFAULT '',
-      original_filename TEXT NOT NULL DEFAULT '',
-      stored_path TEXT NOT NULL DEFAULT '',
-      file_sha256 TEXT NOT NULL DEFAULT '',
-      ocr_status TEXT NOT NULL DEFAULT 'PENDING',
-      reconciliation_status TEXT NOT NULL DEFAULT 'PENDING',
-      accounting_status TEXT NOT NULL DEFAULT 'PENDING',
-      payment_status TEXT NOT NULL DEFAULT 'NOT_APPLICABLE',
-      base_amount REAL NOT NULL DEFAULT 0,
-      vat_amount REAL NOT NULL DEFAULT 0,
-      total_amount REAL NOT NULL DEFAULT 0,
-      currency TEXT NOT NULL DEFAULT 'EUR',
-      notes TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS supplier_document_reconciliations(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      receipt_document_id INTEGER NOT NULL DEFAULT 0,
-      invoice_document_id INTEGER NOT NULL DEFAULT 0,
-      supplier_id INTEGER NOT NULL DEFAULT 0,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'PENDING',
-      base_diff REAL NOT NULL DEFAULT 0,
-      vat_diff REAL NOT NULL DEFAULT 0,
-      total_diff REAL NOT NULL DEFAULT 0,
-      warnings_json TEXT NOT NULL DEFAULT '[]',
-      approved_by TEXT NOT NULL DEFAULT '',
-      approved_at TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS supplier_payment_proposals(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      supplier_id INTEGER NOT NULL DEFAULT 0,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      invoice_document_id INTEGER NOT NULL DEFAULT 0,
-      reconciliation_id INTEGER NOT NULL DEFAULT 0,
-      due_date TEXT NOT NULL DEFAULT '',
-      amount REAL NOT NULL DEFAULT 0,
-      currency TEXT NOT NULL DEFAULT 'EUR',
-      payment_method TEXT NOT NULL DEFAULT '',
-      supplier_iban_masked TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'PROPOSED',
-      human_approval_required INTEGER NOT NULL DEFAULT 1,
-      approved_by TEXT NOT NULL DEFAULT '',
-      approved_at TEXT NOT NULL DEFAULT '',
-      bank_execution_ref TEXT NOT NULL DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-    """)
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS accounting_export_batches(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      period_from TEXT NOT NULL DEFAULT '',
-      period_to TEXT NOT NULL DEFAULT '',
-      supplier_id INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'DRAFT',
-      file_path TEXT NOT NULL DEFAULT '',
-      summary_json TEXT NOT NULL DEFAULT '{}',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      created_by TEXT NOT NULL DEFAULT ''
-    )
-    """)
+        # CREATE TABLE `supplier_documents` moved to backend/migrate.py
+        # CREATE TABLE `supplier_document_reconciliations` moved to backend/migrate.py
+        # CREATE TABLE `supplier_payment_proposals` moved to backend/migrate.py
+        # CREATE TABLE `accounting_export_batches` moved to backend/migrate.py
 
 def ensure_items_columns(cur):
-    cols = {r["name"] for r in cur.execute("PRAGMA table_info(items)").fetchall()}
+    cols = set(get_table_columns_from_cursor(cur, "items"))
     for col, defn in [("waste_default_pct", "REAL NOT NULL DEFAULT 0"),
                       ("current_price", "REAL NOT NULL DEFAULT 0"),
                       ("stock_area", "TEXT NOT NULL DEFAULT ''")]:
@@ -1804,10 +1812,44 @@ def merge_duplicate_items(cur):
                          int(existing["id"])),
                     )
                 else:
-                    cur.execute(
-                        "INSERT OR IGNORE INTO item_location_prefs(center_id,warehouse_id,item_id,min_qty,max_qty) VALUES(?,?,?,?,?)",
-                        (int(pr["center_id"]), int(pr["warehouse_id"]), canon_id, float(pr["min_qty"] or 0), float(pr["max_qty"] or 0)),
-                    )
+                    # Use Postgres UPSERT when available; otherwise emulate INSERT OR IGNORE
+                    center_id_val = int(pr["center_id"])
+                    warehouse_id_val = int(pr["warehouse_id"])
+                    min_val = float(pr["min_qty"] or 0)
+                    max_val = float(pr["max_qty"] or 0)
+                    if getattr(cur, "_is_postgres", False):
+                        try:
+                            cur.execute(
+                                "INSERT INTO item_location_prefs(center_id,warehouse_id,item_id,min_qty,max_qty) VALUES(%s,%s,%s,%s,%s) ON CONFLICT (center_id,warehouse_id,item_id) DO NOTHING",
+                                (center_id_val, warehouse_id_val, canon_id, min_val, max_val),
+                            )
+                        except Exception:
+                            # Fallback to safe SELECT->INSERT emulation
+                            try:
+                                exists2 = cur.execute(
+                                    'SELECT 1 FROM item_location_prefs WHERE center_id=? AND warehouse_id=? AND item_id=?',
+                                    (center_id_val, warehouse_id_val, canon_id),
+                                ).fetchone()
+                                if not exists2:
+                                    cur.execute(
+                                        'INSERT INTO item_location_prefs(center_id,warehouse_id,item_id,min_qty,max_qty) VALUES(?,?,?,?,?)',
+                                        (center_id_val, warehouse_id_val, canon_id, min_val, max_val),
+                                    )
+                            except Exception:
+                                pass
+                    else:
+                        try:
+                            exists2 = cur.execute(
+                                'SELECT 1 FROM item_location_prefs WHERE center_id=? AND warehouse_id=? AND item_id=?',
+                                (center_id_val, warehouse_id_val, canon_id),
+                            ).fetchone()
+                            if not exists2:
+                                cur.execute(
+                                    'INSERT INTO item_location_prefs(center_id,warehouse_id,item_id,min_qty,max_qty) VALUES(?,?,?,?,?)',
+                                    (center_id_val, warehouse_id_val, canon_id, min_val, max_val),
+                                )
+                        except Exception:
+                            pass
             cur.execute(f"DELETE FROM item_location_prefs WHERE item_id IN ({placeholders})", dup_ids)
         except Exception:
             pass
@@ -2086,145 +2128,40 @@ def _autoclassify_item_stock_areas(cur):
 def init_db():
     conn = db()
     cur = conn.cursor()
-    cur.executescript("""
-    CREATE TABLE IF NOT EXISTS centers(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-      kind TEXT NOT NULL DEFAULT 'RESTAURANT');
-    CREATE TABLE IF NOT EXISTS warehouses(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
-      name TEXT NOT NULL, FOREIGN KEY(center_id) REFERENCES centers(id));
-    CREATE TABLE IF NOT EXISTS items(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, unit TEXT NOT NULL,
-      min_qty REAL NOT NULL DEFAULT 0, max_qty REAL NOT NULL DEFAULT 0,
-      current_price REAL NOT NULL DEFAULT 0, waste_default_pct REAL NOT NULL DEFAULT 0,
-      stock_area TEXT NOT NULL DEFAULT '');
-    CREATE TABLE IF NOT EXISTS suppliers(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
-      phone TEXT, email TEXT, is_active INTEGER NOT NULL DEFAULT 1);
-    CREATE TABLE IF NOT EXISTS supplier_item_prices(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, supplier_id INTEGER NOT NULL,
-      item_id INTEGER NOT NULL, center_id INTEGER,
-      price_per_purchase REAL NOT NULL, purchase_unit TEXT NOT NULL,
-      purchase_to_base_factor REAL NOT NULL, is_preferred INTEGER NOT NULL DEFAULT 0,
-      updated_at TEXT NOT NULL,
-      FOREIGN KEY(supplier_id) REFERENCES suppliers(id),
-      FOREIGN KEY(item_id) REFERENCES items(id));
-    CREATE TABLE IF NOT EXISTS movements(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, movement_type TEXT NOT NULL,
-      item_id INTEGER NOT NULL, center_id INTEGER NOT NULL, warehouse_id INTEGER NOT NULL,
-      qty REAL NOT NULL, unit TEXT NOT NULL, note TEXT, created_at TEXT NOT NULL,
-      FOREIGN KEY(item_id) REFERENCES items(id));
-    CREATE TABLE IF NOT EXISTS item_location_prefs(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
-      warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL,
-      min_qty REAL NOT NULL DEFAULT 0, max_qty REAL NOT NULL DEFAULT 0,
-      UNIQUE(center_id, warehouse_id, item_id));
-    CREATE TABLE IF NOT EXISTS recipes(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, name TEXT NOT NULL,
-      category TEXT, subcategory TEXT, cost_supplier_id INTEGER,
-      waste_pct REAL NOT NULL DEFAULT 0, yield_portions REAL NOT NULL DEFAULT 1,
-      yield_final_qty REAL NOT NULL DEFAULT 0, yield_final_unit TEXT NOT NULL DEFAULT 'g',
-      contingency_pct REAL NOT NULL DEFAULT 0, target_food_cost_pct REAL NOT NULL DEFAULT 30,
-      target_margin_pct REAL NOT NULL DEFAULT 70, manual_price REAL NOT NULL DEFAULT 0,
-      suggested_price REAL NOT NULL DEFAULT 0, prep_steps TEXT, allergens TEXT,
-      is_subrecipe INTEGER NOT NULL DEFAULT 0, is_producible INTEGER NOT NULL DEFAULT 0, produced_item_id INTEGER NOT NULL DEFAULT 0, recipe_photo_path TEXT,
-      prep_time_min REAL NOT NULL DEFAULT 0, cook_time_min REAL NOT NULL DEFAULT 0,
-      rest_time_min REAL NOT NULL DEFAULT 0, labor_people REAL NOT NULL DEFAULT 0,
-      labor_hourly_cost REAL NOT NULL DEFAULT 0,
-      indirect_sales_base REAL NOT NULL DEFAULT 0,
-      indirect_rent_amount REAL NOT NULL DEFAULT 0, indirect_rent_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
-      indirect_services_amount REAL NOT NULL DEFAULT 0, indirect_services_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
-      indirect_admin_amount REAL NOT NULL DEFAULT 0, indirect_admin_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
-      indirect_marketing_amount REAL NOT NULL DEFAULT 0, indirect_marketing_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
-      indirect_other_amount REAL NOT NULL DEFAULT 0, indirect_other_tax_mode TEXT NOT NULL DEFAULT 'ex_vat',
-      salary_cost_amount REAL NOT NULL DEFAULT 0,
-      created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS recipe_ingredients(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, recipe_id INTEGER NOT NULL,
-      item_name TEXT NOT NULL, qty_gross REAL NOT NULL, qty_net REAL NOT NULL,
-      unit TEXT NOT NULL, item_id INTEGER, input_unit TEXT,
-      waste_pct_ing REAL NOT NULL DEFAULT 0, subrecipe_id INTEGER,
-      FOREIGN KEY(recipe_id) REFERENCES recipes(id));
-    CREATE TABLE IF NOT EXISTS productions(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
-      warehouse_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'DRAFT',
-      created_at TEXT NOT NULL, note TEXT);
-    CREATE TABLE IF NOT EXISTS production_lines(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, production_id INTEGER NOT NULL,
-      line_type TEXT NOT NULL, item_id INTEGER NOT NULL, qty_base REAL NOT NULL,
-      input_unit TEXT NOT NULL, qty_input REAL NOT NULL,
-      FOREIGN KEY(production_id) REFERENCES productions(id));
-    CREATE TABLE IF NOT EXISTS orders(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'DRAFT', created_at TEXT NOT NULL, note TEXT);
-    CREATE TABLE IF NOT EXISTS order_free_notes(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      order_id INTEGER NOT NULL DEFAULT 0,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      text TEXT NOT NULL DEFAULT '',
-      target_date TEXT NOT NULL DEFAULT '',
-      status TEXT NOT NULL DEFAULT 'IDEA',
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
-    CREATE TABLE IF NOT EXISTS inventory_sessions(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      center_id INTEGER NOT NULL DEFAULT 0,
-      warehouse_id INTEGER NOT NULL DEFAULT 0,
-      session_type TEXT NOT NULL DEFAULT 'MIXTO',
-      status TEXT NOT NULL DEFAULT 'DRAFT',
-      created_at TEXT NOT NULL,
-      note TEXT);
-    CREATE TABLE IF NOT EXISTS inventory_counts(
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      session_id INTEGER NOT NULL,
-      source_type TEXT NOT NULL DEFAULT 'raw',
-      item_id INTEGER NOT NULL DEFAULT 0,
-      item_name TEXT,
-      family_key TEXT NOT NULL DEFAULT '',
-      warehouse_id INTEGER NOT NULL DEFAULT 0,
-      theoretical_qty REAL NOT NULL DEFAULT 0,
-      physical_qty REAL NOT NULL DEFAULT 0,
-      count_unit TEXT NOT NULL DEFAULT 'ud',
-      is_checked INTEGER NOT NULL DEFAULT 0,
-      note TEXT,
-      unit_cost_snapshot REAL NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(session_id) REFERENCES inventory_sessions(id));
-    CREATE TABLE IF NOT EXISTS order_lines(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL,
-      warehouse_id INTEGER NOT NULL, item_id INTEGER NOT NULL,
-      qty_base REAL NOT NULL, input_unit TEXT NOT NULL, qty_input REAL NOT NULL,
-      supplier_id INTEGER,
-      FOREIGN KEY(order_id) REFERENCES orders(id));
-    CREATE TABLE IF NOT EXISTS receipts(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, center_id INTEGER NOT NULL,
-      warehouse_id INTEGER NOT NULL, supplier_id INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'PENDING', doc_number TEXT, doc_date TEXT,
-      note TEXT, created_at TEXT NOT NULL, validated_at TEXT);
-    CREATE TABLE IF NOT EXISTS receipt_lines(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL,
-      item_id INTEGER NOT NULL, qty_input REAL NOT NULL, input_unit TEXT NOT NULL,
-      factor REAL NOT NULL, qty_base REAL NOT NULL, price_unit REAL, line_total REAL,
-      FOREIGN KEY(receipt_id) REFERENCES receipts(id));
-    CREATE TABLE IF NOT EXISTS receipt_photos(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL,
-      file_path TEXT NOT NULL, created_at TEXT NOT NULL,
-      FOREIGN KEY(receipt_id) REFERENCES receipts(id));
-    CREATE TABLE IF NOT EXISTS receipt_ocr_runs(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, receipt_id INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'PENDING', supplier_raw TEXT,
-      doc_number_raw TEXT, doc_date_raw TEXT, supplier_phone_raw TEXT,
-      supplier_email_raw TEXT, supplier_tax_id_raw TEXT, supplier_address_raw TEXT,
-      summary TEXT, created_at TEXT NOT NULL,
-      FOREIGN KEY(receipt_id) REFERENCES receipts(id));
-    CREATE TABLE IF NOT EXISTS receipt_ocr_lines(
-      id INTEGER PRIMARY KEY AUTOINCREMENT, ocr_run_id INTEGER NOT NULL,
-      source_text TEXT, item_name_raw TEXT, qty_raw TEXT, unit_raw TEXT,
-      price_raw TEXT, amount_raw TEXT, discount_raw TEXT, vat_raw TEXT,
-      qty_basis_raw TEXT, qty_aux_raw TEXT, matched_item_id INTEGER,
-      matched_item_name TEXT, review_status TEXT NOT NULL DEFAULT 'PENDING',
-      created_at TEXT NOT NULL,
-      FOREIGN KEY(ocr_run_id) REFERENCES receipt_ocr_runs(id));
-    """)
+    # Do not perform runtime schema creation when running against Postgres.
+    # Schema provisioning should be performed via `backend/migrate.py` and
+    # applied before the app starts in production. The Postgres adapter will
+    # also conservatively skip SQLite-only tokens, but prefer an explicit no-op.
+    try:
+        if getattr(cur, '_is_postgres', False):
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            return
+    except Exception:
+        pass
+
+        # Centralized SQLite schema creation (moved to backend/migrate.py)
+        try:
+                try:
+                        import migrate as _migrate
+                except Exception:
+                        try:
+                                from backend import migrate as _migrate
+                        except Exception:
+                                _migrate = None
+                if _migrate and hasattr(_migrate, "ensure_sqlite_schema"):
+                        try:
+                                _migrate.ensure_sqlite_schema(conn)
+                        except Exception:
+                                pass
+        except Exception:
+                pass
     ensure_columns(cur)
     ensure_items_columns(cur)
 
@@ -2284,7 +2221,7 @@ def init_db():
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             ("REC-PRI-0001", "Solomillo a la plancha", "Principales", "Carne", 12, 5, 30, 70, 19.5, 20.0,
              "1. Porcionar.\n2. Salpimentar.\n3. Sellar.\n4. Mantequilla.\n5. Emplatar.", "Leche"))
-        r1 = cur.lastrowid
+        r1 = get_last_insert_id(cur)
         cur.executemany(
             "INSERT INTO recipe_ingredients(recipe_id,item_name,qty_gross,qty_net,unit) VALUES (?,?,?,?,?)",
             [(r1, "Solomillo", 220, 200, "g"), (r1, "Sal", 2, 2, "g"), (r1, "Mantequilla", 10, 10, "g")])
@@ -2555,7 +2492,8 @@ def _resolve_recipe_id(cur, recipe_id, recipe_query: str):
     nq = norm(q)
     if not nq:
         return None
-    rows = cur.execute("SELECT id,code,name,category,subcategory FROM recipes WHERE COALESCE(is_active,1)=1 ORDER BY name LIMIT 800").fetchall()
+    active_clause = db_truthy_sql("is_active", cur)
+    rows = cur.execute(f"SELECT id,code,name,category,subcategory FROM recipes WHERE {active_clause} ORDER BY name LIMIT 800").fetchall()
     best = None
     best_score = 0.0
     q_tokens = set(nq.split())
@@ -2603,7 +2541,7 @@ def apply_startup_business_corrections():
         return re.sub(r'\s+', ' ', s).strip()
     try:
         conn = db(); cur = conn.cursor(); ensure_columns(cur)
-        cols = {r['name'] for r in cur.execute('PRAGMA table_info(items)').fetchall()}
+        cols = set(get_table_columns_from_cursor(cur, 'items'))
         rows = cur.execute('SELECT id,name,unit,min_qty,max_qty FROM items').fetchall()
         for r in rows:
             name_n = _n(r['name'])
@@ -2772,11 +2710,21 @@ def get_production_stocks(cur, center_id=None):
                             AND m.item_id=i.id
       {center_where}
      GROUP BY c.id, c.name, w.id, w.name, i.id, i.name, i.unit, i.current_price
-    HAVING ABS(COALESCE(SUM(CASE
-               WHEN m.movement_type IN ('ENTRADA','IN')  THEN m.qty
-               WHEN m.movement_type IN ('SALIDA','OUT')  THEN -m.qty
-               ELSE 0 END), 0)) > 0.000001
-        OR last_prod_id IS NOT NULL
+        HAVING ABS(COALESCE(SUM(CASE
+                             WHEN m.movement_type IN ('ENTRADA','IN')  THEN m.qty
+                             WHEN m.movement_type IN ('SALIDA','OUT')  THEN -m.qty
+                             ELSE 0 END), 0)) > 0.000001
+                OR (
+                     SELECT p.id
+                         FROM productions p
+                         JOIN production_lines pl ON pl.production_id=p.id
+                        WHERE UPPER(COALESCE(p.status,'')) IN ('CONFIRMED','CONFIRMADA','CONFIRMADO','ARCHIVED','ARCHIVADA','ARCHIVADO')
+                            AND UPPER(COALESCE(pl.line_type,'')) IN ('IN','ENTRADA','PRODUCCION','PRODUCCIÓN')
+                            AND pl.item_id=i.id
+                            AND p.center_id=c.id
+                            AND p.warehouse_id=w.id
+                        ORDER BY p.id DESC LIMIT 1
+                ) IS NOT NULL
      ORDER BY c.name, w.name, i.name
     """
 

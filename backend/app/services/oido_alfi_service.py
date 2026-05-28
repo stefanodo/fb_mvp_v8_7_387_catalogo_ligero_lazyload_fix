@@ -10,7 +10,7 @@ import unicodedata
 from datetime import date, timedelta
 from typing import Any
 
-from app.core import db
+from app.core import db, db_truthy_sql
 
 _DAY_NAMES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
@@ -112,15 +112,18 @@ def _find_supplier(cur, name: str):
     key = _norm(name)
     if not key:
         return None
+    active_clause = db_truthy_sql('is_active', cur)
+    # Use a DB-agnostic alias for `is_active` that yields 1/0 consistently
+    active_alias = f"CASE WHEN {active_clause} THEN 1 ELSE 0 END AS is_active"
     rows = cur.execute(
-        """SELECT id,name,phone,email,COALESCE(delivery_days,'') delivery_days,
+        f"""SELECT id,name,phone,email,COALESCE(delivery_days,'') delivery_days,
                   COALESCE(delivery_min_order_amount,0) delivery_min_order_amount,
                   COALESCE(delivery_min_tax_mode,'ex_vat') delivery_min_tax_mode,
                   COALESCE(delivery_lead_time_days,0) delivery_lead_time_days,
                   COALESCE(delivery_notes,'') delivery_notes,
-                  COALESCE(is_active,1) is_active
+                  {active_alias}
              FROM suppliers
-            WHERE COALESCE(is_active,1)=1
+            WHERE {active_clause}
             ORDER BY name"""
     ).fetchall()
     exact = [r for r in rows if _norm(r["name"]) == key]

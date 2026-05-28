@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.core import ensure_columns, get_unit_factor, _parse_float
+from app.core import ensure_columns, get_unit_factor, _parse_float, safe_insert_returning
 from app.services.productions_service import get_draft_production, resolve_line_payload
 
 
@@ -27,11 +27,16 @@ def add_manual_line(cur, production_id: int, line_type: str, item_id: str = "", 
             (new_qty_base, new_qty_input, int(existing["id"]), production_id),
         )
         return {"center_id": p["center_id"], "line_id": int(existing["id"])}
-    cur.execute(
-        "INSERT INTO production_lines(production_id,line_type,item_id,qty_base,input_unit,qty_input) VALUES(?,?,?,?,?,?)",
+    # Insert production line in a DB-agnostic way
+    sqlite_sql = "INSERT INTO production_lines(production_id,line_type,item_id,qty_base,input_unit,qty_input) VALUES(?,?,?,?,?,?)"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    line_id = safe_insert_returning(
+        cur,
+        sqlite_sql,
         (production_id, line_type, payload["item_id"], payload["qty_base"], payload["input_unit"], payload["qty_input"]),
-    )
-    return {"center_id": p["center_id"], "line_id": int(cur.lastrowid)}
+        pg_sql=pg_sql,
+    ) or 0
+    return {"center_id": p["center_id"], "line_id": int(line_id)}
 
 
 def update_line_qty(cur, production_id: int, line_id: int, qty_value: str, qty_unit: str) -> dict | None:

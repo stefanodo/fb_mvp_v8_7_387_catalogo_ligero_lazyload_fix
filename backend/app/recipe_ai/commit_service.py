@@ -3,6 +3,7 @@ import json, sqlite3, os, time
 from typing import Optional
 from .models import ImportedRecipeDraft, RecipeImportStatus, RecipeCostStatus
 from .storage_service import get_connection, get_imported_recipe_draft, update_draft_status, add_audit_log, row_to_dict
+from app.core import get_table_columns_from_cursor, safe_insert_returning, table_exists as core_table_exists
 
 class RecipeCommitResult:
     def __init__(self, ok: bool, recipe_id: Optional[int] = None, errors: Optional[list[str]] = None, warnings: Optional[list[str]] = None):
@@ -10,7 +11,7 @@ class RecipeCommitResult:
     def to_dict(self) -> dict: return {"ok": self.ok, "recipe_id": self.recipe_id, "errors": self.errors, "warnings": self.warnings}
 
 def table_exists(conn, table_name):
-    return conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)).fetchone() is not None
+    return core_table_exists(conn, table_name)
 
 def detect_real_recipe_tables(conn):
     for c in [{"recipes":"recipes","ingredients":"recipe_ingredients"},{"recipes":"recetas","ingredients":"receta_ingredientes"},{"recipes":"fichas_tecnicas","ingredients":"ficha_tecnica_ingredientes"}]:
@@ -29,7 +30,12 @@ def validate_draft_before_commit(draft: ImportedRecipeDraft) -> list[str]:
         if ing.ingredient_type == "SUBRECETA" and not ing.matched_subrecipe_id: errors.append(f"Línea {idx}: {ing.normalized_name} sin subreceta.")
     return errors
 
-def get_table_columns(conn, table_name): return {r["name"] for r in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+def get_table_columns(conn, table_name):
+    try:
+        cur = conn.cursor()
+        return get_table_columns_from_cursor(cur, table_name)
+    except Exception:
+        return set()
 def maybe_set(values, columns, name, value):
     if name in columns: values[name] = value
 
@@ -80,8 +86,38 @@ def insert_header(conn, table, draft, actor=None):
     maybe_set(values, cols, "updated_at", time.strftime("%Y-%m-%d %H:%M:%S"))
     if not values: raise RuntimeError(f"No se pudo mapear tabla {table}.")
     fields = list(values)
-    cur = conn.execute(f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({', '.join(['?']*len(fields))})", [values[f] for f in fields])
-    return int(cur.lastrowid)
+    vals = [values[f] for f in fields]
+    # Insert header and obtain id DB-agnostically
+    cur2 = conn.cursor()
+    sqlite_sql = f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({', '.join(['?']*len(fields))})"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    try:
+        rid = safe_insert_returning(cur2, sqlite_sql, tuple(vals), pg_sql=pg_sql)
+        if rid is not None:
+            return int(rid)
+    except Exception:
+        pass
+    # Retry using an explicit cursor with the safe helper; avoid raw INSERT+SELECT fallbacks.
+    try:
+        cur = conn.cursor()
+        rid2 = safe_insert_returning(cur, sqlite_sql, tuple(vals), pg_sql=pg_sql)
+        return int(rid2 or 0)
+    except Exception:
+        # Deterministic lookup by code as last resort (no raw insert performed here)
+        try:
+            if 'code' in fields:
+                idx = fields.index('code')
+                code_val = vals[idx]
+                row = conn.execute(f"SELECT id FROM {table} WHERE code=? ORDER BY id DESC LIMIT 1", (code_val,)).fetchone()
+                if row:
+                    return int(row['id'])
+        except Exception:
+            pass
+        try:
+            cur = conn.cursor()
+            return int(getattr(cur, 'lastrowid', 0) or 0)
+        except Exception:
+            return 0
 
 
 def insert_ingredients(conn, table, recipe_id, draft):
@@ -101,7 +137,15 @@ def insert_ingredients(conn, table, recipe_id, draft):
         for c in ["merma_percent","waste_percent","waste_pct_ing"]: maybe_set(values, cols, c, ing.waste_percent or 0)
         if not values: raise RuntimeError(f"No se pudo mapear ingredientes en {table}.")
         fields = list(values)
-        conn.execute(f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({', '.join(['?']*len(fields))})", [values[f] for f in fields])
+        vals = [values[f] for f in fields]
+        try:
+            cur2 = conn.cursor()
+            if getattr(cur2, "_is_postgres", False):
+                cur2.execute(f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({', '.join(['?']*len(fields))})", vals)
+                continue
+        except Exception:
+            pass
+        conn.execute(f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({', '.join(['?']*len(fields))})", vals)
 
 
 def commit_imported_draft_to_master_recipe(db_path: str, draft_id: int, actor: Optional[str] = None) -> RecipeCommitResult:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from collections import OrderedDict
 
-from app.core import _parse_float, _resolve_recipe_id, _canonical_unit, _convert_qty, _collect_recipe_production_inputs, _merge_or_insert_production_line, _unit_factor
+from app.core import _parse_float, _resolve_recipe_id, _canonical_unit, _convert_qty, _collect_recipe_production_inputs, _merge_or_insert_production_line, _unit_factor, safe_insert_returning
 
 
 def _parse_charge_summary(note: str = "") -> OrderedDict[str, int]:
@@ -37,11 +37,15 @@ def create_draft_production(cur, center_id: int, warehouse_id: int, note: str = 
     if not wh or int(wh['center_id'] or 0) != int(center_id or 0):
         raise ValueError(f'warehouse_id={warehouse_id} no pertenece a center_id={center_id}')
     now = datetime.utcnow().isoformat()
-    cur.execute(
-        "INSERT INTO productions(center_id,warehouse_id,status,created_at,note,production_group) VALUES(?,?,'DRAFT',?,?,?)",
+    # Insert production and return id in a DB-agnostic way
+    sqlite_sql = "INSERT INTO productions(center_id,warehouse_id,status,created_at,note,production_group) VALUES(?,?,'DRAFT',?,?,?)"
+    pg_sql = sqlite_sql.replace('?', '%s')
+    return safe_insert_returning(
+        cur,
+        sqlite_sql,
         (center_id, warehouse_id, now, (note or "").strip(), (production_group or "Otros").strip() or "Otros"),
-    )
-    return int(cur.lastrowid)
+        pg_sql=pg_sql,
+    ) or 0
 
 
 def load_recipe_into_production(cur, production_id: int, recipe_id: str = "", recipe_query: str = "", multiplier: str = "1", target_unit: str = "lotes", append_note: bool = True) -> dict | None:

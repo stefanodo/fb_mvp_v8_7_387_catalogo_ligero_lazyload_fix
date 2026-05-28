@@ -42,19 +42,35 @@ for dbp in paths:
     shutil.copy2(dbp, backup)
     conn=sqlite3.connect(dbp)
     cur=conn.cursor()
-    tables=[r[0] for r in cur.execute("select name from sqlite_master where type='table'")]
+
+    def table_exists(cur, name):
+        try:
+            cur.execute(f"PRAGMA table_info({name})")
+            return cur.fetchone() is not None
+        except Exception:
+            try:
+                cur.execute("SELECT 1 FROM information_schema.tables WHERE table_name=%s", (name,))
+                return cur.fetchone() is not None
+            except Exception:
+                return False
+
     deleted={}
     for t in ['operational_queue_contributions','operational_queue_items','order_lines','orders','production_lines','productions','movements']:
-        if t in tables:
+        if table_exists(cur, t):
             try:
                 deleted[t]=cur.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
                 cur.execute(f'DELETE FROM {t}')
             except Exception as exc:
                 deleted[t]=f'ERROR {exc}'
-    if 'sqlite_sequence' in tables:
+    # Reset sqlite_sequence entries if present (sqlite only)
+    try:
         for t in ['operational_queue_contributions','operational_queue_items','order_lines','orders','production_lines','productions','movements']:
-            try: cur.execute('DELETE FROM sqlite_sequence WHERE name=?',(t,))
-            except Exception: pass
+            try:
+                cur.execute('DELETE FROM sqlite_sequence WHERE name=?',(t,))
+            except Exception:
+                pass
+    except Exception:
+        pass
     conn.commit()
     # Verificación
     checks={}

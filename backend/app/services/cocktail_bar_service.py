@@ -2,32 +2,36 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
+from typing import Any, Dict, List, Optional
+
+import sqlite3
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from app.core import db, safe_insert_returning, get_table_columns_from_cursor
 
-from app.core import db
-
-DEMO_BUSINESS_ID = 'demo_bar_business'
-DEMO_RESTAURANT_ID = 'demo_bar_local'
-DEMO_BAR_ID = 'demo_main_bar'
-DEMO_PROVIDER = 'Proveedor Bar Demo'
+# Demo constants for non-productive demo data
+DEMO_BUSINESS_ID = 99999999
+DEMO_RESTAURANT_ID = 999999
+DEMO_BAR_ID = 9999
+DEMO_PROVIDER = 'Proveedor Demo'
 
 
 def _now() -> str:
-    return datetime.utcnow().isoformat(timespec='seconds')
+    return datetime.now().isoformat(timespec="seconds")
 
 
-def _j(v: Any) -> str:
-    return json.dumps(v, ensure_ascii=False, sort_keys=True)
+def _j(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False)
 
 
-def _norm(value: str) -> str:
-    txt = str(value or '').strip().lower()
-    import unicodedata
-    txt = unicodedata.normalize('NFKD', txt)
-    txt = ''.join(ch for ch in txt if not unicodedata.combining(ch))
-    txt = re.sub(r'[^a-z0-9]+', ' ', txt)
-    return ' '.join(txt.split())
+def _norm(txt: str) -> str:
+    txt = str(txt or "")
+    txt = txt.strip().lower()
+    txt = unicodedata.normalize("NFKD", txt)
+    txt = "".join(ch for ch in txt if not unicodedata.combining(ch))
+    txt = re.sub(r"[^a-z0-9]+", " ", txt)
+    txt = re.sub(r"(.)\1{1,}", r"\1", txt)
+    return " ".join(txt.split())
 
 
 
@@ -99,253 +103,10 @@ def _safe_float(v: Any, default: float = 0.0) -> float:
 
 
 def ensure_bar_schema(cur) -> None:
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_businesses(
-        business_id TEXT PRIMARY KEY,
-        business_name TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        data_scope TEXT DEFAULT 'demo',
-        created_at TEXT,
-        updated_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_locations(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        restaurant_name TEXT,
-        bar_id TEXT,
-        bar_name TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        active INTEGER DEFAULT 1,
-        created_at TEXT,
-        updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id)
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_items(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        code TEXT,
-        name TEXT,
-        normalized_name TEXT,
-        item_type TEXT,
-        family TEXT,
-        base_unit TEXT,
-        purchase_unit TEXT,
-        purchase_qty REAL DEFAULT 0,
-        purchase_price_2025 REAL DEFAULT 0,
-        purchase_price_2026 REAL DEFAULT 0,
-        cost_per_base_unit_2026 REAL DEFAULT 0,
-        standard_waste_percent REAL DEFAULT 0,
-        juice_yield_percent REAL DEFAULT NULL,
-        juice_cost_per_ml_2026 REAL DEFAULT NULL,
-        supplier_name_demo TEXT,
-        min_stock REAL DEFAULT 0,
-        max_stock REAL DEFAULT 0,
-        location TEXT,
-        active INTEGER DEFAULT 1,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        data_scope TEXT DEFAULT 'demo',
-        created_at TEXT,
-        updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,normalized_name)
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_stock_movements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        bar_item_id INTEGER,
-        movement_type TEXT,
-        qty REAL DEFAULT 0,
-        unit TEXT,
-        document_code TEXT,
-        source_module TEXT,
-        responsible_name TEXT,
-        movement_datetime TEXT,
-        notes TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        created_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_productions(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        code TEXT,
-        name TEXT,
-        production_type TEXT,
-        yield_qty REAL DEFAULT 0,
-        yield_unit TEXT,
-        cost_total_2026 REAL DEFAULT 0,
-        cost_per_unit_2026 REAL DEFAULT 0,
-        standard_waste_percent REAL DEFAULT 0,
-        shelf_life_days INTEGER DEFAULT 0,
-        lot TEXT,
-        responsible TEXT,
-        storage_location TEXT,
-        procedure_text TEXT,
-        status TEXT,
-        stock_actual REAL DEFAULT 0,
-        used_in_recipes TEXT,
-        es_vendible INTEGER DEFAULT 0,
-        sale_price REAL DEFAULT NULL,
-        notes TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        data_scope TEXT DEFAULT 'demo',
-        created_at TEXT,
-        updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,code)
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_production_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        bar_production_id INTEGER,
-        bar_item_id INTEGER,
-        item_name TEXT,
-        qty_net REAL DEFAULT 0,
-        unit TEXT,
-        waste_percent REAL DEFAULT 0,
-        qty_gross REAL DEFAULT 0,
-        cost_unit_2026 REAL DEFAULT 0,
-        cost_total_net_2026 REAL DEFAULT 0,
-        cost_total_gross_2026 REAL DEFAULT 0,
-        notes TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_production_stock_movements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        bar_production_id INTEGER,
-        movement_type TEXT,
-        qty REAL DEFAULT 0,
-        unit TEXT,
-        source_module TEXT,
-        responsible_name TEXT,
-        movement_datetime TEXT,
-        notes TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        created_at TEXT
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS cocktail_recipes(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        code TEXT,
-        name TEXT,
-        category TEXT,
-        cocktail_type TEXT,
-        glass_type TEXT,
-        serving_size_ml REAL DEFAULT 0,
-        yield_qty REAL DEFAULT 1,
-        yield_unit TEXT,
-        alcohol_percentage_estimated REAL DEFAULT 0,
-        difficulty TEXT,
-        preparation_time_minutes REAL DEFAULT 0,
-        seasonality TEXT,
-        sale_price REAL DEFAULT 0,
-        suggested_price REAL DEFAULT 0,
-        target_margin_percent REAL DEFAULT 0,
-        contingency_percent REAL DEFAULT 0,
-        cost_2025_orientative REAL DEFAULT 0,
-        cost_2026_net REAL DEFAULT 0,
-        cost_2026_gross_with_waste REAL DEFAULT 0,
-        margin_percent_2026 REAL DEFAULT 0,
-        cost_per_ml REAL DEFAULT 0,
-        contains_alcohol INTEGER DEFAULT 1,
-        allergens_json TEXT,
-        warnings_json TEXT,
-        photo_path TEXT,
-        notes TEXT,
-        status TEXT,
-        active INTEGER DEFAULT 1,
-        created_by TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        data_scope TEXT DEFAULT 'demo',
-        created_at TEXT,
-        updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,code)
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS cocktail_recipe_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cocktail_recipe_id INTEGER,
-        origin TEXT,
-        bar_item_id INTEGER,
-        bar_production_id INTEGER,
-        ingredient_name TEXT,
-        qty_net REAL DEFAULT 0,
-        unit TEXT,
-        waste_percent REAL DEFAULT 0,
-        qty_gross REAL DEFAULT 0,
-        cost_unit_2026 REAL DEFAULT 0,
-        cost_total_net_2026 REAL DEFAULT 0,
-        cost_total_gross_2026 REAL DEFAULT 0,
-        supplier_name_demo TEXT,
-        stock_available REAL DEFAULT 0,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS cocktail_recipe_steps(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cocktail_recipe_id INTEGER,
-        step_number INTEGER,
-        instruction TEXT,
-        demo_data INTEGER DEFAULT 0
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS cocktail_cost_history(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        cocktail_recipe_id INTEGER,
-        cost_per_serving_net_2026 REAL DEFAULT 0,
-        cost_per_serving_gross_2026 REAL DEFAULT 0,
-        sale_price REAL DEFAULT 0,
-        margin_percent REAL DEFAULT 0,
-        calculated_at TEXT,
-        source TEXT,
-        notes TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_alerts(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        alert_code TEXT,
-        alert_text TEXT,
-        severity TEXT,
-        blocking INTEGER DEFAULT 0,
-        active INTEGER DEFAULT 1,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        created_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,alert_code)
-    )''')
-    cur.execute('''CREATE TABLE IF NOT EXISTS bar_tpv_mappings(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT,
-        restaurant_id TEXT,
-        bar_id TEXT,
-        cocktail_recipe_id INTEGER,
-        product_name_raw TEXT,
-        product_code_raw TEXT,
-        mapping_status TEXT,
-        connection_status TEXT,
-        demo_data INTEGER DEFAULT 0,
-        non_productive_demo INTEGER DEFAULT 0,
-        created_at TEXT,
-        updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,product_code_raw)
-    )''')
+    # Schema for cocktail/bar features is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
+    return
 
 
 def _qty_gross(qty_net: float, waste_percent: float) -> float:
@@ -415,12 +176,16 @@ def _upsert_item(cur, row) -> int:
     now = _now()
     code,name,item_type,family,base_unit,purchase_unit,purchase_qty,p25,p26,cost,waste,juice_yield,juice_cost,min_stock,max_stock,location = row
     norm = _norm(name)
-    cur.execute('''INSERT INTO bar_items(business_id,restaurant_id,bar_id,code,name,normalized_name,item_type,family,base_unit,purchase_unit,purchase_qty,purchase_price_2025,purchase_price_2026,cost_per_base_unit_2026,standard_waste_percent,juice_yield_percent,juice_cost_per_ml_2026,supplier_name_demo,min_stock,max_stock,location,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
+    sqlite_sql = '''INSERT INTO bar_items(business_id,restaurant_id,bar_id,code,name,normalized_name,item_type,family,base_unit,purchase_unit,purchase_qty,purchase_price_2025,purchase_price_2026,cost_per_base_unit_2026,standard_waste_percent,juice_yield_percent,juice_cost_per_ml_2026,supplier_name_demo,min_stock,max_stock,location,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name) DO UPDATE SET code=excluded.code,item_type=excluded.item_type,family=excluded.family,base_unit=excluded.base_unit,purchase_unit=excluded.purchase_unit,purchase_qty=excluded.purchase_qty,purchase_price_2025=excluded.purchase_price_2025,purchase_price_2026=excluded.purchase_price_2026,cost_per_base_unit_2026=excluded.cost_per_base_unit_2026,standard_waste_percent=excluded.standard_waste_percent,juice_yield_percent=excluded.juice_yield_percent,juice_cost_per_ml_2026=excluded.juice_cost_per_ml_2026,min_stock=excluded.min_stock,max_stock=excluded.max_stock,location=excluded.location,active=1,demo_data=1,non_productive_demo=1,updated_at=excluded.updated_at''',
-                (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,norm,item_type,family,base_unit,purchase_unit,purchase_qty,p25,p26,cost,waste,juice_yield,juice_cost,DEMO_PROVIDER,min_stock,max_stock,location,1,1,1,'demo',now,now))
-    r = cur.execute('SELECT id FROM bar_items WHERE business_id=? AND restaurant_id=? AND bar_id=? AND normalized_name=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,norm)).fetchone()
-    return int(r['id'])
+                   ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name) DO UPDATE SET code=excluded.code,item_type=excluded.item_type,family=excluded.family,base_unit=excluded.base_unit,purchase_unit=excluded.purchase_unit,purchase_qty=excluded.purchase_qty,purchase_price_2025=excluded.purchase_price_2025,purchase_price_2026=excluded.purchase_price_2026,cost_per_base_unit_2026=excluded.cost_per_base_unit_2026,standard_waste_percent=excluded.standard_waste_percent,juice_yield_percent=excluded.juice_yield_percent,juice_cost_per_ml_2026=excluded.juice_cost_per_ml_2026,min_stock=excluded.min_stock,max_stock=excluded.max_stock,location=excluded.location,active=1,demo_data=1,non_productive_demo=1,updated_at=excluded.updated_at'''
+    params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,norm,item_type,family,base_unit,purchase_unit,purchase_qty,p25,p26,cost,waste,juice_yield,juice_cost,DEMO_PROVIDER,min_stock,max_stock,location,1,1,1,'demo',now,now)
+    pg_sql = sqlite_sql.replace('?', '%s')
+    rid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
+    if not rid:
+        r = cur.execute('SELECT id FROM bar_items WHERE business_id=? AND restaurant_id=? AND bar_id=? AND normalized_name=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,norm)).fetchone()
+        return int(r['id']) if r else 0
+    return int(rid)
 
 
 def _item_by_name(cur, name: str):
@@ -434,9 +199,15 @@ def _prod_by_code(cur, code: str):
 def load_cocktail_bar_demo() -> Dict[str, Any]:
     conn = db(); cur = conn.cursor(); ensure_bar_schema(cur); now = _now()
     try:
-        cur.execute('INSERT OR REPLACE INTO bar_businesses(business_id,business_name,demo_data,non_productive_demo,data_scope,created_at,updated_at) VALUES(?,?,?,?,?,?,?)', (DEMO_BUSINESS_ID,'Negocio Demo Coctelería',1,1,'demo',now,now))
-        cur.execute('''INSERT INTO bar_locations(business_id,restaurant_id,restaurant_name,bar_id,bar_name,demo_data,non_productive_demo,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)
-                       ON CONFLICT(business_id,restaurant_id,bar_id) DO UPDATE SET restaurant_name=excluded.restaurant_name,bar_name=excluded.bar_name,demo_data=1,non_productive_demo=1,active=1,updated_at=excluded.updated_at''', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,'Local Demo Barra',DEMO_BAR_ID,'Barra Principal Demo',1,1,1,now,now))
+        params = (DEMO_BUSINESS_ID, 'Negocio Demo Coctelería', 1, 1, 'demo', now, now)
+        # Use DB-agnostic helper so Postgres gets `RETURNING id` and SQLite uses qmark-style SQL.
+        sqlite_sql = 'INSERT INTO bar_businesses(business_id,business_name,demo_data,non_productive_demo,data_scope,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(business_id) DO UPDATE SET business_name=excluded.business_name,demo_data=1,non_productive_demo=1,data_scope=excluded.data_scope,updated_at=excluded.updated_at'
+        pg_sql = sqlite_sql.replace('?', '%s')
+        _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
+
+        sqlite_sql = '''INSERT INTO bar_locations(business_id,restaurant_id,restaurant_name,bar_id,bar_name,demo_data,non_productive_demo,active,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(business_id,restaurant_id,bar_id) DO UPDATE SET restaurant_name=excluded.restaurant_name,bar_name=excluded.bar_name,demo_data=1,non_productive_demo=1,active=1,updated_at=excluded.updated_at'''
+        pg_sql = sqlite_sql.replace('?', '%s')
+        _ = safe_insert_returning(cur, sqlite_sql, (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,'Local Demo Barra',DEMO_BAR_ID,'Barra Principal Demo',1,1,1,now,now), pg_sql=pg_sql)
         item_ids = {}
         for row in ITEMS:
             item_ids[row[1]] = _upsert_item(cur, row)
@@ -453,11 +224,13 @@ def load_cocktail_bar_demo() -> Dict[str, Any]:
                 it=_item_by_name(cur,iname); cost=float(it['cost_per_base_unit_2026'] if it else 0)
                 qg=_qty_gross(qty,lwaste); net=float(qty)*cost; gross=qg*cost; total += gross
                 line_calc.append((it, iname, qty, unit, lwaste, qg, cost, net, gross))
-            cpu = total / float(yqty or 1)
-            cur.execute('''INSERT INTO bar_productions(business_id,restaurant_id,bar_id,code,name,production_type,yield_qty,yield_unit,cost_total_2026,cost_per_unit_2026,standard_waste_percent,shelf_life_days,lot,responsible,storage_location,procedure_text,status,stock_actual,used_in_recipes,es_vendible,sale_price,notes,demo_data,non_productive_demo,data_scope,created_at,updated_at)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                           ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,production_type=excluded.production_type,yield_qty=excluded.yield_qty,yield_unit=excluded.yield_unit,cost_total_2026=excluded.cost_total_2026,cost_per_unit_2026=excluded.cost_per_unit_2026,standard_waste_percent=excluded.standard_waste_percent,shelf_life_days=excluded.shelf_life_days,responsible=excluded.responsible,storage_location=excluded.storage_location,procedure_text=excluded.procedure_text,status=excluded.status,stock_actual=excluded.stock_actual,used_in_recipes=excluded.used_in_recipes,es_vendible=0,sale_price=NULL,notes=excluded.notes,demo_data=1,non_productive_demo=1,updated_at=excluded.updated_at''',
-                        (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,ptype,yqty,yunit,total,cpu,waste,shelf,f"DEMO-{code}",'Sistema Demo',loc,'\n'.join(f"{i+1}. {s}" for i,s in enumerate(steps)),'plantilla_demo',yqty,'',0,None,notes,1,1,'demo',now,now))
+                cpu = total / float(yqty or 1)
+                sqlite_sql = '''INSERT INTO bar_productions(business_id,restaurant_id,bar_id,code,name,production_type,yield_qty,yield_unit,cost_total_2026,cost_per_unit_2026,standard_waste_percent,shelf_life_days,lot,responsible,storage_location,procedure_text,status,stock_actual,used_in_recipes,es_vendible,sale_price,notes,demo_data,non_productive_demo,data_scope,created_at,updated_at)
+                                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                                    ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,production_type=excluded.production_type,yield_qty=excluded.yield_qty,yield_unit=excluded.yield_unit,cost_total_2026=excluded.cost_total_2026,cost_per_unit_2026=excluded.cost_per_unit_2026,standard_waste_percent=excluded.standard_waste_percent,shelf_life_days=excluded.shelf_life_days,responsible=excluded.responsible,storage_location=excluded.storage_location,procedure_text=excluded.procedure_text,status=excluded.status,stock_actual=excluded.stock_actual,used_in_recipes=excluded.used_in_recipes,es_vendible=0,sale_price=NULL,notes=excluded.notes,demo_data=1,non_productive_demo=1,updated_at=excluded.updated_at'''
+                params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,ptype,yqty,yunit,total,cpu,waste,shelf,f"DEMO-{code}",'Sistema Demo',loc,'\n'.join(f"{i+1}. {s}" for i,s in enumerate(steps)),'plantilla_demo',yqty,'',0,None,notes,1,1,'demo',now,now)
+                pg_sql = sqlite_sql.replace('?', '%s')
+                _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
             prod=_prod_by_code(cur,code); pid=int(prod['id']); prod_count+=1
             cur.execute('DELETE FROM bar_production_lines WHERE bar_production_id=?', (pid,))
             for it,iname,qty,unit,lwaste,qg,cost,net,gross in line_calc:
@@ -467,11 +240,16 @@ def load_cocktail_bar_demo() -> Dict[str, Any]:
         recipe_count=0; line_count=0; step_count=0
         for rec in RECIPES:
             code,name,cat,ctype,glass,serving,yqty,yunit,abv,diff,ptime,season,sale,target,cont,cost25,warnings,allergens,ingredients,steps = rec
-            cur.execute('''INSERT INTO cocktail_recipes(business_id,restaurant_id,bar_id,code,name,category,cocktail_type,glass_type,serving_size_ml,yield_qty,yield_unit,alcohol_percentage_estimated,difficulty,preparation_time_minutes,seasonality,sale_price,suggested_price,target_margin_percent,contingency_percent,cost_2025_orientative,cost_2026_net,cost_2026_gross_with_waste,margin_percent_2026,cost_per_ml,contains_alcohol,allergens_json,warnings_json,photo_path,notes,status,active,created_by,demo_data,non_productive_demo,data_scope,created_at,updated_at)
+            sqlite_sql = '''INSERT INTO cocktail_recipes(business_id,restaurant_id,bar_id,code,name,category,cocktail_type,glass_type,serving_size_ml,yield_qty,yield_unit,alcohol_percentage_estimated,difficulty,preparation_time_minutes,seasonality,sale_price,suggested_price,target_margin_percent,contingency_percent,cost_2025_orientative,cost_2026_net,cost_2026_gross_with_waste,margin_percent_2026,cost_per_ml,contains_alcohol,allergens_json,warnings_json,photo_path,notes,status,active,created_by,demo_data,non_productive_demo,data_scope,created_at,updated_at)
                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                           ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,category=excluded.category,cocktail_type=excluded.cocktail_type,glass_type=excluded.glass_type,serving_size_ml=excluded.serving_size_ml,sale_price=excluded.sale_price,target_margin_percent=excluded.target_margin_percent,contingency_percent=excluded.contingency_percent,cost_2025_orientative=excluded.cost_2025_orientative,contains_alcohol=1,allergens_json=excluded.allergens_json,warnings_json=excluded.warnings_json,photo_path=excluded.photo_path,notes=excluded.notes,status='activo',active=1,demo_data=1,non_productive_demo=1,updated_at=excluded.updated_at''',
-                        (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,cat,ctype,glass,serving,yqty,yunit,abv,diff,ptime,season,sale,0,target,cont,cost25,0,0,0,0,1,_j(allergens),_j(warnings),'pendiente_subir','Cóctel demo no productivo. Precios 2026 orientativos.','activo',1,'Sistema Demo',1,1,'demo',now,now))
-            crow=cur.execute('SELECT id FROM cocktail_recipes WHERE business_id=? AND restaurant_id=? AND bar_id=? AND code=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code)).fetchone(); rid=int(crow['id']); recipe_count+=1
+                           ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,category=excluded.category,cocktail_type=excluded.cocktail_type,glass_type=excluded.glass_type,serving_size_ml=excluded.serving_size_ml,sale_price=excluded.sale_price,target_margin_percent=excluded.target_margin_percent,contingency_percent=excluded.contingency_percent,cost_2025_orientative=excluded.cost_2025_orientative,contains_alcohol=1,allergens_json=excluded.allergens_json,warnings_json=excluded.warnings_json,photo_path=excluded.photo_path,notes=excluded.notes,status='activo',active=1,demo_data=1,non_productive_demo=1,updated_at=excluded.updated_at'''
+            params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,cat,ctype,glass,serving,yqty,yunit,abv,diff,ptime,season,sale,0,target,cont,cost25,0,0,0,0,1,_j(allergens),_j(warnings),'pendiente_subir','Cóctel demo no productivo. Precios 2026 orientativos.','activo',1,'Sistema Demo',1,1,'demo',now,now)
+            pg_sql = sqlite_sql.replace('?', '%s')
+            rid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
+            if not rid:
+                crow = cur.execute('SELECT id FROM cocktail_recipes WHERE business_id=? AND restaurant_id=? AND bar_id=? AND code=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code)).fetchone()
+                rid = int(crow['id']) if crow else 0
+            recipe_count += 1
             cur.execute('DELETE FROM cocktail_recipe_lines WHERE cocktail_recipe_id=?', (rid,)); cur.execute('DELETE FROM cocktail_recipe_steps WHERE cocktail_recipe_id=?', (rid,))
             net_total=0.0; gross_total=0.0
             for origin, ref, qty, unit, lwaste in ingredients:
@@ -493,8 +271,11 @@ def load_cocktail_bar_demo() -> Dict[str, Any]:
                 step_count+=1; cur.execute('INSERT INTO cocktail_recipe_steps(cocktail_recipe_id,step_number,instruction,demo_data) VALUES(?,?,?,1)', (rid,i,s))
             cur.execute('DELETE FROM cocktail_cost_history WHERE cocktail_recipe_id=? AND source=?', (rid,'carga_demo_cocteleria'))
             cur.execute('''INSERT INTO cocktail_cost_history(cocktail_recipe_id,cost_per_serving_net_2026,cost_per_serving_gross_2026,sale_price,margin_percent,calculated_at,source,notes,demo_data,non_productive_demo) VALUES(?,?,?,?,?,?,?,?,?,?)''', (rid,net_total,gross_total,sale,margin,now,'carga_demo_cocteleria','Simulacro con precios orientativos. Sustituir por albaranes reales antes de producción.',1,1))
-            cur.execute('''INSERT INTO bar_tpv_mappings(business_id,restaurant_id,bar_id,cocktail_recipe_id,product_name_raw,product_code_raw,mapping_status,connection_status,demo_data,non_productive_demo,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-                           ON CONFLICT(business_id,restaurant_id,bar_id,product_code_raw) DO UPDATE SET cocktail_recipe_id=excluded.cocktail_recipe_id,product_name_raw=excluded.product_name_raw,mapping_status='preparado_demo',connection_status='TPV_NO_CONECTADO',updated_at=excluded.updated_at''', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,rid,name,code,'preparado_demo','TPV_NO_CONECTADO',1,1,now,now))
+            sqlite_sql = '''INSERT INTO bar_tpv_mappings(business_id,restaurant_id,bar_id,cocktail_recipe_id,product_name_raw,product_code_raw,mapping_status,connection_status,demo_data,non_productive_demo,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+                       ON CONFLICT(business_id,restaurant_id,bar_id,product_code_raw) DO UPDATE SET cocktail_recipe_id=excluded.cocktail_recipe_id,product_name_raw=excluded.product_name_raw,mapping_status='preparado_demo',connection_status='TPV_NO_CONECTADO',updated_at=excluded.updated_at'''
+            params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,rid,name,code,'preparado_demo','TPV_NO_CONECTADO',1,1,now,now)
+            pg_sql = sqlite_sql.replace('?', '%s')
+            _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
         alerts = {
             'PRECIOS_DEMO':'Los precios de estos escandallos son orientativos. Sustituir por albaranes reales antes de uso productivo.',
             'MERMAS_ORIENTATIVAS':'Los porcentajes de merma son estándar operativos. Ajustar por proveedor, temporada, calibre y método de trabajo.',
@@ -504,8 +285,11 @@ def load_cocktail_bar_demo() -> Dict[str, Any]:
             'PRODUCCIONES_BAR_DEMO':'Las Producciones Bar cargadas son subrecetas internas a coste, no productos vendibles.',
         }
         for code,txt in alerts.items():
-            cur.execute('''INSERT INTO bar_alerts(business_id,restaurant_id,bar_id,alert_code,alert_text,severity,blocking,active,demo_data,non_productive_demo,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)
-                           ON CONFLICT(business_id,restaurant_id,bar_id,alert_code) DO UPDATE SET alert_text=excluded.alert_text,active=1,demo_data=1,non_productive_demo=1''', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,txt,'info',0,1,1,1,now))
+            sqlite_sql = '''INSERT INTO bar_alerts(business_id,restaurant_id,bar_id,alert_code,alert_text,severity,blocking,active,demo_data,non_productive_demo,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                           ON CONFLICT(business_id,restaurant_id,bar_id,alert_code) DO UPDATE SET alert_text=excluded.alert_text,active=1,demo_data=1,non_productive_demo=1'''
+            params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,txt,'info',0,1,1,1,now)
+            pg_sql = sqlite_sql.replace('?', '%s')
+            _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
         conn.commit()
         return {'ok': True, 'message': 'Demo Coctelería / Barra cargada correctamente. No productivo.', 'items': len(ITEMS), 'stock_movements': len(INITIAL_STOCK), 'productions': prod_count, 'cocktail_recipes': recipe_count, 'recipe_lines': line_count, 'steps': step_count, 'alerts': len(alerts), 'cost_history': recipe_count, 'demo_data': True, 'DATOS_DEMO_NO_PRODUCTIVOS': True}
     except Exception as exc:
@@ -696,10 +480,17 @@ def save_cocktail(payload: Dict[str, Any]) -> Dict[str, Any]:
             cur.execute("""UPDATE cocktail_recipes SET code=?,name=?,category=?,cocktail_type=?,glass_type=?,serving_size_ml=?,yield_qty=?,yield_unit=?,difficulty=?,preparation_time_minutes=?,seasonality=?,sale_price=?,target_margin_percent=?,contingency_percent=?,photo_path=?,notes=?,status=?,updated_at=? WHERE id=?""",
                         (vals['code'],vals['name'],vals['category'],vals['cocktail_type'],vals['glass_type'],vals['serving_size_ml'],vals['yield_qty'],vals['yield_unit'],vals['difficulty'],vals['preparation_time_minutes'],vals['seasonality'],vals['sale_price'],vals['target_margin_percent'],vals['contingency_percent'],vals['photo_path'],vals['notes'],vals['status'],now,rid))
         else:
-            cur.execute("""INSERT INTO cocktail_recipes(business_id,restaurant_id,bar_id,code,name,category,cocktail_type,glass_type,serving_size_ml,yield_qty,yield_unit,difficulty,preparation_time_minutes,seasonality,sale_price,target_margin_percent,contingency_percent,photo_path,notes,status,active,created_by,demo_data,non_productive_demo,data_scope,created_at,updated_at,contains_alcohol,allergens_json,warnings_json)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,vals['code'],vals['name'],vals['category'],vals['cocktail_type'],vals['glass_type'],vals['serving_size_ml'],vals['yield_qty'],vals['yield_unit'],vals['difficulty'],vals['preparation_time_minutes'],vals['seasonality'],vals['sale_price'],vals['target_margin_percent'],vals['contingency_percent'],vals['photo_path'],vals['notes'],vals['status'],1,'Usuario LAB',1,1,'demo',now,now,1,_j([]),_j(['TPV_NO_CONECTADO','FOTO_PENDIENTE'])))
-            rid = int(cur.lastrowid)
+            sqlite_sql = """INSERT INTO cocktail_recipes(business_id,restaurant_id,bar_id,code,name,category,cocktail_type,glass_type,serving_size_ml,yield_qty,yield_unit,difficulty,preparation_time_minutes,seasonality,sale_price,target_margin_percent,contingency_percent,photo_path,notes,status,active,created_by,demo_data,non_productive_demo,data_scope,created_at,updated_at,contains_alcohol,allergens_json,warnings_json)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+            pg_sql = sqlite_sql.replace('?', '%s')
+            rid = safe_insert_returning(
+                cur,
+                sqlite_sql,
+                (
+                    DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,vals['code'],vals['name'],vals['category'],vals['cocktail_type'],vals['glass_type'],vals['serving_size_ml'],vals['yield_qty'],vals['yield_unit'],vals['difficulty'],vals['preparation_time_minutes'],vals['seasonality'],vals['sale_price'],vals['target_margin_percent'],vals['contingency_percent'],vals['photo_path'],vals['notes'],vals['status'],1,'Usuario LAB',1,1,'demo',now,now,1,_j([]),_j(['TPV_NO_CONECTADO','FOTO_PENDIENTE']),
+                ),
+                pg_sql=pg_sql,
+            ) or 0
         _recalculate_cocktail(cur, rid)
         conn.commit()
         detail = get_cocktail_detail(rid)
@@ -744,9 +535,15 @@ def save_cocktail_line(cocktail_recipe_id: int, payload: Dict[str, Any]) -> Dict
         if line_id > 0:
             cur.execute("""UPDATE cocktail_recipe_lines SET origin=?,bar_item_id=?,bar_production_id=?,ingredient_name=?,qty_net=?,unit=?,waste_percent=?,qty_gross=?,cost_unit_2026=?,cost_total_net_2026=?,cost_total_gross_2026=?,supplier_name_demo=?,stock_available=?,demo_data=?,non_productive_demo=? WHERE id=? AND cocktail_recipe_id=?""", vals + (line_id, rid))
         else:
-            cur.execute("""INSERT INTO cocktail_recipe_lines(cocktail_recipe_id,origin,bar_item_id,bar_production_id,ingredient_name,qty_net,unit,waste_percent,qty_gross,cost_unit_2026,cost_total_net_2026,cost_total_gross_2026,supplier_name_demo,stock_available,demo_data,non_productive_demo)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (rid,) + vals)
-            line_id = int(cur.lastrowid)
+            sqlite_sql = """INSERT INTO cocktail_recipe_lines(cocktail_recipe_id,origin,bar_item_id,bar_production_id,ingredient_name,qty_net,unit,waste_percent,qty_gross,cost_unit_2026,cost_total_net_2026,cost_total_gross_2026,supplier_name_demo,stock_available,demo_data,non_productive_demo)
+                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"""
+            pg_sql = sqlite_sql.replace('?', '%s')
+            line_id = safe_insert_returning(
+                cur,
+                sqlite_sql,
+                (rid,) + vals,
+                pg_sql=pg_sql,
+            ) or 0
         _recalculate_cocktail(cur, rid)
         conn.commit()
         return {'ok': True, 'message': 'Línea de escandallo guardada.', 'recipe_id': rid, 'line_id': line_id, 'detail': get_cocktail_detail(rid)}
@@ -795,7 +592,7 @@ def save_cocktail_steps(cocktail_recipe_id: int, steps_text: str) -> Dict[str, A
 
 def _ensure_col(cur, table: str, col: str, ddl: str) -> None:
     try:
-        cols = [r['name'] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        cols = get_table_columns_from_cursor(cur, table)
         if col not in cols:
             cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
     except Exception:
@@ -803,71 +600,9 @@ def _ensure_col(cur, table: str, col: str, ddl: str) -> None:
 
 
 def ensure_bar_order_schema(cur) -> None:
-    ensure_bar_schema(cur)
-    _ensure_col(cur, 'bar_items', 'purchase_link_mode', "TEXT DEFAULT 'bar_only'")
-    _ensure_col(cur, 'bar_items', 'kitchen_item_id', 'INTEGER DEFAULT NULL')
-    _ensure_col(cur, 'bar_items', 'consolidation_allowed', 'INTEGER DEFAULT 0')
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_consolidated_order_runs(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        run_code TEXT UNIQUE,
-        supplier_name TEXT,
-        status TEXT,
-        receipt_variant TEXT,
-        demo_data INTEGER DEFAULT 1,
-        non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT,
-        notes TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_area_order_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        run_id INTEGER,
-        area TEXT,
-        source_item_table TEXT,
-        source_item_id INTEGER,
-        item_name TEXT,
-        normalized_name TEXT,
-        supplier_name TEXT,
-        current_stock REAL DEFAULT 0,
-        min_stock REAL DEFAULT 0,
-        max_stock REAL DEFAULT 0,
-        suggested_qty REAL DEFAULT 0,
-        unit TEXT,
-        purchase_link_mode TEXT,
-        consolidation_allowed INTEGER DEFAULT 0,
-        demo_data INTEGER DEFAULT 1,
-        non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_consolidated_order_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        run_id INTEGER,
-        supplier_name TEXT,
-        item_name TEXT,
-        normalized_name TEXT,
-        total_qty REAL DEFAULT 0,
-        unit TEXT,
-        can_consolidate INTEGER DEFAULT 0,
-        consolidation_reason TEXT,
-        split_json TEXT,
-        demo_data INTEGER DEFAULT 1,
-        non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_receipt_split_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        run_id INTEGER,
-        consolidated_line_id INTEGER,
-        item_name TEXT,
-        ordered_qty REAL DEFAULT 0,
-        received_qty REAL DEFAULT 0,
-        unit TEXT,
-        auto_split_status TEXT,
-        split_json TEXT,
-        notes TEXT,
-        demo_data INTEGER DEFAULT 1,
-        non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT
-    )""")
+    # Schema for consolidated lab orders is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def _update_bar_purchase_modes(cur) -> None:
@@ -954,9 +689,14 @@ def simulate_consolidated_bar_kitchen_order(receipt_variant: str = 'match') -> D
         
         import uuid
         run_code = 'LAB-CONSOLIDADO-' + now.replace(':','').replace('-','').replace('T','-') + '-' + uuid.uuid4().hex[:6]
-        cur.execute("""INSERT INTO lab_consolidated_order_runs(run_code,supplier_name,status,receipt_variant,demo_data,non_productive_demo,created_at,notes)
-                       VALUES(?,?,?,?,?,?,?,?)""", (run_code, DEMO_PROVIDER, 'simulado_no_productivo', variant, 1, 1, now, 'Cocina y Barra calculan min/max propios. Solo se consolida envío a proveedor; recepción reparte stock por área.'))
-        run_id = int(cur.lastrowid)
+        sqlite_sql = "INSERT INTO lab_consolidated_order_runs(run_code,supplier_name,status,receipt_variant,demo_data,non_productive_demo,created_at,notes) VALUES(?,?,?,?,?,?,?,?)"
+        pg_sql = sqlite_sql.replace('?', '%s')
+        run_id = safe_insert_returning(
+            cur,
+            sqlite_sql,
+            (run_code, DEMO_PROVIDER, 'simulado_no_productivo', variant, 1, 1, now, 'Cocina y Barra calculan min/max propios. Solo se consolida envío a proveedor; recepción reparte stock por área.'),
+            pg_sql=pg_sql,
+        ) or 0
         area_lines = _demo_kitchen_needs() + _demo_bar_needs(cur)
         area_lines = [x for x in area_lines if float(x.get('suggested_qty') or 0) > 0]
         for line in area_lines:
@@ -973,9 +713,14 @@ def simulate_consolidated_bar_kitchen_order(receipt_variant: str = 'match') -> D
             display = lines[0]['item_name']
             split = {x['area']: {'qty': float(x.get('suggested_qty') or 0), 'unit': unit, 'stock_destino': 'Stock Cocina' if x['area']=='cocina' else 'Stock Bar'} for x in lines}
             reason = 'consolidado_por_proveedor_con_reparto_stock' if can and len(lines) > 1 else ('pedido_area_independiente_no_consolidable' if not can else 'pedido_area_unica')
-            cur.execute("""INSERT INTO lab_consolidated_order_lines(run_id,supplier_name,item_name,normalized_name,total_qty,unit,can_consolidate,consolidation_reason,split_json,demo_data,non_productive_demo,created_at)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""", (run_id, _supplier, display, lines[0]['normalized_name'], total, unit, 1 if can else 0, reason, _j(split), 1, 1, now))
-            cid = int(cur.lastrowid)
+            sqlite_sql = "INSERT INTO lab_consolidated_order_lines(run_id,supplier_name,item_name,normalized_name,total_qty,unit,can_consolidate,consolidation_reason,split_json,demo_data,non_productive_demo,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)"
+            pg_sql = sqlite_sql.replace('?', '%s')
+            cid = safe_insert_returning(
+                cur,
+                sqlite_sql,
+                (run_id, _supplier, display, lines[0]['normalized_name'], total, unit, 1 if can else 0, reason, _j(split), 1, 1, now),
+                pg_sql=pg_sql,
+            ) or 0
             consolidated.append({'id': cid, 'item_name': display, 'total_qty': total, 'unit': unit, 'can_consolidate': can, 'reason': reason, 'split': split})
             received = total
             status = 'ok_auto_split'
@@ -1022,36 +767,20 @@ def ensure_shared_supplier_receipt_schema(cur) -> None:
     """LAB seguro para un único albarán de proveedor con líneas compartidas.
     No crea dos albaranes. Guarda un documento único y split interno por destino de stock.
     """
-    ensure_bar_order_schema(cur)
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_shared_item_split_rules(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT,
-        normalized_name TEXT, item_name TEXT, supplier_name TEXT,
-        kitchen_percent REAL DEFAULT 0, bar_percent REAL DEFAULT 0,
-        active INTEGER DEFAULT 1, demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,normalized_name,supplier_name)
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_shared_supplier_receipts(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        document_code TEXT UNIQUE,
-        supplier_name TEXT, receipt_date TEXT,
-        source_module TEXT DEFAULT 'ocr_albaran_unico_compartido_lab',
-        status TEXT, split_policy TEXT,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT, notes TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS lab_shared_supplier_receipt_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        receipt_id INTEGER,
-        raw_text TEXT, item_name TEXT, normalized_name TEXT,
-        received_qty REAL DEFAULT 0, unit TEXT,
-        matched_consolidated_order INTEGER DEFAULT 0,
-        split_source TEXT, split_status TEXT,
-        split_json TEXT, notes TEXT,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT
-    )""")
+    try:
+        from app.db_config import IS_PRODUCTION
+    except Exception:
+        IS_PRODUCTION = False
+    if IS_PRODUCTION:
+        return
+    try:
+        if getattr(cur, "_is_postgres", False):
+            return
+    except Exception:
+        pass
+    # Schema for shared supplier receipts is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def _seed_shared_split_rules(cur) -> None:
@@ -1065,11 +794,13 @@ def _seed_shared_split_rules(cur) -> None:
         ('Hierbabuena', 20, 80),
     ]
     for name, kp, bp in rules:
-        cur.execute("""INSERT INTO lab_shared_item_split_rules(business_id,restaurant_id,bar_id,normalized_name,item_name,supplier_name,kitchen_percent,bar_percent,active,demo_data,non_productive_demo,created_at,updated_at)
+        sqlite_sql = """INSERT INTO lab_shared_item_split_rules(business_id,restaurant_id,bar_id,normalized_name,item_name,supplier_name,kitchen_percent,bar_percent,active,demo_data,non_productive_demo,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
                        ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name,supplier_name)
-                       DO UPDATE SET item_name=excluded.item_name,kitchen_percent=excluded.kitchen_percent,bar_percent=excluded.bar_percent,active=1,updated_at=excluded.updated_at""",
-                    (DEMO_BUSINESS_ID, DEMO_RESTAURANT_ID, DEMO_BAR_ID, _norm(name), name, DEMO_PROVIDER, float(kp), float(bp), 1, 1, 1, now, now))
+                       DO UPDATE SET item_name=excluded.item_name,kitchen_percent=excluded.kitchen_percent,bar_percent=excluded.bar_percent,active=1,updated_at=excluded.updated_at"""
+        params = (DEMO_BUSINESS_ID, DEMO_RESTAURANT_ID, DEMO_BAR_ID, _norm(name), name, DEMO_PROVIDER, float(kp), float(bp), 1, 1, 1, now, now)
+        pg_sql = sqlite_sql.replace('?', '%s')
+        _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
 
 
 def _demo_exact_order_split_by_name(cur) -> Dict[str, Dict[str, Any]]:
@@ -1149,10 +880,14 @@ def simulate_single_shared_supplier_receipt(receipt_variant: str = 'pedido_previ
             else:
                 policy = 'pedido_previo_desglose_exacto'
 
-        cur.execute("""INSERT INTO lab_shared_supplier_receipts(document_code,supplier_name,receipt_date,status,split_policy,demo_data,non_productive_demo,created_at,updated_at,notes)
-                       VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                    (doc, DEMO_PROVIDER, now[:10], 'simulado_no_productivo', policy, 1, 1, now, now, 'Un único albarán proveedor con reparto interno Cocina/Barra. No se crean dos albaranes.'))
-        receipt_id = int(cur.lastrowid)
+        sqlite_sql = "INSERT INTO lab_shared_supplier_receipts(document_code,supplier_name,receipt_date,status,split_policy,demo_data,non_productive_demo,created_at,updated_at,notes) VALUES(?,?,?,?,?,?,?,?,?,?)"
+        pg_sql = sqlite_sql.replace('?', '%s')
+        receipt_id = safe_insert_returning(
+            cur,
+            sqlite_sql,
+            (doc, DEMO_PROVIDER, now[:10], 'simulado_no_productivo', policy, 1, 1, now, now, 'Un único albarán proveedor con reparto interno Cocina/Barra. No se crean dos albaranes.'),
+            pg_sql=pg_sql,
+        ) or 0
         results=[]; auto=0; review=0
         for rl in raw_lines:
             name = rl['name']; n = _norm(name); qty = float(rl['qty'] or 0); unit = rl.get('unit') or 'gr'
@@ -1220,55 +955,9 @@ def get_shared_supplier_receipt_summary() -> Dict[str, Any]:
 # ==============================================================================
 
 def ensure_bar_beverage_schema(cur) -> None:
-    ensure_bar_schema(cur)
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_pour_sizes(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT, code TEXT, name TEXT,
-        service_type TEXT, qty_ml REAL DEFAULT 0, active INTEGER DEFAULT 1,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,code)
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_beverage_services(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT, code TEXT, name TEXT,
-        service_type TEXT, sale_format TEXT, billing_mode TEXT DEFAULT 'bundle_price',
-        bundle_sale_price REAL DEFAULT 0, separate_sale_price_total REAL DEFAULT 0,
-        suggested_price REAL DEFAULT 0, target_margin_percent REAL DEFAULT 0,
-        contingency_percent REAL DEFAULT 0, bottle_ml REAL DEFAULT 0, service_ml REAL DEFAULT 0,
-        theoretical_servings REAL DEFAULT 0, waste_percent REAL DEFAULT 0,
-        cost_total_2026 REAL DEFAULT 0, margin_percent_2026 REAL DEFAULT 0,
-        tpv_ready INTEGER DEFAULT 1, affects_stock_pool TEXT DEFAULT 'stock_bar', notes TEXT,
-        active INTEGER DEFAULT 1, demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        data_scope TEXT DEFAULT 'demo', created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,code)
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_beverage_service_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        beverage_service_id INTEGER, line_type TEXT DEFAULT 'stock_bar', bar_item_id INTEGER,
-        item_name TEXT, qty_net REAL DEFAULT 0, unit TEXT, waste_percent REAL DEFAULT 0,
-        qty_gross REAL DEFAULT 0, cost_unit_2026 REAL DEFAULT 0,
-        cost_total_net_2026 REAL DEFAULT 0, cost_total_gross_2026 REAL DEFAULT 0,
-        sale_price_component REAL DEFAULT 0, component_role TEXT,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_open_bottles(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT, bar_item_id INTEGER, item_name TEXT,
-        bottle_code TEXT, bottle_ml REAL DEFAULT 0, opened_at TEXT, opened_by TEXT,
-        theoretical_ml_remaining REAL DEFAULT 0, servings_sold REAL DEFAULT 0,
-        oxidation_waste_percent REAL DEFAULT 0, shelf_life_days INTEGER DEFAULT 0,
-        status TEXT DEFAULT 'abierta_demo', demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,bottle_code)
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_beverage_service_history(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        beverage_service_id INTEGER, cost_total_2026 REAL DEFAULT 0,
-        bundle_sale_price REAL DEFAULT 0, margin_percent_2026 REAL DEFAULT 0,
-        calculated_at TEXT, source TEXT, notes TEXT,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1
-    )""")
+    # Schema for beverage-related tables is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def _bar_item_by_name(cur) -> Dict[str, Any]:
@@ -1301,10 +990,12 @@ BEVERAGE_SERVICES = [
 def _ensure_beverage_items(cur) -> None:
     now = _now()
     for code,name,item_type,family,base_unit,purchase_unit,purchase_qty,p25,p26,cost,waste,jy,jc,min_s,max_s,loc in ITEMS:
-        cur.execute("""INSERT INTO bar_items(business_id,restaurant_id,bar_id,code,name,normalized_name,item_type,family,base_unit,purchase_unit,purchase_qty,purchase_price_2025,purchase_price_2026,cost_per_base_unit_2026,standard_waste_percent,juice_yield_percent,juice_cost_per_ml_2026,supplier_name_demo,min_stock,max_stock,location,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
+        sqlite_sql = """INSERT INTO bar_items(business_id,restaurant_id,bar_id,code,name,normalized_name,item_type,family,base_unit,purchase_unit,purchase_qty,purchase_price_2025,purchase_price_2026,cost_per_base_unit_2026,standard_waste_percent,juice_yield_percent,juice_cost_per_ml_2026,supplier_name_demo,min_stock,max_stock,location,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                       ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name) DO UPDATE SET code=excluded.code,item_type=excluded.item_type,family=excluded.family,base_unit=excluded.base_unit,purchase_unit=excluded.purchase_unit,purchase_qty=excluded.purchase_qty,purchase_price_2025=excluded.purchase_price_2025,purchase_price_2026=excluded.purchase_price_2026,cost_per_base_unit_2026=excluded.cost_per_base_unit_2026,standard_waste_percent=excluded.standard_waste_percent,min_stock=excluded.min_stock,max_stock=excluded.max_stock,location=excluded.location,updated_at=excluded.updated_at""",
-                    (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,_norm(name),item_type,family,base_unit,purchase_unit,purchase_qty,p25,p26,cost,waste,jy,jc,DEMO_PROVIDER,min_s,max_s,loc,1,1,1,'demo',now,now))
+                       ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name) DO UPDATE SET code=excluded.code,item_type=excluded.item_type,family=excluded.family,base_unit=excluded.base_unit,purchase_unit=excluded.purchase_unit,purchase_qty=excluded.purchase_qty,purchase_price_2025=excluded.purchase_price_2025,purchase_price_2026=excluded.purchase_price_2026,cost_per_base_unit_2026=excluded.cost_per_base_unit_2026,standard_waste_percent=excluded.standard_waste_percent,min_stock=excluded.min_stock,max_stock=excluded.max_stock,location=excluded.location,updated_at=excluded.updated_at"""
+        params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,_norm(name),item_type,family,base_unit,purchase_unit,purchase_qty,p25,p26,cost,waste,jy,jc,DEMO_PROVIDER,min_s,max_s,loc,1,1,1,'demo',now,now)
+        pg_sql = sqlite_sql.replace('?', '%s')
+        _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
     for name,qty in INITIAL_STOCK.items():
         row=cur.execute('SELECT id,base_unit FROM bar_items WHERE normalized_name=? AND demo_data=1', (_norm(name),)).fetchone()
         if row:
@@ -1322,10 +1013,12 @@ def load_bar_beverage_demo() -> Dict[str, Any]:
         _ensure_beverage_items(cur)
         now = _now()
         for code,name,stype,qty in POUR_SIZES:
-            cur.execute("""INSERT INTO bar_pour_sizes(business_id,restaurant_id,bar_id,code,name,service_type,qty_ml,active,demo_data,non_productive_demo,created_at,updated_at)
+            sqlite_sql = """INSERT INTO bar_pour_sizes(business_id,restaurant_id,bar_id,code,name,service_type,qty_ml,active,demo_data,non_productive_demo,created_at,updated_at)
                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-                           ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,service_type=excluded.service_type,qty_ml=excluded.qty_ml,updated_at=excluded.updated_at""",
-                        (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,stype,qty,1,1,1,now,now))
+                           ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,service_type=excluded.service_type,qty_ml=excluded.qty_ml,updated_at=excluded.updated_at"""
+            params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,stype,qty,1,1,1,now,now)
+            pg_sql = sqlite_sql.replace('?', '%s')
+            _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
         item_map = _bar_item_by_name(cur)
         service_count = 0; line_count = 0
         for svc in BEVERAGE_SERVICES:
@@ -1341,11 +1034,12 @@ def load_bar_beverage_demo() -> Dict[str, Any]:
             sale = float(svc.get('bundle_sale_price') or 0)
             margin = ((sale - cost_total) / sale * 100.0) if sale else 0.0
             theoretical_servings = (float(svc.get('bottle_ml') or 0) / float(svc.get('service_ml') or 1)) if float(svc.get('service_ml') or 0) else 0.0
-            cur.execute("""INSERT INTO bar_beverage_services(business_id,restaurant_id,bar_id,code,name,service_type,sale_format,billing_mode,bundle_sale_price,separate_sale_price_total,suggested_price,target_margin_percent,contingency_percent,bottle_ml,service_ml,theoretical_servings,waste_percent,cost_total_2026,margin_percent_2026,tpv_ready,affects_stock_pool,notes,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                           ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,service_type=excluded.service_type,sale_format=excluded.sale_format,billing_mode=excluded.billing_mode,bundle_sale_price=excluded.bundle_sale_price,separate_sale_price_total=excluded.separate_sale_price_total,suggested_price=excluded.suggested_price,target_margin_percent=excluded.target_margin_percent,contingency_percent=excluded.contingency_percent,bottle_ml=excluded.bottle_ml,service_ml=excluded.service_ml,theoretical_servings=excluded.theoretical_servings,waste_percent=excluded.waste_percent,cost_total_2026=excluded.cost_total_2026,margin_percent_2026=excluded.margin_percent_2026,tpv_ready=excluded.tpv_ready,notes=excluded.notes,updated_at=excluded.updated_at""",
-                        (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,svc['code'],svc['name'],svc['service_type'],svc['sale_format'],svc['billing_mode'],sale,float(svc.get('separate_sale_price_total') or sale),suggested,target,float(svc.get('contingency_percent') or 0),float(svc.get('bottle_ml') or 0),float(svc.get('service_ml') or 0),theoretical_servings,float(svc.get('waste_percent') or 0),cost_total,margin,1,'stock_bar',svc.get('notes',''),1,1,1,'demo',now,now))
-            service_id = int(cur.execute('SELECT id FROM bar_beverage_services WHERE business_id=? AND restaurant_id=? AND bar_id=? AND code=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,svc['code'])).fetchone()['id'])
+            sqlite_sql = """INSERT INTO bar_beverage_services(business_id,restaurant_id,bar_id,code,name,service_type,sale_format,billing_mode,bundle_sale_price,separate_sale_price_total,suggested_price,target_margin_percent,contingency_percent,bottle_ml,service_ml,theoretical_servings,waste_percent,cost_total_2026,margin_percent_2026,tpv_ready,affects_stock_pool,notes,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(business_id,restaurant_id,bar_id,code) DO UPDATE SET name=excluded.name,service_type=excluded.service_type,sale_format=excluded.sale_format,billing_mode=excluded.billing_mode,bundle_sale_price=excluded.bundle_sale_price,separate_sale_price_total=excluded.separate_sale_price_total,suggested_price=excluded.suggested_price,target_margin_percent=excluded.target_margin_percent,contingency_percent=excluded.contingency_percent,bottle_ml=excluded.bottle_ml,service_ml=excluded.service_ml,theoretical_servings=excluded.theoretical_servings,waste_percent=excluded.waste_percent,cost_total_2026=excluded.cost_total_2026,margin_percent_2026=excluded.margin_percent_2026,tpv_ready=excluded.tpv_ready,notes=excluded.notes,updated_at=excluded.updated_at"""
+            params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,svc['code'],svc['name'],svc['service_type'],svc['sale_format'],svc['billing_mode'],sale,float(svc.get('separate_sale_price_total') or sale),suggested,target,float(svc.get('contingency_percent') or 0),float(svc.get('bottle_ml') or 0),float(svc.get('service_ml') or 0),theoretical_servings,float(svc.get('waste_percent') or 0),cost_total,margin,1,'stock_bar',svc.get('notes',''),1,1,1,'demo',now,now)
+            pg_sql = sqlite_sql.replace('?', '%s')
+            service_id = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql) or (int(cur.execute('SELECT id FROM bar_beverage_services WHERE business_id=? AND restaurant_id=? AND bar_id=? AND code=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,svc['code'])).fetchone()['id']))
             cur.execute('DELETE FROM bar_beverage_service_lines WHERE beverage_service_id=?', (service_id,))
             for item,item_name,qty,unit,waste,gross,cost_unit,net,gross_cost,sale_component,role in prepared_lines:
                 cur.execute("""INSERT INTO bar_beverage_service_lines(beverage_service_id,line_type,bar_item_id,item_name,qty_net,unit,waste_percent,qty_gross,cost_unit_2026,cost_total_net_2026,cost_total_gross_2026,sale_price_component,component_role,demo_data,non_productive_demo)
@@ -1359,10 +1053,12 @@ def load_bar_beverage_demo() -> Dict[str, Any]:
         for bottle_code, item_name, bottle_ml, remaining, shelf, ox in [('OPEN-WINE-WHITE-DEMO-001','Vino Blanco Demo',750,500,2,3),('OPEN-WINE-RED-DEMO-001','Vino Tinto Demo',750,450,2,3)]:
             item = item_map.get(_norm(item_name))
             if item:
-                cur.execute("""INSERT INTO bar_open_bottles(business_id,restaurant_id,bar_id,bar_item_id,item_name,bottle_code,bottle_ml,opened_at,opened_by,theoretical_ml_remaining,servings_sold,oxidation_waste_percent,shelf_life_days,status,demo_data,non_productive_demo,created_at,updated_at)
-                               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                               ON CONFLICT(business_id,restaurant_id,bar_id,bottle_code) DO UPDATE SET theoretical_ml_remaining=excluded.theoretical_ml_remaining,servings_sold=excluded.servings_sold,updated_at=excluded.updated_at""",
-                            (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,int(item['id']),item_name,bottle_code,bottle_ml,now,'Sistema Demo',remaining,(bottle_ml-remaining),ox,shelf,'abierta_demo',1,1,now,now))
+                sqlite_sql = """INSERT INTO bar_open_bottles(business_id,restaurant_id,bar_id,bar_item_id,item_name,bottle_code,bottle_ml,opened_at,opened_by,theoretical_ml_remaining,servings_sold,oxidation_waste_percent,shelf_life_days,status,demo_data,non_productive_demo,created_at,updated_at)
+                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                            ON CONFLICT(business_id,restaurant_id,bar_id,bottle_code) DO UPDATE SET theoretical_ml_remaining=excluded.theoretical_ml_remaining,servings_sold=excluded.servings_sold,updated_at=excluded.updated_at"""
+                params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,int(item['id']),item_name,bottle_code,bottle_ml,now,'Sistema Demo',remaining,(bottle_ml-remaining),ox,shelf,'abierta_demo',1,1,now,now)
+                pg_sql = sqlite_sql.replace('?', '%s')
+                _ = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
         conn.commit()
         return {'ok': True, 'message': 'Demo bebidas por servicio cargada correctamente. No productivo.', 'services': service_count, 'service_lines': line_count, 'pour_sizes': len(POUR_SIZES), 'open_bottles_demo': 2, 'demo_data': True, 'DATOS_DEMO_NO_PRODUCTIVOS': True}
     except Exception as exc:
@@ -1528,64 +1224,9 @@ def simulate_bar_beverage_sale(service_code: str = 'BAR-SVC-VODKA-REDBULL-001', 
 # ==============================================================================
 
 def ensure_bar_receipt_schema(cur) -> None:
-    ensure_bar_beverage_schema(cur)
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_stock_balances(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT, bar_item_id INTEGER,
-        item_name TEXT, qty_available REAL DEFAULT 0, unit TEXT,
-        last_movement_at TEXT, demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,bar_item_id)
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_receipts(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT,
-        document_code TEXT, supplier_name TEXT, receipt_date TEXT,
-        source_module TEXT DEFAULT 'ocr_bebidas_lab', status TEXT,
-        classification_status TEXT, total_amount REAL DEFAULT 0,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,document_code)
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_receipt_lines(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        bar_receipt_id INTEGER, raw_text TEXT, item_name_raw TEXT,
-        bar_item_id INTEGER, matched_item_name TEXT,
-        qty REAL DEFAULT 0, unit TEXT, purchase_unit TEXT,
-        unit_price REAL DEFAULT 0, amount REAL DEFAULT 0,
-        classification TEXT, destination_area TEXT, destination_stock TEXT,
-        validation_status TEXT, split_required INTEGER DEFAULT 0,
-        notes TEXT, demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_supplier_item_prices(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT,
-        supplier_name TEXT, bar_item_id INTEGER, item_name TEXT,
-        purchase_unit TEXT, purchase_qty REAL DEFAULT 0,
-        purchase_price REAL DEFAULT 0, cost_per_base_unit REAL DEFAULT 0,
-        source_receipt_id INTEGER, source_receipt_line_id INTEGER,
-        price_year TEXT DEFAULT '2026', active INTEGER DEFAULT 1,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_inventory_movements(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT,
-        bar_item_id INTEGER, item_name TEXT,
-        movement_type TEXT, qty REAL DEFAULT 0, unit TEXT,
-        source_module TEXT, source_receipt_id INTEGER, source_receipt_line_id INTEGER,
-        affects_inventory INTEGER DEFAULT 1, notes TEXT,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT
-    )""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_receipt_cost_recalc_log(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        bar_receipt_id INTEGER, bar_receipt_line_id INTEGER, bar_item_id INTEGER,
-        item_name TEXT, affected_type TEXT, affected_id INTEGER, affected_name TEXT,
-        old_cost REAL DEFAULT 0, new_cost REAL DEFAULT 0,
-        recalculated_at TEXT, demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1
-    )""")
+    # Schema for receipts and related bar tables is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def _classify_bar_receipt_line(name: str) -> Dict[str, Any]:
@@ -1625,11 +1266,15 @@ def _ensure_bar_item_for_receipt(cur, name: str, unit: str, qty: float, amount: 
     elif classification == 'barra_cerveza': family='cervezas'; item_type='cerveza'
     elif classification == 'barra_mixer_refresco': family='mixers'; item_type='mixer'
     code = 'AUTO-BAR-' + re.sub(r'[^A-Z0-9]+','-', _norm(name).upper()).strip('-')[:40]
-    cur.execute("""INSERT INTO bar_items(business_id,restaurant_id,bar_id,code,name,normalized_name,item_type,family,base_unit,purchase_unit,purchase_qty,purchase_price_2025,purchase_price_2026,cost_per_base_unit_2026,standard_waste_percent,supplier_name_demo,min_stock,max_stock,location,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
+    sqlite_sql = """INSERT INTO bar_items(business_id,restaurant_id,bar_id,code,name,normalized_name,item_type,family,base_unit,purchase_unit,purchase_qty,purchase_price_2025,purchase_price_2026,cost_per_base_unit_2026,standard_waste_percent,supplier_name_demo,min_stock,max_stock,location,active,demo_data,non_productive_demo,data_scope,created_at,updated_at)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name) DO UPDATE SET updated_at=excluded.updated_at""",
-                (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,_norm(name),item_type,family,unit,unit,float(qty or 0),0,float(amount or 0),cost_unit,1,DEMO_PROVIDER,0,0,'almacén_bar',1,1,1,'demo',now,now))
-    return int(cur.execute('SELECT id FROM bar_items WHERE business_id=? AND restaurant_id=? AND bar_id=? AND normalized_name=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,_norm(name))).fetchone()['id'])
+                   ON CONFLICT(business_id,restaurant_id,bar_id,normalized_name) DO UPDATE SET updated_at=excluded.updated_at"""
+    params = (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,code,name,_norm(name),item_type,family,unit,unit,float(qty or 0),0,float(amount or 0),cost_unit,1,DEMO_PROVIDER,0,0,'almacén_bar',1,1,1,'demo',now,now)
+    pg_sql = sqlite_sql.replace('?', '%s')
+    bid = safe_insert_returning(cur, sqlite_sql, params, pg_sql=pg_sql)
+    if not bid:
+        bid = int(cur.execute('SELECT id FROM bar_items WHERE business_id=? AND restaurant_id=? AND bar_id=? AND normalized_name=?', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,_norm(name))).fetchone()['id'])
+    return bid
 
 
 def _update_bar_balance(cur, item_id: int, item_name: str, qty: float, unit: str, now: str) -> None:
@@ -1709,19 +1354,28 @@ def simulate_bar_beverage_receipt(receipt_variant: str = 'beverages') -> Dict[st
         if (receipt_variant or '').strip().lower() in ('shared','compartido'):
             raw_lines.append({'name':'Lima','qty':3000,'unit':'gr','purchase_unit':'3 kg','amount':11.91})
         total = sum(float(x['amount']) for x in raw_lines)
-        cur.execute("""INSERT INTO bar_receipts(business_id,restaurant_id,bar_id,document_code,supplier_name,receipt_date,source_module,status,classification_status,total_amount,demo_data,non_productive_demo,created_at,updated_at)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,doc,DEMO_PROVIDER,now[:10],'ocr_bebidas_lab','validado_demo','clasificado_barra',total,1,1,now,now))
-        receipt_id = int(cur.lastrowid)
+        sqlite_sql = "INSERT INTO bar_receipts(business_id,restaurant_id,bar_id,document_code,supplier_name,receipt_date,source_module,status,classification_status,total_amount,demo_data,non_productive_demo,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+        pg_sql = sqlite_sql.replace('?', '%s')
+        receipt_id = safe_insert_returning(
+            cur,
+            sqlite_sql,
+            (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,doc,DEMO_PROVIDER,now[:10],'ocr_bebidas_lab','validado_demo','clasificado_barra',total,1,1,now,now),
+            pg_sql=pg_sql,
+        ) or 0
         validated=[]; review=[]; movements=[]; recalculated=[]
         for rl in raw_lines:
             cls = _classify_bar_receipt_line(rl['name'])
             item_id = _ensure_bar_item_for_receipt(cur, rl['name'], rl['unit'], rl['qty'], rl['amount'], cls['classification'])
             unit_price = float(rl['amount'] or 0) / float(rl['qty'] or 1)
             validation_status = 'validado_stock_bar' if item_id and not cls['split_required'] else 'revision_reparto_o_clasificacion'
-            cur.execute("""INSERT INTO bar_receipt_lines(bar_receipt_id,raw_text,item_name_raw,bar_item_id,matched_item_name,qty,unit,purchase_unit,unit_price,amount,classification,destination_area,destination_stock,validation_status,split_required,notes,demo_data,non_productive_demo,created_at,updated_at)
-                           VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (receipt_id,f"{rl['name']} {rl['qty']} {rl['unit']} {rl['amount']}€",rl['name'],item_id,rl['name'] if item_id else '',float(rl['qty']),rl['unit'],rl['purchase_unit'],unit_price,float(rl['amount']),cls['classification'],cls['destination_area'],cls['destination_stock'],validation_status,int(cls['split_required']),'OCR bebidas LAB demo. Validación humana simulada.' if validation_status.startswith('validado') else 'Línea compartida/dudosa: no entra en Cocina ni Barra sin reparto validado.',1,1,now,now))
-            line_id = int(cur.lastrowid)
+            sqlite_sql = "INSERT INTO bar_receipt_lines(bar_receipt_id,raw_text,item_name_raw,bar_item_id,matched_item_name,qty,unit,purchase_unit,unit_price,amount,classification,destination_area,destination_stock,validation_status,split_required,notes,demo_data,non_productive_demo,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            pg_sql = sqlite_sql.replace('?', '%s')
+            line_id = safe_insert_returning(
+                cur,
+                sqlite_sql,
+                (receipt_id,f"{rl['name']} {rl['qty']} {rl['unit']} {rl['amount']}€",rl['name'],item_id,rl['name'] if item_id else '',float(rl['qty']),rl['unit'],rl['purchase_unit'],unit_price,float(rl['amount']),cls['classification'],cls['destination_area'],cls['destination_stock'],validation_status,int(cls['split_required']),'OCR bebidas LAB demo. Validación humana simulada.' if validation_status.startswith('validado') else 'Línea compartida/dudosa: no entra en Cocina ni Barra sin reparto validado.',1,1,now,now),
+                pg_sql=pg_sql,
+            ) or 0
             if item_id and validation_status == 'validado_stock_bar':
                 cur.execute('UPDATE bar_items SET purchase_price_2026=?,cost_per_base_unit_2026=?,supplier_name_demo=?,updated_at=? WHERE id=?', (float(rl['amount']),unit_price,DEMO_PROVIDER,now,int(item_id)))
                 cur.execute('INSERT INTO bar_supplier_item_prices(business_id,restaurant_id,bar_id,supplier_name,bar_item_id,item_name,purchase_unit,purchase_qty,purchase_price,cost_per_base_unit,source_receipt_id,source_receipt_line_id,price_year,active,demo_data,non_productive_demo,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (DEMO_BUSINESS_ID,DEMO_RESTAURANT_ID,DEMO_BAR_ID,DEMO_PROVIDER,int(item_id),rl['name'],rl['purchase_unit'],float(rl['qty']),float(rl['amount']),unit_price,receipt_id,line_id,'2026',1,1,1,now,now))
@@ -1767,25 +1421,9 @@ def get_bar_receipt_summary() -> Dict[str, Any]:
 # ==============================================================================
 
 def ensure_bar_mixer_container_schema(cur) -> None:
-    ensure_bar_beverage_schema(cur)
-    _ensure_col(cur, 'bar_items', 'container_type', "TEXT DEFAULT ''")
-    _ensure_col(cur, 'bar_items', 'container_volume_ml', 'REAL DEFAULT 0')
-    _ensure_col(cur, 'bar_items', 'is_multi_serve', 'INTEGER DEFAULT 0')
-    _ensure_col(cur, 'bar_items', 'opened_container_tracking', 'INTEGER DEFAULT 0')
-    _ensure_col(cur, 'bar_items', 'shelf_life_after_opening_hours', 'REAL DEFAULT 0')
-    _ensure_col(cur, 'bar_items', 'gas_loss_percent', 'REAL DEFAULT 0')
-    _ensure_col(cur, 'bar_items', 'standard_serving_ml', 'REAL DEFAULT 0')
-    cur.execute("""CREATE TABLE IF NOT EXISTS bar_open_mixer_containers(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        business_id TEXT, restaurant_id TEXT, bar_id TEXT,
-        bar_item_id INTEGER, item_name TEXT, container_code TEXT,
-        container_type TEXT, initial_ml REAL DEFAULT 0, used_ml REAL DEFAULT 0,
-        remaining_ml REAL DEFAULT 0, waste_ml REAL DEFAULT 0,
-        opened_at TEXT, responsible TEXT, location TEXT, status TEXT,
-        demo_data INTEGER DEFAULT 1, non_productive_demo INTEGER DEFAULT 1,
-        created_at TEXT, updated_at TEXT,
-        UNIQUE(business_id,restaurant_id,bar_id,container_code)
-    )""")
+    # Schema for mixer containers and related bar columns is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def load_bar_mixer_container_demo() -> Dict[str, Any]:

@@ -100,9 +100,13 @@ async def _save_image_upload(file: UploadFile) -> Path:
 
 
 def _connect():
-    conn = sqlite3.connect(get_db_path())
-    conn.row_factory = sqlite3.Row
-    return conn
+    try:
+        from app.core import db as core_db
+        return core_db()
+    except Exception:
+        conn = sqlite3.connect(get_db_path())
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 def load_catalog_items() -> list[dict]:
@@ -112,7 +116,7 @@ def load_catalog_items() -> list[dict]:
                 """
                 SELECT id, name, unit, current_price, waste_default_pct, stock_area
                   FROM items
-                 ORDER BY name COLLATE NOCASE
+                 ORDER BY LOWER(name)
                 """
             ).fetchall()
             return [
@@ -138,7 +142,7 @@ def load_subrecipes() -> list[dict]:
                 SELECT id, name, yield_final_qty, yield_final_unit, suggested_price
                   FROM recipes
                  WHERE COALESCE(is_subrecipe,0)=1
-                 ORDER BY name COLLATE NOCASE
+                 ORDER BY LOWER(name)
                 """
             ).fetchall()
             return [
@@ -158,7 +162,7 @@ def load_subrecipes() -> list[dict]:
 def load_price_map() -> dict:
     try:
         with _connect() as conn:
-            rows = conn.execute("SELECT id, name, unit, current_price FROM items ORDER BY name COLLATE NOCASE").fetchall()
+            rows = conn.execute("SELECT id, name, unit, current_price FROM items ORDER BY LOWER(name)").fetchall()
             return {int(r["id"]): {"name": r["name"], "unit_cost": float(r["current_price"] or 0), "unit": r["unit"] or "kg"} for r in rows}
     except Exception:
         return {}

@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from app.core import db
+from app.core import db, get_table_columns_from_cursor, db_truthy_sql
 
 
 
@@ -323,7 +323,7 @@ def _dict_from_row(row) -> Dict[str, Any]:
 
 def _ensure_col(cur: sqlite3.Cursor, table: str, col: str, ddl: str) -> None:
     try:
-        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        cols = get_table_columns_from_cursor(cur, table)
         if col not in cols:
             cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
     except Exception:
@@ -331,52 +331,9 @@ def _ensure_col(cur: sqlite3.Cursor, table: str, col: str, ddl: str) -> None:
 
 
 def ensure_operational_schema(cur: sqlite3.Cursor) -> None:
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS operational_queue_items(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            center_id INTEGER NOT NULL DEFAULT 0,
-            task_type TEXT NOT NULL,
-            item_name TEXT NOT NULL,
-            item_name_norm TEXT NOT NULL,
-            item_ref_id INTEGER NOT NULL DEFAULT 0,
-            qty_total REAL NOT NULL DEFAULT 0,
-            unit TEXT NOT NULL DEFAULT 'ud',
-            status TEXT NOT NULL DEFAULT 'REVIEW',
-            requested_by TEXT DEFAULT '',
-            source TEXT DEFAULT 'voice',
-            voice_text TEXT DEFAULT '',
-            notes TEXT DEFAULT '',
-            decision_note TEXT DEFAULT '',
-            created_at TEXT DEFAULT '',
-            updated_at TEXT DEFAULT ''
-        )
-        """
-    )
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS operational_queue_contributions(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            line_id INTEGER NOT NULL,
-            requested_by TEXT DEFAULT '',
-            qty_requested REAL NOT NULL DEFAULT 0,
-            unit TEXT NOT NULL DEFAULT 'ud',
-            voice_text TEXT DEFAULT '',
-            source TEXT DEFAULT 'voice',
-            decision TEXT DEFAULT 'ADDED',
-            created_at TEXT DEFAULT '',
-            FOREIGN KEY(line_id) REFERENCES operational_queue_items(id)
-        )
-        """
-    )
-    _ensure_col(cur, "operational_queue_items", "confidence", "REAL DEFAULT 0")
-    _ensure_col(cur, "operational_queue_items", "intent_source", "TEXT DEFAULT 'rules'")
-    _ensure_col(cur, "operational_queue_items", "raw_json", "TEXT DEFAULT ''")
-    _ensure_col(cur, "operational_queue_contributions", "raw_json", "TEXT DEFAULT ''")
-    try:
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_operational_queue_lookup ON operational_queue_items(center_id, task_type, status, item_name_norm, unit)")
-    except Exception:
-        pass
+    # Schema for operational quick queue is managed by backend/migrate.py.
+    # Avoid runtime DDL in the service module; run migrations as an administrative step.
+    return
 
 
 def extract_responsible(raw_text: str) -> str:
@@ -393,37 +350,38 @@ def extract_responsible(raw_text: str) -> str:
         if m:
             words = [w for w in m.group(1).split() if w not in stops]
             if words:
-                return " ".join(w.capitalize() for w in words[:2])
+                name = " ".join(words).strip()
+                return name.title()
     return ""
 
 
-def detect_task_type(raw_text: str, forced: str = "AUTO") -> tuple[str, float, str]:
-    forced = str(forced or "AUTO").upper().strip()
-    if forced in {"ORDER", "PRODUCTION", "WASTE"}:
-        return forced, 0.99, "manual"
-    c = _norm(raw_text)
-    scores = {"ORDER": 0, "PRODUCTION": 0, "WASTE": 0}
-    for k in ["pedido", "pedir", "pide", "comprar", "compra", "encargar", "encarga", "solicitar", "solicita", "agrega", "anade", "añade", "carrito", "necesito", "falta", "faltan", "apunta compra", "anota compra"]:
-        if k in c: scores["ORDER"] += 2
-    for k in ["produc", "produccion", "producción", "hacer produccion", "hacer producción", "preparar", "prepara", "preparame", "prepárame", "elaborar", "cocinar", "raciones", "receta", "mise", "partida", "lote"]:
-        if k in c: scores["PRODUCTION"] += 2
-    for k in ["merma", "mima", "desperdicio", "perdida", "pérdida", "tirar", "tira", "desechar", "mal estado", "caduc", "podrido", "ferment", "roto", "quemado"]:
-        if k in c: scores["WASTE"] += 2
-    # Patrones fuertes: evitan que "quiero hacer una producción de X" empate con pedido por "quiero".
-    if re.search(r"\b(quiero\s+)?hacer\s+(una\s+)?produccion\b", c) or re.search(r"\bproduccion\s+de\b", c):
+def detect_task_type(c: str, forced_task_type: str = "AUTO") -> tuple[str, float, str]:
+    scores = {"ORDER": 0, "PRODUCTION": 0, "WASTE": 0, "UNKNOWN": 0}
+    # Heuristics
+    if re.search(r"\b(hacer|preparar|producci[oó]n|producir|prepara|elaborar|preparame)\b", c):
         scores["PRODUCTION"] += 5
-    if re.search(r"\b(hacer|preparar|preparame|elaborar)\s+pico\b", c):
-        scores["PRODUCTION"] += 5
-    if re.search(r"\b(merma|mima|merna|tirar|tira|perdida|mal estado|roto|rotos|caduc|podrido)\s+(de\s+)?", c):
+    if re.search(r"\b(merma|mima|merna|tirar|tira|perdida|mal estado|roto|rotos|caduc|podrido)\b", c):
         scores["WASTE"] += 4
-    if re.search(r"\b(pedir|pedido|encargar|solicitar)\b", c):
+    if re.search(r"\b(pedir|pedido|encargar|solicitar|pide)\b", c):
         scores["ORDER"] += 3
+    # Quantity tokens bias towards order/production
+    try:
+        tokens, hits = _qty_unit_matches(c)
+        if hits:
+            # presence of quantities typically indicates ORDER or PRODUCTION
+            scores["ORDER"] += 1
+            scores["PRODUCTION"] += 2
+    except Exception:
+        pass
+    if forced_task_type and forced_task_type != "AUTO":
+        return forced_task_type, 0.9, "forced"
     best = max(scores, key=scores.get)
     if scores[best] <= 0:
         return "UNKNOWN", 0.25, "rules"
     total = sum(scores.values()) or 1
     confidence = max(0.45, min(0.98, scores[best] / total))
-    if sorted(scores.values(), reverse=True)[0] == sorted(scores.values(), reverse=True)[1]:
+    vals = sorted(scores.values(), reverse=True)
+    if vals[0] == vals[1]:
         confidence = 0.55
     return best, confidence, "rules"
 
@@ -608,17 +566,19 @@ def _fetch_context_candidates(cur: sqlite3.Cursor, raw_text: str, forced_task_ty
         except Exception:
             pass
         try:
-            for r in cur.execute("SELECT id,name,category,subcategory,is_subrecipe,yield_final_qty,yield_final_unit FROM recipes WHERE COALESCE(is_active,1)=1 AND lower(name) LIKE lower(?) ORDER BY LENGTH(name) LIMIT 8", (like,)).fetchall():
+            active_clause = db_truthy_sql("is_active", cur)
+            for r in cur.execute(f"SELECT id,name,category,subcategory,is_subrecipe,yield_final_qty,yield_final_unit FROM recipes WHERE {active_clause} AND lower(name) LIKE lower(?) ORDER BY LENGTH(name) LIMIT 8", (like,)).fetchall():
                 add("recipes", _dict_from_row(r), _name_similarity(seed, r["name"]))
         except Exception:
             pass
         try:
-            for r in cur.execute("SELECT id,name FROM suppliers WHERE COALESCE(is_active,1)=1 AND lower(name) LIKE lower(?) ORDER BY LENGTH(name) LIMIT 5", (like,)).fetchall():
+            active_clause = db_truthy_sql("is_active", cur)
+            for r in cur.execute(f"SELECT id,name FROM suppliers WHERE {active_clause} AND lower(name) LIKE lower(?) ORDER BY LENGTH(name) LIMIT 5", (like,)).fetchall():
                 add("suppliers", _dict_from_row(r), _name_similarity(seed, r["name"]))
         except Exception:
             pass
         try:
-            cols = [x[1] for x in cur.execute("PRAGMA table_info(productions)").fetchall()]
+            cols = list(get_table_columns_from_cursor(cur, "productions"))
             name_cols = [c for c in ["recipe_name", "item_name", "name", "title"] if c in cols]
             if name_cols:
                 nc = name_cols[0]
@@ -634,7 +594,7 @@ def _fetch_context_candidates(cur: sqlite3.Cursor, raw_text: str, forced_task_ty
         except Exception:
             pass
         try:
-            rid, rname = _token_like_match(cur, "recipes", seed, "COALESCE(is_active,1)=1")
+            rid, rname = _token_like_match(cur, "recipes", seed, db_truthy_sql("is_active", cur))
             if rid: add("recipes", {"id": rid, "name": rname}, _name_similarity(seed, rname))
         except Exception:
             pass
@@ -974,11 +934,16 @@ def create_missing_article_and_add_to_order(*, center_id: int, item_name: str, q
         if row:
             item_id = int(row["id"]); item_real_name = str(row["name"] or clean_name); real_unit = str(row["unit"] or unit)
         else:
-            cur.execute(
-                "INSERT INTO items(name,unit,min_qty,max_qty,current_price,waste_default_pct,stock_area,order_category) VALUES(?,?,?,?,?,?,?,?)",
+            # Insert new item and obtain id DB-agnostically
+            sqlite_sql = "INSERT INTO items(name,unit,min_qty,max_qty,current_price,waste_default_pct,stock_area,order_category) VALUES(?,?,?,?,?,?,?,?)"
+            pg_sql = sqlite_sql.replace('?', '%s')
+            item_id = safe_insert_returning(
+                cur,
+                sqlite_sql,
                 (clean_name, defaults["unit"], 0, 0, 0, 0, defaults["stock_area"], defaults["order_category"]),
-            )
-            item_id = int(cur.lastrowid); item_real_name = clean_name; real_unit = defaults["unit"]
+                pg_sql=pg_sql,
+            ) or 0
+            item_real_name = clean_name; real_unit = defaults["unit"]
         parsed = {"task_type": "ORDER", "task_label": "Pedido", "confidence": 1.0, "intent_source": "manual_alta_articulo", "responsible": requested_by, "items": [{"name": item_real_name, "name_norm": _norm(item_real_name), "qty": qty, "unit": unit or real_unit, "matched_kind": "items", "matched_id": item_id, "match_confidence": 1.0}], "voice_text": voice_text, "needs_clarification": True, "created_missing_article": True}
         parsed_json = json.dumps(parsed, ensure_ascii=False)
         res = _add_one(cur, center_id=center_id, task_type="ORDER", item_name=item_real_name, item_norm=_norm(item_real_name), qty=qty, unit=unit or real_unit, requested_by=requested_by, source="operativa_alta_articulo", voice_text=voice_text, parsed_json=parsed_json, confidence=1.0, intent_source="manual_alta_articulo")
@@ -1032,15 +997,16 @@ def _find_match(cur: sqlite3.Cursor, task_type: str, item_name_norm: str) -> tup
     like = f"%{item_name_norm}%"
     if task_type in {"PRODUCTION", "WASTE"}:
         try:
+            active_clause = db_truthy_sql("is_active", cur)
             row = cur.execute(
-                "SELECT id,name FROM recipes WHERE COALESCE(is_active,1)=1 AND lower(name) LIKE lower(?) ORDER BY LENGTH(name) LIMIT 1",
+                f"SELECT id,name FROM recipes WHERE {active_clause} AND lower(name) LIKE lower(?) ORDER BY LENGTH(name) LIMIT 1",
                 (like,),
             ).fetchone()
             if row:
                 return int(row["id"]), str(row["name"] or "")
         except Exception:
             pass
-        rid, rname = _token_like_match(cur, "recipes", item_name_norm, "COALESCE(is_active,1)=1")
+        rid, rname = _token_like_match(cur, "recipes", item_name_norm, db_truthy_sql("is_active", cur))
         if rid:
             return rid, rname
     try:
@@ -1061,6 +1027,7 @@ def _add_one(cur: sqlite3.Cursor, *, center_id: int, task_type: str, item_name: 
     display_name = matched_name or item_name or "Sin identificar"
     display_norm = _norm(display_name)
     now = _now()
+
     existing = cur.execute(
         """
         SELECT * FROM operational_queue_items
@@ -1070,9 +1037,10 @@ def _add_one(cur: sqlite3.Cursor, *, center_id: int, task_type: str, item_name: 
         """,
         (int(center_id or 0), task_type, display_norm, unit),
     ).fetchone()
+
     if existing:
         line_id = int(existing["id"])
-        old_qty = float(existing["qty_total"] or 0.0)
+        old_qty = float(existing.get("qty_total") or 0.0)
         new_qty = old_qty + float(qty or 0.0)
         decision_note = f"Ya existía en cola: {old_qty:g} {unit}. Nueva aportación: +{float(qty or 0):g} {unit}. Total propuesto: {new_qty:g} {unit}."
         cur.execute(
@@ -1081,15 +1049,20 @@ def _add_one(cur: sqlite3.Cursor, *, center_id: int, task_type: str, item_name: 
         )
         merged = True
     else:
-        cur.execute(
-            """
+        # Insert operational queue line in DB-agnostic way
+        sqlite_sql = """
             INSERT INTO operational_queue_items(center_id,task_type,item_name,item_name_norm,item_ref_id,qty_total,unit,status,requested_by,source,voice_text,notes,decision_note,created_at,updated_at,confidence,intent_source,raw_json)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,
+            """
+        pg_sql = sqlite_sql.replace('?', '%s')
+        line_id = safe_insert_returning(
+            cur,
+            sqlite_sql,
             (int(center_id or 0), task_type, display_name, display_norm, int(ref_id or 0), float(qty or 0.0), unit, "REVIEW", requested_by, source, voice_text, "", "Propuesta pendiente de validación humana.", now, now, float(confidence or 0), intent_source, parsed_json),
-        )
-        line_id = int(cur.lastrowid)
+            pg_sql=pg_sql,
+        ) or 0
         merged = False
+
     cur.execute(
         """
         INSERT INTO operational_queue_contributions(line_id,requested_by,qty_requested,unit,voice_text,source,decision,created_at,raw_json)
