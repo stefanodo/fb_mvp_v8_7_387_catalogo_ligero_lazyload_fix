@@ -615,11 +615,24 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
             current_session = {k: row[k] for k in row.keys()} if row else None
     conn.close()
 
+    # Ensure we always have a dict to work with. If DB operations somehow
+    # failed to create or return a session, provide a safe fallback so the
+    # view can render instead of crashing with a TypeError.
+    if current_session is None:
+        current_session = {
+            'id': 0,
+            'warehouse_id': 0,
+            'warehouse_name': 'Todos',
+            'responsible_user_id': 0,
+            'responsible_name': '',
+            'note': ''
+        }
+
     # Si la vista entra sin inv_session_id explícito, no preseleccionar responsable en la UI.
     if not str(sid_q).isdigit():
-        current_session['responsible_user_id'] = 0
-        current_session['responsible_name'] = ''
-        current_session['note'] = ''
+        current_session.setdefault('responsible_user_id', 0)
+        current_session.setdefault('responsible_name', '')
+        current_session.setdefault('note', '')
 
     counts_map = _inventory_counts_map(int(current_session.get('id') or 0))
     selected_wh = int(current_session.get('warehouse_id') or 0)
