@@ -10,7 +10,7 @@
       }
     }
   ],
-  "buildCommand": "cd backend && python migrate.py",
+  "buildCommand": "python -m pip install -r requirements.vercel.txt && cd backend && python migrate.py",
   "routes": [
     {
       "src": "/(.*)",
