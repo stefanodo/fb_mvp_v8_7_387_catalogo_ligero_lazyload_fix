@@ -10,6 +10,7 @@ import csv
 import time
 import calendar
 from pathlib import Path
+import tempfile
 from typing import Optional
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -33,20 +34,44 @@ APP_TZ = ZoneInfo("Europe/Madrid")
 APP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = APP_DIR.parent
 USER_HOME = Path.home()
+BUNDLED_RUNTIME_DIR = ROOT_DIR / "runtime"
 _DEFAULT_SHARED_RUNTIME = USER_HOME / "Documents" / "F&B_MAC_RUNTIME"
 _RUNTIME_ENV = os.getenv("FB_MVP_RUNTIME_DIR", "").strip()
-RUNTIME_DIR = Path(_RUNTIME_ENV).expanduser() if _RUNTIME_ENV else _DEFAULT_SHARED_RUNTIME
-RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-BUNDLED_RUNTIME_DIR = ROOT_DIR / "runtime"
+
+# Resolve runtime directory with sensible fallbacks for read-only environments
+if _RUNTIME_ENV:
+    RUNTIME_DIR = Path(_RUNTIME_ENV).expanduser()
+else:
+    RUNTIME_DIR = _DEFAULT_SHARED_RUNTIME
+
+try:
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    # Fallback to the system temp directory when the default location is not writable
+    try:
+        tmp_base = Path(os.getenv("TMPDIR") or tempfile.gettempdir())
+        tmp_runtime = tmp_base / "fb_mvp_runtime"
+        tmp_runtime.mkdir(parents=True, exist_ok=True)
+        RUNTIME_DIR = tmp_runtime
+    except Exception:
+        # As a last resort, use the bundled runtime location inside the repo
+        RUNTIME_DIR = BUNDLED_RUNTIME_DIR
 BUNDLED_DB_PATH = BUNDLED_RUNTIME_DIR / "fb_mvp_v8.db"
 DB_PATH = RUNTIME_DIR / "fb_mvp_v8.db"
-if not DB_PATH.exists() and BUNDLED_DB_PATH.exists():
-    try:
-        shutil.copy2(BUNDLED_DB_PATH, DB_PATH)
-    except Exception:
-        pass
+try:
+    if not DB_PATH.exists() and BUNDLED_DB_PATH.exists():
+        try:
+            shutil.copy2(BUNDLED_DB_PATH, DB_PATH)
+        except Exception:
+            pass
+except Exception:
+    pass
+
 UPLOADS_DIR = RUNTIME_DIR / "uploads"
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 SEED_DIR = APP_DIR / "data"
 SEED_ITEMS_CSV = SEED_DIR / "seed_items_152.csv"
 SEED_PRICES_CSV = SEED_DIR / "seed_prices_35.csv"
