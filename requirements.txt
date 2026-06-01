@@ -3,12 +3,10 @@ uvicorn==0.30.6
 jinja2==3.1.4
 python-multipart==0.0.9
 
-pytesseract==0.3.13
-pillow==11.1.0
-
-paddleocr>=2.7,<3
-qrcode[pil]==8.0
-
-# Database drivers
+# Minimal production deps for Vercel serverless (trimmed)
 psycopg2-binary==2.9.9
 python-dotenv==1.0.1
+pillow==11.1.0
+
+# Optional: use requirements.full.txt for local/dev with OCR and extras
+# Full requirements saved in requirements.full.txt
