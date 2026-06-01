@@ -3,8 +3,9 @@
 import sys
 from pathlib import Path
 
-# Add backend to path so imports work
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
+# Add backend to path so imports work (resolve repository root and point to backend)
+repo_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(repo_root / "backend"))
 
 from app.main import app
 

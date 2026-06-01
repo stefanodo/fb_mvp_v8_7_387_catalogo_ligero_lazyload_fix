@@ -7,8 +7,8 @@ import os
 import sys
 from pathlib import Path
 
-# Add backend to path
-sys.path.insert(0, str(Path(__file__).parent / "backend"))
+# Add backend to path (migrate.py lives inside backend; add backend dir to sys.path)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from app.db_config import get_db_connection, IS_PRODUCTION
 
