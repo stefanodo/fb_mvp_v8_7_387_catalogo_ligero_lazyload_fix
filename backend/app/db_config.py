@@ -1,17 +1,85 @@
-"""Database configuration - supports both SQLite (local) and PostgreSQL (production)"""
+"""Database configuration - supports both SQLite (local) and PostgreSQL (production).
+
+This module now attempts to discover a PostgreSQL connection string from a
+variety of environment variable names that marketplace integrations (like
+Neon) may create with custom prefixes. It only attempts to create local
+development folders when running in non-production mode.
+"""
 import os
 import sqlite3
 from pathlib import Path
 from typing import Optional
+import urllib.parse
 
-# Check if we're in production (Vercel/PostgreSQL) or local (SQLite)
-DATABASE_URL = os.getenv("DATABASE_URL")
-IS_PRODUCTION = DATABASE_URL is not None and "postgresql" in DATABASE_URL.lower()
 
-# SQLite for local development
-DB_DIR = Path.home() / "Documents" / "F&B_MAC_RUNTIME"
-DB_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DB_DIR / "fb_mvp_v8.db"
+def _discover_database_url() -> Optional[str]:
+    """Return the first available database URL from common env names.
+
+    Order of precedence:
+    1. Common canonical names (`DATABASE_URL`, `DATABASE_URL_UNPOOLED`,
+       `POSTGRES_URL`, etc.)
+    2. Any environment variable with a suffix matching Neon/Vercel integration
+       patterns (e.g. `*_DATABASE_URL`, `*_POSTGRES_URL`).
+    3. Construct a URL from `PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` if present.
+    """
+    candidates = [
+        "DATABASE_URL",
+        "DATABASE_URL_UNPOOLED",
+        "POSTGRES_URL",
+        "POSTGRES_URL_NON_POOLING",
+        "POSTGRES_URL_NONPOOLING",
+        "POSTGRES_PRISMA_URL",
+        "POSTGRES_URL_NO_SSL",
+    ]
+    for name in candidates:
+        val = os.getenv(name)
+        if val:
+            return val
+
+    # Detect integration-provided vars with prefixes (e.g. fbmvp_DATABASE_URL)
+    suffixes = ("_DATABASE_URL", "_POSTGRES_URL", "_POSTGRES_URL_NON_POOLING",
+                "_POSTGRES_PRISMA_URL", "_POSTGRES_URL_NO_SSL")
+    for key, val in os.environ.items():
+        try:
+            if any(key.endswith(s) for s in suffixes):
+                return val
+        except Exception:
+            continue
+
+    # As a last resort, attempt to build a URL from component parts
+    user = os.getenv("PGUSER") or os.getenv("POSTGRES_USER") or os.getenv("PGUSER")
+    host = os.getenv("PGHOST") or os.getenv("POSTGRES_HOST") or os.getenv("PGHOST")
+    password = os.getenv("PGPASSWORD") or os.getenv("POSTGRES_PASSWORD")
+    database = os.getenv("PGDATABASE") or os.getenv("POSTGRES_DATABASE")
+    if user and host and database and password:
+        return f"postgresql://{user}:{urllib.parse.quote(password)}@{host}/{database}"
+
+    return None
+
+
+# Discover DB connection and detect production mode
+DATABASE_URL = _discover_database_url()
+IS_PRODUCTION = DATABASE_URL is not None and "postgres" in DATABASE_URL.lower()
+
+# SQLite for local development (only create local dirs when not production)
+if not IS_PRODUCTION:
+    DB_DIR = Path.home() / "Documents" / "F&B_MAC_RUNTIME"
+    try:
+        DB_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        # If creating in the user's Documents fails (e.g., unusual environments),
+        # fall back to a temp directory so local dev can continue.
+        import tempfile
+        DB_DIR = Path(tempfile.gettempdir()) / "F&B_MAC_RUNTIME"
+        try:
+            DB_DIR.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+    DB_PATH = DB_DIR / "fb_mvp_v8.db"
+else:
+    # When running in production with Postgres, DB_PATH is unused but keep a
+    # value for diagnostics elsewhere in the codebase.
+    DB_PATH = Path("/tmp/fb_mvp_v8.db")
 
 
 def get_db_connection():
