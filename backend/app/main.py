@@ -69,6 +69,35 @@ from app.recipe_ai import router as recipe_ai_router
 app = FastAPI(title=f"F&B MVP {BUILD_ID}")
 
 
+class TimingMiddleware(BaseHTTPMiddleware):
+    """Minimal timing middleware that logs and exposes X-Response-Time.
+
+    Keeps implementation tiny and defensive so it never blocks requests.
+    """
+    async def dispatch(self, request: Request, call_next):
+        start = time.time()
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            dt = time.time() - start
+            try:
+                print(f"[timing] {request.method} {request.url.path} {dt:.3f}s ERROR {exc}")
+            except Exception:
+                pass
+            raise
+        dt = time.time() - start
+        try:
+            # Expose timing for quick diagnostics in responses and logs
+            response.headers["X-Response-Time"] = f"{dt:.3f}s"
+        except Exception:
+            pass
+        try:
+            print(f"[timing] {request.method} {request.url.path} {dt:.3f}s")
+        except Exception:
+            pass
+        return response
+
+
 class NoStoreMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -84,6 +113,7 @@ class NoStoreMiddleware(BaseHTTPMiddleware):
         return response
 
 
+app.add_middleware(TimingMiddleware)
 app.add_middleware(NoStoreMiddleware)
 
 # --- Montar routers ---
