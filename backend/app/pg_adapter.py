@@ -65,7 +65,18 @@ class PGCursorAdapter:
         except Exception:
             # On any error while checking, fall back to attempting execution.
             pass
-        self._cursor.execute(new_sql, params)
+        try:
+            self._cursor.execute(new_sql, params)
+        except Exception:
+            # Ensure the connection is rolled back so the transaction does
+            # not remain in an aborted state (which causes
+            # InFailedSqlTransaction on subsequent commands). Rollback
+            # here and re-raise so callers can handle the original error.
+            try:
+                self._cursor.connection.rollback()
+            except Exception:
+                pass
+            raise
         # Provide a sqlite3-like `lastrowid` compatibility layer for callers
         # that still expect `cur.lastrowid`. We try, in order:
         # 1) If the INSERT used RETURNING, fetch the returned value.
@@ -128,7 +139,14 @@ class PGCursorAdapter:
 
     def executemany(self, sql: str, seq_of_params):
         new_sql = self._convert_qmarks(sql)
-        self._cursor.executemany(new_sql, seq_of_params)
+        try:
+            self._cursor.executemany(new_sql, seq_of_params)
+        except Exception:
+            try:
+                self._cursor.connection.rollback()
+            except Exception:
+                pass
+            raise
         return self
 
     def fetchone(self):
