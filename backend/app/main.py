@@ -2206,7 +2206,7 @@ def home(request: Request, center_id: Optional[int] = None):
     _mark('receipts_context', t0)
 
     t0 = time.time()
-    resp = templates.TemplateResponse(request, "index.html", {
+    ctx = {
         "request": request,
         "page": page,
         "centers": [{k: c[k] for k in c.keys()} for c in centers],
@@ -2272,15 +2272,20 @@ def home(request: Request, center_id: Optional[int] = None):
         "direction_end": direction_end_q,
         "direction_view": direction_view,
         **inventory_ctx,
-    })
-    # Force template rendering here to measure render time (helps diagnose cold-starts)
+    }
+    # Force Jinja2 render synchronously to measure and include render time in perf
     t_render = time.time()
     try:
-        # TemplateResponse.render() will produce the body synchronously
-        resp.render()
+        rendered_html = templates.env.get_template("index.html").render(ctx)
         _mark('template_render', t_render)
     except Exception:
+        try:
+            rendered_html = templates.env.get_template("index.html").render(ctx)
+        except Exception:
+            rendered_html = ""
         _mark('template_render', t_render)
+    from fastapi.responses import HTMLResponse as _HTMLResponse
+    resp = _HTMLResponse(rendered_html)
     _mark('template_response_prep', t0)
     total_elapsed = time.time() - total_start
     try:
