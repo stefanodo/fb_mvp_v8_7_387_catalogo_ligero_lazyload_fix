@@ -86,116 +86,13 @@ else:
 def get_db_connection():
     """Get database connection - PostgreSQL in production, SQLite locally"""
     if IS_PRODUCTION:
-        # Prefer a process-local connection pool (psycopg2) to avoid creating
-        # a fresh TCP/SSL connection on every `get_db_connection()` call.
-        # Pool is lazily initialized on first use. If psycopg2 is not
-        # available, fall back to direct connects while attempting to reuse
-        # a request-scoped connection (if `app.core._DB_CONN` exists).
+        # PostgreSQL connection for Vercel — return a lightweight adapter that
+        # emulates the sqlite3 Connection/Cursor API used across the codebase.
+        # Import adapter lazily to avoid importing psycopg2 during local dev.
         from app.pg_adapter import PGConnectionAdapter
-
-        # Module-level pool globals
-        global _PG_POOL, _PG_POOL_LOCK, _PG_POOL_DRIVER
-        try:
-            _PG_POOL
-        except NameError:
-            _PG_POOL = None
-            _PG_POOL_LOCK = threading.Lock()
-            _PG_POOL_DRIVER = None
-
-        def _init_pool():
-            nonlocal_vars = globals()
-            with _PG_POOL_LOCK:
-                if globals().get("_PG_POOL") is not None:
-                    return
-                min_size = int(os.getenv("PG_POOL_MIN", "1"))
-                max_size = int(os.getenv("PG_POOL_MAX", os.getenv("PG_CONN_POOL_SIZE", "6")))
-                # Try psycopg2 ThreadedConnectionPool first
-                try:
-                    import psycopg2 as _psycopg2  # type: ignore
-                    from psycopg2.pool import ThreadedConnectionPool  # type: ignore
-                    try:
-                        pool = ThreadedConnectionPool(min_size, max_size, DATABASE_URL)
-                    except TypeError:
-                        # Some older psycopg2 versions expect dsn as keyword
-                        pool = ThreadedConnectionPool(min_size, max_size, dsn=DATABASE_URL)
-                    globals()['_PG_POOL'] = pool
-                    globals()['_PG_POOL_DRIVER'] = 'psycopg2'
-                    return
-                except Exception:
-                    globals()['_PG_POOL'] = None
-                    globals()['_PG_POOL_DRIVER'] = None
-                    # Do not raise here; fall back to direct connects below
-
-        # Lazy-init pool (best-effort)
-        try:
-            if _PG_POOL is None:
-                _init_pool()
-        except Exception:
-            pass
-
-        # If pool available (psycopg2), get a connection from it and return
-        # a wrapper that returns the conn to the pool on `close()`.
-        if globals().get('_PG_POOL') is not None and globals().get('_PG_POOL_DRIVER') == 'psycopg2':
-            try:
-                pool = globals()['_PG_POOL']
-                raw = pool.getconn()
-                adapter = PGConnectionAdapter(raw)
-
-                class _PooledConn:
-                    def __init__(self, raw_conn, adapter, pool):
-                        self._raw = raw_conn
-                        self._adapter = adapter
-                        self._pool = pool
-
-                    def cursor(self):
-                        return self._adapter.cursor()
-
-                    def commit(self):
-                        return self._adapter.commit()
-
-                    def rollback(self):
-                        return self._adapter.rollback()
-
-                    def close(self):
-                        try:
-                            self._pool.putconn(self._raw)
-                        except Exception:
-                            try:
-                                self._raw.close()
-                            except Exception:
-                                pass
-
-                    def executescript(self, sql_script: str):
-                        return self._adapter.executescript(sql_script)
-
-                    def execute(self, sql: str, params=None):
-                        return self._adapter.execute(sql, params)
-
-                    def __getattr__(self, name: str):
-                        return getattr(self._adapter, name)
-
-                return _PooledConn(raw, adapter, pool)
-            except Exception:
-                # Fall through to direct connect below
-                pass
-
-        # No pool available — attempt to reuse a per-request connection when
-        # possible by storing it in `app.core._DB_CONN` (if present).
-        try:
-            from app.core import _DB_CONN
-        except Exception:
-            _DB_CONN = None
-
-        # If a request-scoped connection exists, return it.
-        try:
-            if _DB_CONN is not None:
-                existing = _DB_CONN.get()
-                if existing is not None:
-                    return existing
-        except Exception:
-            pass
-
-        # Finally, fall back to direct connect (psycopg2 then psycopg3)
+        # Try psycopg2 first (commonly installed as psycopg2-binary). If it's
+        # not available, fall back to psycopg (psycopg3) which tends to have
+        # prebuilt wheels on modern systems.
         try:
             import psycopg2 as _psycopg2  # type: ignore
             try:
@@ -206,65 +103,19 @@ def get_db_connection():
                     raw = _psycopg2.connect(DATABASE_URL)
                 else:
                     raise
-            conn = PGConnectionAdapter(raw)
+            return PGConnectionAdapter(raw)
         except Exception:
+            # Try psycopg (psycopg3)
             try:
                 import psycopg as _psycopg3  # type: ignore
                 try:
                     raw = _psycopg3.connect(DATABASE_URL, sslmode="require")
                 except Exception:
                     raw = _psycopg3.connect(DATABASE_URL)
-                conn = PGConnectionAdapter(raw)
+                return PGConnectionAdapter(raw)
             except Exception:
+                # Re-raise a clear error for the caller so failures are visible
                 raise
-
-        # If request-scoped storage is available, save this connection so
-        # subsequent get_db_connection() calls during the same request reuse it.
-        try:
-            if _DB_CONN is not None:
-                class _ReqConnWrapper:
-                    def __init__(self, adapter_conn):
-                        self._adapter = adapter_conn
-
-                    def cursor(self):
-                        return self._adapter.cursor()
-
-                    def commit(self):
-                        return self._adapter.commit()
-
-                    def rollback(self):
-                        return self._adapter.rollback()
-
-                    def close(self):
-                        # deferred — leave to middleware to really close
-                        pass
-
-                    def really_close(self):
-                        try:
-                            if hasattr(self._adapter, 'close'):
-                                self._adapter.close()
-                        except Exception:
-                            pass
-
-                    def executescript(self, sql_script: str):
-                        return self._adapter.executescript(sql_script)
-
-                    def execute(self, sql: str, params=None):
-                        return self._adapter.execute(sql, params)
-
-                    def __getattr__(self, name: str):
-                        return getattr(self._adapter, name)
-
-                req_conn = _ReqConnWrapper(conn)
-                try:
-                    _DB_CONN.set(req_conn)
-                except Exception:
-                    pass
-                return req_conn
-        except Exception:
-            pass
-
-        return conn
     else:
         # SQLite for local development
         conn = sqlite3.connect(
