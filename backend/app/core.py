@@ -31,6 +31,9 @@ except Exception:
 _PADDLE_OCR = None
 APP_TZ = ZoneInfo("Europe/Madrid")
 
+# ContextVar for per-request DB connection metrics: count and cumulative connect time
+_DB_METRICS = contextvars.ContextVar('db_metrics', default={'count': 0, 'time': 0.0})
+
 # --- Rutas de la aplicación ---
 APP_DIR = Path(__file__).resolve().parent
 ROOT_DIR = APP_DIR.parent
@@ -112,13 +115,8 @@ def db():
         from app.db_config import get_db_connection
         # Track per-request DB connection metrics using a ContextVar so the
         # home() handler can report aggregated connect times without relying
-        # on external logging. Default is created lazily in handlers.
-        try:
-            _db_metrics = _DB_METRICS
-        except NameError:
-            _DB_METRICS = contextvars.ContextVar('db_metrics', default={'count': 0, 'time': 0.0})
-            _db_metrics = _DB_METRICS
-
+        # on external logging.
+        _db_metrics = _DB_METRICS
         t0 = time.time()
         conn = get_db_connection()
         elapsed = time.time() - t0
