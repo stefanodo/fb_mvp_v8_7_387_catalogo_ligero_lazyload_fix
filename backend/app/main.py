@@ -98,6 +98,46 @@ class TimingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class DBConnectionMiddleware(BaseHTTPMiddleware):
+    """Reset per-request DB metrics and ensure the request-scoped DB
+    connection is really closed after the response is sent."""
+    async def dispatch(self, request: Request, call_next):
+        try:
+            from app.core import _DB_METRICS, _DB_CONN
+            try:
+                _DB_METRICS.set({'count': 0, 'time': 0.0})
+            except Exception:
+                pass
+            try:
+                _DB_CONN.set(None)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        response = await call_next(request)
+
+        try:
+            from app.core import _DB_CONN
+            conn = _DB_CONN.get()
+            if conn is not None:
+                try:
+                    # Perform the real close that was deferred during the request
+                    conn.really_close()
+                except Exception:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                try:
+                    _DB_CONN.set(None)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return response
+
+
 class NoStoreMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -113,6 +153,7 @@ class NoStoreMiddleware(BaseHTTPMiddleware):
         return response
 
 
+app.add_middleware(DBConnectionMiddleware)
 app.add_middleware(TimingMiddleware)
 app.add_middleware(NoStoreMiddleware)
 
