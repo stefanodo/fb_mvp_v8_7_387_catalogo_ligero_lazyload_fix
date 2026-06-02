@@ -2273,6 +2273,14 @@ def home(request: Request, center_id: Optional[int] = None):
         "direction_view": direction_view,
         **inventory_ctx,
     })
+    # Force template rendering here to measure render time (helps diagnose cold-starts)
+    t_render = time.time()
+    try:
+        # TemplateResponse.render() will produce the body synchronously
+        resp.render()
+        _mark('template_render', t_render)
+    except Exception:
+        _mark('template_render', t_render)
     _mark('template_response_prep', t0)
     total_elapsed = time.time() - total_start
     try:
