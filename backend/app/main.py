@@ -1351,6 +1351,17 @@ def home(request: Request, center_id: Optional[int] = None):
     stock_item_id_q = request.query_params.get("stock_item_id") or ""
     stock_wh_id_q = request.query_params.get("stock_wh_id") or ""
 
+    # Performance timers for diagnosing slow cold-starts / long handlers
+    total_start = time.time()
+    perf = {}
+    def _mark(name, t0):
+        elapsed = time.time() - t0
+        try:
+            print(f"[perf-home] {name} {elapsed:.3f}s path={request.url.path}")
+        except Exception:
+            pass
+        perf[name] = elapsed
+
     if page not in {"inicio", "finanzas", "operativa", "stock", "inventario", "recetas", "producciones", "pedidos", "albaranes", "laboratorio", "admin", "mermas", "mermas_control"}:
         page = "inicio"
 
@@ -1371,6 +1382,7 @@ def home(request: Request, center_id: Optional[int] = None):
     # Catálogo/Admin debe cargar liviano: no hacemos CROSS JOIN stock x almacén x artículo
     # ni cálculos operativos que esta página no necesita. Las tablas grandes se cargan por API.
     if page == "admin":
+        t0 = time.time()
         conn_light = db(); cur_light = conn_light.cursor(); ensure_columns(cur_light)
         centers = cur_light.execute("SELECT * FROM centers ORDER BY id").fetchall()
         warehouses = cur_light.execute("SELECT w.id,w.name,w.center_id,c.name center_name FROM warehouses w JOIN centers c ON c.id=w.center_id ORDER BY c.id,w.id").fetchall()
@@ -1379,11 +1391,15 @@ def home(request: Request, center_id: Optional[int] = None):
         conn_light.close()
         stocks = []
         summary = {"centers": len(centers), "positions": 0, "below_min": 0}
+        _mark('get_dashboard_data_admin', t0)
     else:
+        t0 = time.time()
         centers, warehouses, items, stocks, summary, recipes = get_dashboard_data(center_id)
+        _mark('get_dashboard_data', t0)
     warehouses_json = [{k: w[k] for k in w.keys()} for w in warehouses]
     # Producciones limpias para Producciones/Pedidos: no platos finales, no fotos, no ingredientes sueltos.
     production_recipe_groups = {k: [] for k in ['frio','caliente','postres','salsas','guarniciones','bases','masas','pasteleria','porcionados','otros']}
+    t0 = time.time()
     try:
         for _r in recipes:
             _d = {k: _r[k] for k in _r.keys()} if hasattr(_r, 'keys') else dict(_r)
@@ -1395,6 +1411,7 @@ def home(request: Request, center_id: Optional[int] = None):
             production_recipe_groups[_fam].sort(key=lambda x: (x.get('name') or '').lower())
     except Exception:
         pass
+    _mark('production_recipe_groups', t0)
     items_json = [{k: i[k] for k in i.keys()} for i in items]
     for it in items_json:
         it['stock_area'] = normalize_stock_area(it.get('stock_area') or '')
@@ -1995,10 +2012,13 @@ def home(request: Request, center_id: Optional[int] = None):
     if stock_section not in {'fresh', 'productions', 'frozen', 'dry', 'cleaning', 'unclassified', 'unlocated', 'current_all'}:
         stock_section = 'fresh'
 
+    t0 = time.time()
     connps = db(); curps = connps.cursor()
     production_stocks = get_production_stocks(curps, center_id if center_id else None)
     connps.close()
+    _mark('get_production_stocks', t0)
 
+    t0 = time.time()
     inventory_ctx = _build_inventory_context(
         center_id=center_id or 0,
         warehouses=warehouses,
@@ -2006,6 +2026,7 @@ def home(request: Request, center_id: Optional[int] = None):
         production_stocks=production_stocks,
         request=request,
     )
+    _mark('build_inventory_context', t0)
 
     item_search = (request.query_params.get("item_search") or "").strip()
     ql = item_search.lower()
@@ -2013,11 +2034,14 @@ def home(request: Request, center_id: Optional[int] = None):
 
     # Proveedores y precios
     conn2 = db(); cur2 = conn2.cursor()
+    t1 = time.time()
     suppliers = cur2.execute("SELECT * FROM suppliers ORDER BY name").fetchall()
+    _mark('suppliers_query', t1)
     if page == "admin":
         # Se carga bajo demanda con /api/admin/supplier_prices_page.
         supplier_prices = []
     else:
+        t2 = time.time()
         supplier_prices = cur2.execute(
             """SELECT sp.id,sp.supplier_id,sp.item_id,sp.center_id,sp.price_per_purchase,sp.purchase_unit,
                       sp.purchase_to_base_factor,sp.is_preferred,sp.updated_at,s.name supplier_name,i.name item_name
@@ -2025,18 +2049,24 @@ def home(request: Request, center_id: Optional[int] = None):
                  JOIN suppliers s ON s.id=sp.supplier_id
                  JOIN items i ON i.id=sp.item_id
                  ORDER BY s.name,i.name""").fetchall()
+        _mark('supplier_prices_query', t2)
+    t3 = time.time()
     suppliers_json = [{k: s[k] for k in s.keys()} for s in suppliers]
     supplier_prices_json = [{k: p[k] for k in p.keys()} for p in supplier_prices]
     users_rows = cur2.execute("SELECT id,name,role,center_id,is_active FROM users WHERE COALESCE(is_active,1)=1 ORDER BY CASE WHEN UPPER(TRIM(name))='ADMIN GENERAL' THEN 1 ELSE 0 END, name").fetchall()
+    _mark('users_query', t3)
     users_json = [{k: u[k] for k in u.keys()} for u in users_rows]
     try:
+        t4 = time.time()
         recipe_modifiers_admin = list_recipe_modifiers_admin(cur2)
+        _mark('recipe_modifiers_admin', t4)
     except Exception as _pm_admin_exc:
         print(f"POS_MODIFIERS_ADMIN_SKIP reason={_pm_admin_exc}")
         recipe_modifiers_admin = {"modifiers": [], "maps": [], "recipes": [], "items": [], "actions": [], "types": []}
     conn2.close()
 
     # Producciones
+    t0 = time.time()
     connp = db(); curp = connp.cursor()
     production_group_filter = (request.query_params.get("prod_group") or "").strip()
     productions_json = list_productions(
@@ -2046,8 +2076,10 @@ def home(request: Request, center_id: Optional[int] = None):
         production_group_filter=production_group_filter,
     )
     connp.close()
+    _mark('list_productions', t0)
 
     # Pedidos
+    t0 = time.time()
     conno = db(); curo = conno.cursor()
     order_status_clause = "o.status='ARCHIVED'" if show_archived_orders else "COALESCE(o.status,'') <> 'ARCHIVED'"
     if center_id:
@@ -2063,10 +2095,12 @@ def home(request: Request, center_id: Optional[int] = None):
                 WHERE {order_status_clause} ORDER BY o.id DESC""").fetchall()
     orders_json = [{k: r[k] for k in r.keys()} for r in orders]
     conno.close()
+    _mark('orders_query', t0)
 
     # Mermas / Control de mermas
     waste_status_filter = (request.query_params.get("waste_status") or "").strip().upper()
     waste_days = int(request.query_params.get("waste_days") or 30) if str(request.query_params.get("waste_days") or "30").isdigit() else 30
+    t0 = time.time()
     try:
         waste_records = list_waste_records(center_id=center_id or 0, status=waste_status_filter, limit=160)
         waste_control = waste_analytics(center_id=center_id or 0, days=waste_days)
@@ -2074,21 +2108,27 @@ def home(request: Request, center_id: Optional[int] = None):
         print(f"WASTE_CONTEXT_SKIP reason={_wexc}")
         waste_records = []
         waste_control = {"days": waste_days, "total_records": 0, "confirmed_records": 0, "pending_records": 0, "total_loss": 0, "potential_loss": 0, "avg_loss": 0, "by_reason": [], "by_responsible": [], "by_center": [], "by_family": [], "top_items": [], "recent": []}
+    _mark('waste_context', t0)
 
 
     # Operativa rápida: colas compartidas de pedidos/producciones/mermas
+    t0 = time.time()
     try:
         operational_queue = list_operational_queue(center_id=center_id or 0)
     except Exception as _oexc:
         print(f"OPERATIVA_CONTEXT_SKIP reason={_oexc}")
         operational_queue = {"ORDER": [], "PRODUCTION": [], "WASTE": []}
+    _mark('operational_queue', t0)
+    t1 = time.time()
     try:
         ai_status = get_ai_status()
     except Exception as _aiex:
         print(f"AI_STATUS_SKIP reason={_aiex}")
         ai_status = {"configured": False, "ai_mode": "local", "stt_mode": "local", "ai_model": "local", "stt_model": "local", "status_label": "LOCAL / SIN IA EXTERNA", "warning": "No se pudo leer estado IA."}
+    _mark('ai_status', t1)
 
     # Albaranes
+    t0 = time.time()
     connr = db(); curr = connr.cursor()
     try:
         cleanup_receipt_photos(curr, int(center_id) if center_id else None)
@@ -2163,7 +2203,9 @@ def home(request: Request, center_id: Optional[int] = None):
                             pass
                     _ol["display_name"] = _display
     connr.close()
+    _mark('receipts_context', t0)
 
+    t0 = time.time()
     resp = templates.TemplateResponse(request, "index.html", {
         "request": request,
         "page": page,
@@ -2231,6 +2273,13 @@ def home(request: Request, center_id: Optional[int] = None):
         "direction_view": direction_view,
         **inventory_ctx,
     })
+    _mark('template_response_prep', t0)
+    total_elapsed = time.time() - total_start
+    try:
+        summary_str = ' '.join([f"{k}:{v:.3f}s" for k, v in perf.items()])
+        print(f"[perf-home] total {total_elapsed:.3f}s path={request.url.path} breakdown={summary_str}")
+    except Exception:
+        pass
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     return resp
