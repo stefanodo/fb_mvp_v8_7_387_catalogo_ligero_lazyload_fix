@@ -86,102 +86,36 @@ else:
 def get_db_connection():
     """Get database connection - PostgreSQL in production, SQLite locally"""
     if IS_PRODUCTION:
-        # Simple in-process pooled connections to avoid creating a new
-        # TCP/SSL connection on every `db()` call (which is very expensive
-        # under serverless). Keep the pool tiny and thread-safe.
+        # PostgreSQL connection for Vercel — return a lightweight adapter that
+        # emulates the sqlite3 Connection/Cursor API used across the codebase.
+        # Import adapter lazily to avoid importing psycopg2 during local dev.
         from app.pg_adapter import PGConnectionAdapter
-
-        # Pool globals (module-scoped)
-        global _PG_CONN_POOL, _PG_POOL_LOCK, _PG_POOL_MAX
+        # Try psycopg2 first (commonly installed as psycopg2-binary). If it's
+        # not available, fall back to psycopg (psycopg3) which tends to have
+        # prebuilt wheels on modern systems.
         try:
-            _PG_CONN_POOL
-        except NameError:
-            _PG_CONN_POOL = []
-            _PG_POOL_LOCK = threading.Lock()
-            _PG_POOL_MAX = int(os.getenv("PG_CONN_POOL_SIZE", "6"))
-
-        def _create_raw_conn_psycopg2():
             import psycopg2 as _psycopg2  # type: ignore
             try:
-                return _psycopg2.connect(DATABASE_URL, sslmode="require")
+                raw = _psycopg2.connect(DATABASE_URL, sslmode="require")
             except Exception as exc:
                 msg = str(exc).lower()
                 if "server does not support ssl" in msg or "ssl" in msg:
-                    return _psycopg2.connect(DATABASE_URL)
-                raise
-
-        def _create_raw_conn_psycopg3():
-            import psycopg as _psycopg3  # type: ignore
-            try:
-                return _psycopg3.connect(DATABASE_URL, sslmode="require")
-            except Exception:
-                return _psycopg3.connect(DATABASE_URL)
-
-        def _acquire_raw():
-            with _PG_POOL_LOCK:
-                if _PG_CONN_POOL:
-                    return _PG_CONN_POOL.pop()
-            # create new
-            try:
-                return _create_raw_conn_psycopg2()
-            except Exception:
-                return _create_raw_conn_psycopg3()
-
-        def _release_raw(conn):
-            try:
-                with _PG_POOL_LOCK:
-                    if len(_PG_CONN_POOL) < _PG_POOL_MAX:
-                        _PG_CONN_POOL.append(conn)
-                        return
-                # pool full — close the connection
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-            except Exception:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-        # Acquire a raw connection from pool (or create one)
-        raw = None
-        try:
-            raw = _acquire_raw()
+                    raw = _psycopg2.connect(DATABASE_URL)
+                else:
+                    raise
+            return PGConnectionAdapter(raw)
         except Exception:
-            # If pool acquisition/creation failed, propagate a clear error
-            raise
-
-        # Wrap raw conn in a pool-aware adapter that returns the raw connection
-        # to the pool when `close()` is called.
-        class _PoolAwareConn:
-            def __init__(self, raw_conn):
-                self._raw = raw_conn
-                self._adapter = PGConnectionAdapter(raw_conn)
-
-            def cursor(self):
-                return self._adapter.cursor()
-
-            def commit(self):
-                return self._adapter.commit()
-
-            def rollback(self):
-                return self._adapter.rollback()
-
-            def close(self):
-                # Return to pool instead of fully closing.
-                _release_raw(self._raw)
-
-            def executescript(self, sql_script: str):
-                return self._adapter.executescript(sql_script)
-
-            def execute(self, sql: str, params=None):
-                return self._adapter.execute(sql, params)
-
-            def __getattr__(self, name: str):
-                return getattr(self._adapter, name)
-
-        return _PoolAwareConn(raw)
+            # Try psycopg (psycopg3)
+            try:
+                import psycopg as _psycopg3  # type: ignore
+                try:
+                    raw = _psycopg3.connect(DATABASE_URL, sslmode="require")
+                except Exception:
+                    raw = _psycopg3.connect(DATABASE_URL)
+                return PGConnectionAdapter(raw)
+            except Exception:
+                # Re-raise a clear error for the caller so failures are visible
+                raise
     else:
         # SQLite for local development
         conn = sqlite3.connect(
