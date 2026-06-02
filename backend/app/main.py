@@ -2278,6 +2278,10 @@ def home(request: Request, center_id: Optional[int] = None):
     try:
         summary_str = ' '.join([f"{k}:{v:.3f}s" for k, v in perf.items()])
         print(f"[perf-home] total {total_elapsed:.3f}s path={request.url.path} breakdown={summary_str}")
+        try:
+            resp.headers["X-Perf-Breakdown"] = summary_str
+        except Exception:
+            pass
     except Exception:
         pass
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
