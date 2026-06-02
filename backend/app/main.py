@@ -2290,6 +2290,20 @@ def home(request: Request, center_id: Optional[int] = None):
     total_elapsed = time.time() - total_start
     try:
         summary_str = ' '.join([f"{k}:{v:.3f}s" for k, v in perf.items()])
+        # Include DB connection metrics if available
+        try:
+            from app.core import _DB_METRICS
+            m = _DB_METRICS.get()
+            db_count = int(m.get('count', 0))
+            db_time = float(m.get('time', 0.0))
+            summary_str = f"db_conns:{db_count} db_connect_time:{db_time:.3f}s " + summary_str
+            try:
+                resp.headers["X-DB-Conn-Count"] = str(db_count)
+                resp.headers["X-DB-Conn-Time"] = f"{db_time:.3f}s"
+            except Exception:
+                pass
+        except Exception:
+            pass
         print(f"[perf-home] total {total_elapsed:.3f}s path={request.url.path} breakdown={summary_str}")
         try:
             resp.headers["X-Perf-Breakdown"] = summary_str
