@@ -314,6 +314,14 @@ def migrate_to_postgresql():
             )
         """)
 
+        # Create index to speed up queries that filter inventory_sessions by center_id and status
+        # This is guarded with try/except because some older schemas may not have a `status` column;
+        # if the column is missing, the CREATE INDEX will fail and we simply skip it.
+        try:
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_inventory_sessions_center_status ON inventory_sessions (center_id, status)")
+        except Exception:
+            pass
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS inventory_counts (
                 id SERIAL PRIMARY KEY,
