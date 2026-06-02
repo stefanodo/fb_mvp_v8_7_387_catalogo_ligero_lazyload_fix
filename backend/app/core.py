@@ -3,6 +3,7 @@
 # ==============================================================================
 import re
 import sqlite3
+import contextvars
 import unicodedata
 import os
 import shutil
@@ -109,7 +110,25 @@ def db():
         # sqlite3 connection. This avoids duplicate pragma/connection logic
         # spread across the codebase.
         from app.db_config import get_db_connection
-        return get_db_connection()
+        # Track per-request DB connection metrics using a ContextVar so the
+        # home() handler can report aggregated connect times without relying
+        # on external logging. Default is created lazily in handlers.
+        try:
+            _db_metrics = _DB_METRICS
+        except NameError:
+            _DB_METRICS = contextvars.ContextVar('db_metrics', default={'count': 0, 'time': 0.0})
+            _db_metrics = _DB_METRICS
+
+        t0 = time.time()
+        conn = get_db_connection()
+        elapsed = time.time() - t0
+        try:
+            m = _db_metrics.get()
+            m2 = {'count': int(m.get('count', 0)) + 1, 'time': float(m.get('time', 0.0)) + elapsed}
+            _db_metrics.set(m2)
+        except Exception:
+            pass
+        return conn
     except Exception:
         # Fallback: local sqlite connection (keeps previous behavior when
         # `app.db_config` is not available for any reason).
