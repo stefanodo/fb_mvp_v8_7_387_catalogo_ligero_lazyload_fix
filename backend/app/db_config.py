@@ -90,32 +90,100 @@ def get_db_connection():
         # emulates the sqlite3 Connection/Cursor API used across the codebase.
         # Import adapter lazily to avoid importing psycopg2 during local dev.
         from app.pg_adapter import PGConnectionAdapter
-        # Try psycopg2 first (commonly installed as psycopg2-binary). If it's
-        # not available, fall back to psycopg (psycopg3) which tends to have
-        # prebuilt wheels on modern systems.
+
+        # If a request-scoped connection was already created by `core.db()`
+        # or by another caller, return it so all code paths share the same
+        # connection during a request. This avoids repeated TCP connects
+        # when modules call `get_db_connection()` directly.
+        try:
+            # Import locally to avoid circular imports at module import time.
+            import app.core as _core
+            try:
+                existing = _core._DB_CONN.get()
+                if existing is not None:
+                    return existing
+            except Exception:
+                existing = None
+        except Exception:
+            existing = None
+
+        # Establish a new raw connection (prefer psycopg2, fallback to psycopg3)
+        raw_conn = None
         try:
             import psycopg2 as _psycopg2  # type: ignore
             try:
-                raw = _psycopg2.connect(DATABASE_URL, sslmode="require")
+                raw_conn = _psycopg2.connect(DATABASE_URL, sslmode="require")
             except Exception as exc:
                 msg = str(exc).lower()
                 if "server does not support ssl" in msg or "ssl" in msg:
-                    raw = _psycopg2.connect(DATABASE_URL)
+                    raw_conn = _psycopg2.connect(DATABASE_URL)
                 else:
                     raise
-            return PGConnectionAdapter(raw)
         except Exception:
-            # Try psycopg (psycopg3)
             try:
                 import psycopg as _psycopg3  # type: ignore
                 try:
-                    raw = _psycopg3.connect(DATABASE_URL, sslmode="require")
+                    raw_conn = _psycopg3.connect(DATABASE_URL, sslmode="require")
                 except Exception:
-                    raw = _psycopg3.connect(DATABASE_URL)
-                return PGConnectionAdapter(raw)
+                    raw_conn = _psycopg3.connect(DATABASE_URL)
             except Exception:
                 # Re-raise a clear error for the caller so failures are visible
                 raise
+
+        adapter = PGConnectionAdapter(raw_conn)
+
+        # Wrap the adapter in a request-scoped thin wrapper so that legacy
+        # code can call `.close()` safely (no-op) and middleware will call
+        # `.really_close()` at request end to perform the actual close.
+        class _RequestScopedConn:
+            def __init__(self, raw):
+                self._raw = raw
+                self._adapter = raw
+                self._closed = False
+
+            def cursor(self):
+                return self._adapter.cursor()
+
+            def commit(self):
+                return self._adapter.commit()
+
+            def rollback(self):
+                return self._adapter.rollback()
+
+            def close(self):
+                # Defer actual close until middleware calls `really_close()`
+                self._closed = True
+
+            def really_close(self):
+                try:
+                    if hasattr(self._adapter, 'close'):
+                        self._adapter.close()
+                except Exception:
+                    pass
+
+            def executescript(self, sql_script: str):
+                return self._adapter.executescript(sql_script)
+
+            def execute(self, sql: str, params=None):
+                return self._adapter.execute(sql, params)
+
+            def __getattr__(self, name: str):
+                return getattr(self._adapter, name)
+
+        req_conn = _RequestScopedConn(adapter)
+
+        # Propagate into core._DB_CONN if available so other callers (and
+        # middleware) will see the same request-scoped connection.
+        try:
+            import app.core as _core2
+            try:
+                _core2._DB_CONN.set(req_conn)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        return req_conn
     else:
         # SQLite for local development
         conn = sqlite3.connect(
