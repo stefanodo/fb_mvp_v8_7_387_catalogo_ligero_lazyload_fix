@@ -654,6 +654,7 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
     if inv_mode=='limpieza': inv_family='limpieza'
     if inv_mode=='libres': inv_family='libres'
 
+    t_inv_start = time.time()
     conn = db(); cur = conn.cursor()
     ensure_columns(cur)
     current_session = None
@@ -685,6 +686,11 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
             row = cur.execute("SELECT * FROM inventory_sessions WHERE id=?", (int(last_id),)).fetchone()
             current_session = {k: row[k] for k in row.keys()} if row else None
     conn.close()
+    try:
+        t_after_session = time.time() - t_inv_start
+        print(f"[perf-inv] session_lookup {t_after_session:.3f}s center_id={center_id}")
+    except Exception:
+        pass
 
     # Ensure we always have a dict to work with. If DB operations somehow
     # failed to create or return a session, provide a safe fallback so the
@@ -705,7 +711,12 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
         current_session.setdefault('responsible_name', '')
         current_session.setdefault('note', '')
 
+    t_counts_start = time.time()
     counts_map = _inventory_counts_map(int(current_session.get('id') or 0))
+    try:
+        print(f"[perf-inv] counts_map {time.time() - t_counts_start:.3f}s session_id={int(current_session.get('id') or 0)}")
+    except Exception:
+        pass
     selected_wh = int(current_session.get('warehouse_id') or 0)
     warehouse_lookup = {0: 'Todos'}
     for _w in warehouses:
@@ -742,6 +753,10 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
         seen_warehouse_names.add(wkey)
         row['name'] = wname
         warehouse_options.append(row)
+    try:
+        print(f"[perf-inv] warehouse_options_build {time.time() - t_counts_start:.3f}s options={len(warehouse_options)}")
+    except Exception:
+        pass
     selected_wh_name_norm = _norm_warehouse_name(current_session.get('warehouse_name'))
     inv_family = _inventory_normalize_family_for_warehouse(inv_mode, inv_family, current_session.get('warehouse_name') or '')
     raw_groups = {k: [] for k in ['verduras','carnes','pescados','lacteos_huevos','secos','congelados','limpieza','otros']}
@@ -840,6 +855,7 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
     prod_groups = {k: [] for k in ['frio','caliente','postres','salsas','guarniciones','bases','masas','pasteleria','porcionados','otros']}
     prod_id_groups = {}
     recipe_meta = {}
+    t_prod_start = time.time()
     if production_stocks:
         conn = db(); cur = conn.cursor()
         ids = sorted({int(p.get('last_prod_id') or 0) for p in production_stocks if int(p.get('last_prod_id') or 0) > 0})
@@ -941,6 +957,10 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
     for fam in prod_groups:
         prod_groups[fam].sort(key=lambda x: ((x['theoretical_qty']<=0), x['item_name'].lower()))
 
+    try:
+        print(f"[perf-inv] production_groups_prep {time.time() - t_prod_start:.3f}s prod_count={len(production_stocks) if production_stocks else 0}")
+    except Exception:
+        pass
     conn = db(); cur = conn.cursor()
     free_rows_raw = cur.execute("SELECT * FROM inventory_counts WHERE session_id=? AND source_type='free' ORDER BY id DESC", (int(current_session.get('id') or 0),)).fetchall()
     conn.close()
@@ -1018,6 +1038,10 @@ def _build_inventory_context(*, center_id, warehouses, stocks, production_stocks
         'limpieza_total': len(raw_groups.get('limpieza', [])),
         'limpieza_checked': _count_checked(raw_groups.get('limpieza', [])),
     }
+    try:
+        print(f"[perf-inv] build_inventory_context_total {time.time() - t_inv_start:.3f}s center_id={center_id}")
+    except Exception:
+        pass
     return {
         'inventory_session': current_session, 'inventory_mode': inv_mode, 'inventory_family': inv_family,
         'inventory_raw_groups': raw_groups, 'inventory_production_groups': prod_groups,

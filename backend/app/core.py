@@ -9,6 +9,7 @@ import os
 import shutil
 import csv
 import time
+import traceback
 import calendar
 from pathlib import Path
 import tempfile
@@ -2818,7 +2819,18 @@ def get_production_stocks(cur, center_id=None):
      ORDER BY c.name, w.name, i.name
     """
 
-    rows = cur.execute(sql, params).fetchall()
+    try:
+        rows = cur.execute(sql, params).fetchall()
+    except Exception as exc:
+        try:
+            print(f"ERROR_SQL get_production_stocks failed: {exc}")
+            print("ERROR_SQL query:")
+            print(sql)
+            print("ERROR_SQL params:", repr(params))
+            print(traceback.format_exc())
+        except Exception:
+            pass
+        raise
     payload = []
     seen_prod = set()
     for r in rows:
@@ -2862,7 +2874,8 @@ def get_production_stocks(cur, center_id=None):
     if center_id:
         center_clause = 'AND p.center_id=?'
         inc_params.append(int(center_id))
-    inc_rows = cur.execute(f"""
+    try:
+        inc_rows = cur.execute(f"""
         SELECT p.id production_id, p.center_id, c.name center_name, p.warehouse_id, w.name warehouse_name,
                p.created_at, COALESCE(p.note,'') note
           FROM productions p
@@ -2877,6 +2890,16 @@ def get_production_stocks(cur, center_id=None):
            )
          ORDER BY p.id DESC
     """, tuple(inc_params)).fetchall()
+    except Exception as exc:
+        try:
+            print(f"ERROR_SQL get_production_stocks (inc_rows) failed: {exc}")
+            print("ERROR_SQL inc_query:")
+            print(f"SELECT ... with center_clause={center_clause}")
+            print("ERROR_SQL params:", repr(tuple(inc_params)))
+            print(traceback.format_exc())
+        except Exception:
+            pass
+        raise
     for r in inc_rows:
         pid = int(r['production_id'] or 0)
         if pid in seen_prod:
