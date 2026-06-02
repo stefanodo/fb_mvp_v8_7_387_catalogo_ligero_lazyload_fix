@@ -33,6 +33,8 @@ APP_TZ = ZoneInfo("Europe/Madrid")
 
 # ContextVar for per-request DB connection metrics: count and cumulative connect time
 _DB_METRICS = contextvars.ContextVar('db_metrics', default={'count': 0, 'time': 0.0})
+# ContextVar for per-request cached DB connection (to avoid repeated TCP connects)
+_DB_CONN = contextvars.ContextVar('db_conn', default=None)
 
 # --- Rutas de la aplicación ---
 APP_DIR = Path(__file__).resolve().parent
@@ -117,8 +119,13 @@ def db():
         # home() handler can report aggregated connect times without relying
         # on external logging.
         _db_metrics = _DB_METRICS
+        # Reuse a single connection per request if already created
+        existing = _DB_CONN.get()
+        if existing is not None:
+            return existing
+
         t0 = time.time()
-        conn = get_db_connection()
+        raw_conn = get_db_connection()
         elapsed = time.time() - t0
         try:
             m = _db_metrics.get()
@@ -126,7 +133,48 @@ def db():
             _db_metrics.set(m2)
         except Exception:
             pass
-        return conn
+
+        # Wrap raw connection so that .close() called by legacy code is a
+        # no-op during the request; the real close is performed by middleware
+        # at the end of the request via `really_close`.
+        class _RequestScopedConn:
+            def __init__(self, raw):
+                self._raw = raw
+                self._adapter = raw
+                self._closed = False
+
+            def cursor(self):
+                return self._adapter.cursor()
+
+            def commit(self):
+                return self._adapter.commit()
+
+            def rollback(self):
+                return self._adapter.rollback()
+
+            def close(self):
+                # Defer actual close until request end
+                self._closed = True
+
+            def really_close(self):
+                try:
+                    if hasattr(self._adapter, 'close'):
+                        self._adapter.close()
+                except Exception:
+                    pass
+
+            def executescript(self, sql_script: str):
+                return self._adapter.executescript(sql_script)
+
+            def execute(self, sql: str, params=None):
+                return self._adapter.execute(sql, params)
+
+            def __getattr__(self, name: str):
+                return getattr(self._adapter, name)
+
+        req_conn = _RequestScopedConn(raw_conn)
+        _DB_CONN.set(req_conn)
+        return req_conn
     except Exception:
         # Fallback: local sqlite connection (keeps previous behavior when
         # `app.db_config` is not available for any reason).
