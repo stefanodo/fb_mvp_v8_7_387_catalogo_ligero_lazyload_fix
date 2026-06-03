@@ -1337,6 +1337,12 @@ def migrate_to_postgresql():
         except Exception:
             pass
 
+        # Ensure the index exists after the `status` column has been added.
+        try:
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_inventory_sessions_center_status ON inventory_sessions (center_id, status)")
+        except Exception:
+            pass
+
         try:
             cur.execute("ALTER TABLE inventory_counts ADD COLUMN IF NOT EXISTS source_type TEXT NOT NULL DEFAULT 'raw'")
             cur.execute("ALTER TABLE inventory_counts ADD COLUMN IF NOT EXISTS item_name TEXT")
