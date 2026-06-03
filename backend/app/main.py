@@ -59,7 +59,7 @@ from app.services.daily_business_dashboard_service import build_daily_business_d
 from app.services.executive_finance_dashboard_service import build_executive_finance_dashboard
 from app.services.pos_modifiers_service import build_monthly_modifier_dashboard, list_recipe_modifiers_admin, interpret_free_pos_modifier_note
 from app.services.oido_alfi_service import answer_oido_alfi
-from app.routers import stock, recetas, producciones, pedidos, albaranes, laboratorio, admin, inventario, mermas, operativa, ai_system
+from app.routers import stock, recetas, producciones, pedidos, albaranes, laboratorio, admin, inventario, mermas, operativa, ai_system, debug_index
 from app.recipe_ai import router as recipe_ai_router
 
 # ==============================================================================
@@ -170,6 +170,7 @@ app.include_router(mermas.router)
 app.include_router(operativa.router)
 app.include_router(ai_system.router)
 app.include_router(recipe_ai_router.router)
+app.include_router(debug_index.router)
 
 # --- Archivos estáticos ---
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
