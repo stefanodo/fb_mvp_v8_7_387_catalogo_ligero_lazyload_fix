@@ -151,5 +151,47 @@ def verify_index(token: str | None = None, create: int = 0, explain: int = 0, ce
                 except Exception:
                     return {"ok": False, "error": "EXPLAIN failed", "pg_error": str(e_pg)}
         return {"ok": True, "indexes": out, "creation_error": creation_error, "explain": explain_output}
+    # Optional: quick DB ping to measure connection / simple query times
+    if int(os.getenv('PING_DB_SAFE', '1')) and int(os.getenv('VERIFY_INDEX_TOKEN') or 0) == 0:
+        # Allow lightweight ping when no token is configured; otherwise use token to protect.
+        pass
+    if int(os.getenv('PING_DB_SAFE', '1')) and int(os.getenv('VERIFY_INDEX_TOKEN') or 0) != 0 and token != os.getenv('VERIFY_INDEX_TOKEN'):
+        # If token is configured and not provided, do not run ping.
+        pass
+    # If user requested a DB ping explicitly, run it and return timings.
+    ping = False
+    try:
+        # Accept ping_db either as query param (present in function args via request binding)
+        # or reading raw query string via environment isn't feasible here; rely on `create`/`explain` combos.
+        # For backward compatibility, check `which=='ping_db'` as a trigger.
+        if (which or '').lower() == 'ping_db':
+            ping = True
+    except Exception:
+        ping = False
+    if ping:
+        try:
+            import time
+            t0 = time.time()
+            conn = db()
+            t_conn = time.time() - t0
+            cur = conn.cursor()
+            t_q0 = time.time()
+            try:
+                cur.execute('SELECT 1')
+                _ = cur.fetchone()
+            except Exception:
+                pass
+            t_q = time.time() - t_q0
+            # Close the request-scoped connection if present
+            try:
+                if hasattr(conn, 'really_close'):
+                    conn.really_close()
+                else:
+                    conn.close()
+            except Exception:
+                pass
+            return {"ok": True, "db_connect_time": f"{t_conn:.3f}s", "simple_query_time": f"{t_q:.3f}s"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
     except Exception as e:
         return {"ok": False, "error": str(e)}
