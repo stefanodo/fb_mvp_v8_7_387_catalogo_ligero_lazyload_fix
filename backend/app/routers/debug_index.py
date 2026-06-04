@@ -24,7 +24,10 @@ def verify_index(token: str | None = None, create: int = 0, explain: int = 0, ce
         # Optionally create the index (temporary route for verification)
         if int(create):
             try:
+                # Create the inventory_sessions index (existing helper)
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_inventory_sessions_center_status ON inventory_sessions (center_id, status)")
+                # Also create an index to speed up inventory_counts lookups by session_id
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_inventory_counts_session_id ON inventory_counts (session_id)")
             except Exception as e:
                 # Return creation error but continue to show current indexes
                 creation_error = str(e)
