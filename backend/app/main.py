@@ -1431,6 +1431,32 @@ def home(request: Request, center_id: Optional[int] = None):
     if page not in {"inicio", "finanzas", "operativa", "stock", "inventario", "recetas", "producciones", "pedidos", "albaranes", "laboratorio", "admin", "mermas", "mermas_control"}:
         page = "inicio"
 
+    is_inicio = page == "inicio"
+    is_finanzas = page == "finanzas"
+    is_operativa = page == "operativa"
+    is_stock = page == "stock"
+    is_inventario = page == "inventario"
+    is_recetas = page == "recetas"
+    is_producciones = page == "producciones"
+    is_pedidos = page == "pedidos"
+    is_albaranes = page == "albaranes"
+    is_laboratorio = page == "laboratorio"
+    is_admin = page == "admin"
+    is_mermas = page == "mermas"
+    is_mermas_control = page == "mermas_control"
+
+    need_stock_context = page in {"stock", "inventario"}
+    need_inventory_context = page == "inventario"
+    need_admin_page = page == "admin"
+    need_recipes_page = page in {"recetas", "producciones", "laboratorio"}
+    need_productions_page = page == "producciones"
+    need_orders_page = page == "pedidos"
+    need_receipts_page = page == "albaranes"
+    need_waste_page = page in {"mermas", "mermas_control"}
+    need_operativa_page = page == "operativa"
+    need_inicio_page = page == "inicio"
+    need_finanzas_page = page == "finanzas"
+
     rid_q = request.query_params.get("rid") or ""
     q_recipe = (request.query_params.get("q_recipe") or "").strip()
     new_q = request.query_params.get("new") or ""
@@ -1444,6 +1470,38 @@ def home(request: Request, center_id: Optional[int] = None):
     if page == "recetas" and new_q == "1":
         rid_q = ""
 
+    centers = []
+    warehouses = []
+    items = []
+    stocks = []
+    summary = {"centers": 0, "positions": 0, "below_min": 0}
+    recipes = []
+    suppliers = []
+    supplier_prices = []
+    users_rows = []
+    recipe_modifiers_admin = {"modifiers": [], "maps": [], "recipes": [], "items": [], "actions": [], "types": []}
+    production_stocks = []
+    production_recipe_groups = {}
+    inventory_ctx = {}
+    stock_groups = {
+        'fresh': [], 'frozen': [], 'dry': [], 'cleaning': [],
+        'unclassified': [], 'unlocated': [], 'current_all': [],
+    }
+    stock_section = 'fresh'
+    item_search = ''
+    items_pick = []
+    orders_json = []
+    receipts_json = []
+    waste_records = []
+    waste_control = {"days": 30, "total_records": 0, "confirmed_records": 0, "pending_records": 0, "total_loss": 0, "potential_loss": 0, "avg_loss": 0, "by_reason": [], "by_responsible": [], "by_center": [], "by_family": [], "top_items": [], "recent": []}
+    operational_queue = {"ORDER": [], "PRODUCTION": [], "WASTE": []}
+    ai_status = {"configured": False, "ai_mode": "local", "stt_mode": "local", "ai_model": "local", "status_label": "LOCAL / SIN IA EXTERNA", "warning": "No se pudo leer estado IA.", "openai_key_loaded": False, "deepgram_key_loaded": False}
+    warehouses_json = []
+    items_json = []
+    suppliers_json = []
+    supplier_prices_json = []
+    users_json = []
+
     # Dashboard global (needed early for pedidos/inventario helpers)
     # Catálogo/Admin debe cargar liviano: no hacemos CROSS JOIN stock x almacén x artículo
     # ni cálculos operativos que esta página no necesita. Las tablas grandes se cargan por API.
@@ -1454,17 +1512,73 @@ def home(request: Request, center_id: Optional[int] = None):
         warehouses = cur_light.execute("SELECT w.id,w.name,w.center_id,c.name center_name FROM warehouses w JOIN centers c ON c.id=w.center_id ORDER BY c.id,w.id").fetchall()
         items = cur_light.execute("SELECT *, COALESCE(stock_area,'') stock_area FROM items ORDER BY name COLLATE NOCASE LIMIT 60").fetchall()
         recipes = cur_light.execute("SELECT id,name,category,subcategory,is_subrecipe,produced_item_id,is_producible FROM recipes WHERE is_active=1 ORDER BY id LIMIT 120").fetchall()
+        suppliers = cur_light.execute("SELECT * FROM suppliers ORDER BY name").fetchall()
+        users_rows = cur_light.execute("SELECT id,name,role,center_id,is_active FROM users WHERE COALESCE(is_active,1)=1 ORDER BY CASE WHEN UPPER(TRIM(name))='ADMIN GENERAL' THEN 1 ELSE 0 END, name").fetchall()
+        try:
+            recipe_modifiers_admin = list_recipe_modifiers_admin(cur_light)
+        except Exception:
+            recipe_modifiers_admin = {"modifiers": [], "maps": [], "recipes": [], "items": [], "actions": [], "types": []}
         conn_light.close()
         stocks = []
         summary = {"centers": len(centers), "positions": 0, "below_min": 0}
+        warehouses_json = [{k: w[k] for k in w.keys()} for w in warehouses]
+        items_json = [{k: i[k] for k in i.keys()} for i in items]
+        suppliers_json = [{k: s[k] for k in s.keys()} for s in suppliers]
+        users_json = [{k: u[k] for k in u.keys()} for u in users_rows]
         _mark('get_dashboard_data_admin', t0)
-    else:
+        try:
+            ai_status = get_ai_status()
+        except Exception as _aiex:
+            print(f"AI_STATUS_SKIP reason={_aiex}")
+            ai_status = {"configured": False, "ai_mode": "local", "stt_mode": "local", "ai_model": "local", "status_label": "LOCAL / SIN IA EXTERNA", "warning": "No se pudo leer estado IA.", "openai_key_loaded": False, "deepgram_key_loaded": False}
+    elif page in {"stock", "inventario"}:
         t0 = time.time()
         centers, warehouses, items, stocks, summary, recipes = get_dashboard_data(center_id)
         _mark('get_dashboard_data', t0)
-    warehouses_json = [{k: w[k] for k in w.keys()} for w in warehouses]
-    # Producciones limpias para Producciones/Pedidos: no platos finales, no fotos, no ingredientes sueltos.
-    production_recipe_groups = {k: [] for k in ['frio','caliente','postres','salsas','guarniciones','bases','masas','pasteleria','porcionados','otros']}
+        t1 = time.time()
+        conn_light = db(); cur_light = conn_light.cursor(); ensure_columns(cur_light)
+        suppliers = cur_light.execute("SELECT * FROM suppliers ORDER BY name").fetchall()
+        conn_light.close()
+        warehouses_json = [{k: w[k] for k in w.keys()} for w in warehouses]
+        items_json = [{k: i[k] for k in i.keys()} for i in items]
+        suppliers_json = [{k: s[k] for k in s.keys()} for s in suppliers]
+        _mark('suppliers_query', t1)
+    else:
+        t0 = time.time()
+        conn_light = db(); cur_light = conn_light.cursor(); ensure_columns(cur_light)
+        centers = cur_light.execute("SELECT * FROM centers ORDER BY id").fetchall()
+        suppliers = cur_light.execute("SELECT * FROM suppliers ORDER BY name").fetchall()
+        if page in {"recetas", "producciones", "laboratorio", "pedidos", "albaranes", "mermas", "mermas_control"}:
+            items = cur_light.execute("SELECT *, COALESCE(stock_area,'') stock_area FROM items ORDER BY name COLLATE NOCASE").fetchall()
+        if page in {"recetas", "producciones", "laboratorio"}:
+            if center_id:
+                recipes = cur_light.execute(
+                    """SELECT * FROM recipes WHERE is_active=1
+                       AND (COALESCE(scope_global,1)=1 OR (',' || COALESCE(scope_centers,'') || ',') LIKE ('%,"" || ? || ",%'))
+                       ORDER BY id""",
+                    (int(center_id),),
+                ).fetchall()
+            else:
+                recipes = cur_light.execute("SELECT * FROM recipes WHERE is_active=1 ORDER BY id").fetchall()
+        if page in {"pedidos", "albaranes", "laboratorio", "admin", "inventario"}:
+            warehouses = cur_light.execute("SELECT w.id,w.name,w.center_id,c.name center_name FROM warehouses w JOIN centers c ON c.id=w.center_id ORDER BY c.id,w.id").fetchall()
+        if page in {"admin", "inventario", "laboratorio", "pedidos", "albaranes", "mermas", "mermas_control"}:
+            users_rows = cur_light.execute("SELECT id,name,role,center_id,is_active FROM users WHERE COALESCE(is_active,1)=1 ORDER BY CASE WHEN UPPER(TRIM(name))='ADMIN GENERAL' THEN 1 ELSE 0 END, name").fetchall()
+        conn_light.close()
+        warehouses_json = [{k: w[k] for k in w.keys()} for w in warehouses]
+        items_json = [{k: i[k] for k in i.keys()} for i in items]
+        suppliers_json = [{k: s[k] for k in s.keys()} for s in suppliers]
+        users_json = [{k: u[k] for k in u.keys()} for u in users_rows]
+        _mark('light_context', t0)
+        if page in {"admin", "operativa"}:
+            try:
+                ai_status = get_ai_status()
+            except Exception as _aiex:
+                print(f"AI_STATUS_SKIP reason={_aiex}")
+                ai_status = {"configured": False, "ai_mode": "local", "stt_mode": "local", "ai_model": "local", "status_label": "LOCAL / SIN IA EXTERNA", "warning": "No se pudo leer estado IA.", "openai_key_loaded": False, "deepgram_key_loaded": False}
+    if page != "admin":
+        supplier_prices = []
+        supplier_prices_json = []
     t0 = time.time()
     try:
         for _r in recipes:
@@ -2047,56 +2161,71 @@ def home(request: Request, center_id: Optional[int] = None):
         s = ''.join(ch for ch in s if not unicodedata.combining(ch))
         return s.lower().strip()
     stock_q_norm = _norm_stock_search(stock_q)
-    filtered_stocks = []
-    for s in stocks:
-        s['stock_area'] = normalize_stock_area(s.get('stock_area') or '')
-        s['stock_area_label'] = stock_area_label(s.get('stock_area'))
-        s['_search_norm'] = _norm_stock_search(s.get('item_name') or '')
-        inferred_family = _inventory_raw_family(s.get('item_name') or '', s.get('stock_area') or '')
-        s['inventory_raw_family'] = inferred_family
-        has_activity = bool((s.get('last_move_at') or '').strip()) or float(s.get('stock_qty') or 0) != 0
-        default_wh = _default_warehouse_name_for_stock_area(s.get('stock_area') or '')
-        wh_name_norm = _norm_warehouse_name(s.get('warehouse_name') or '')
-        default_norm = _norm_warehouse_name(default_wh or '')
-        preferred_names = _preferred_warehouse_names_for_raw_family(inferred_family)
-        keep = has_activity or not default_wh or wh_name_norm == default_norm
-        if preferred_names and wh_name_norm in preferred_names:
-            keep = True
-        if keep:
-            filtered_stocks.append(s)
-    stocks = filtered_stocks
-    stock_groups = {
-        'fresh': _collapse_stock_rows_for_operational_view(stocks, {'verduras','carnes','pescados','lacteos_huevos'}),
-        'frozen': _collapse_stock_rows_for_operational_view(stocks, {'congelados'}),
-        'dry': _collapse_stock_rows_for_operational_view(stocks, {'secos'}),
-        'cleaning': _collapse_stock_rows_for_operational_view(stocks, {'limpieza'}),
-        'unclassified': _collapse_stock_rows_for_operational_view([s for s in stocks if s.get('stock_area') == 'SIN_CLASIFICACION']),
-        'unlocated': _collapse_stock_rows_for_operational_view([s for s in stocks if not s.get('stock_area')]),
-        'current_all': _collapse_stock_rows_for_operational_view(stocks),
-    }
-    stock_section = (request.query_params.get('stock_section') or 'fresh').strip().lower()
-    if stock_section not in {'fresh', 'productions', 'frozen', 'dry', 'cleaning', 'unclassified', 'unlocated', 'current_all'}:
+
+    if need_stock_context:
+        filtered_stocks = []
+        for s in stocks:
+            s['stock_area'] = normalize_stock_area(s.get('stock_area') or '')
+            s['stock_area_label'] = stock_area_label(s.get('stock_area'))
+            s['_search_norm'] = _norm_stock_search(s.get('item_name') or '')
+            inferred_family = _inventory_raw_family(s.get('item_name') or '', s.get('stock_area') or '')
+            s['inventory_raw_family'] = inferred_family
+            has_activity = bool((s.get('last_move_at') or '').strip()) or float(s.get('stock_qty') or 0) != 0
+            default_wh = _default_warehouse_name_for_stock_area(s.get('stock_area') or '')
+            wh_name_norm = _norm_warehouse_name(s.get('warehouse_name') or '')
+            default_norm = _norm_warehouse_name(default_wh or '')
+            preferred_names = _preferred_warehouse_names_for_raw_family(inferred_family)
+            keep = has_activity or not default_wh or wh_name_norm == default_norm
+            if preferred_names and wh_name_norm in preferred_names:
+                keep = True
+            if keep:
+                filtered_stocks.append(s)
+        stocks = filtered_stocks
+        stock_groups = {
+            'fresh': _collapse_stock_rows_for_operational_view(stocks, {'verduras','carnes','pescados','lacteos_huevos'}),
+            'frozen': _collapse_stock_rows_for_operational_view(stocks, {'congelados'}),
+            'dry': _collapse_stock_rows_for_operational_view(stocks, {'secos'}),
+            'cleaning': _collapse_stock_rows_for_operational_view(stocks, {'limpieza'}),
+            'unclassified': _collapse_stock_rows_for_operational_view([s for s in stocks if s.get('stock_area') == 'SIN_CLASIFICACION']),
+            'unlocated': _collapse_stock_rows_for_operational_view([s for s in stocks if not s.get('stock_area')]),
+            'current_all': _collapse_stock_rows_for_operational_view(stocks),
+        }
+        stock_section = (request.query_params.get('stock_section') or 'fresh').strip().lower()
+        if stock_section not in {'fresh', 'productions', 'frozen', 'dry', 'cleaning', 'unclassified', 'unlocated', 'current_all'}:
+            stock_section = 'fresh'
+    else:
+        stock_groups = {
+            'fresh': [], 'frozen': [], 'dry': [], 'cleaning': [],
+            'unclassified': [], 'unlocated': [], 'current_all': [],
+        }
         stock_section = 'fresh'
 
-    t0 = time.time()
-    connps = db(); curps = connps.cursor()
-    production_stocks = get_production_stocks(curps, center_id if center_id else None)
-    connps.close()
-    _mark('get_production_stocks', t0)
+    if need_stock_context:
+        t0 = time.time()
+        connps = db(); curps = connps.cursor()
+        production_stocks = get_production_stocks(curps, center_id if center_id else None)
+        connps.close()
+        _mark('get_production_stocks', t0)
+    else:
+        production_stocks = []
 
-    t0 = time.time()
-    inventory_ctx = _build_inventory_context(
-        center_id=center_id or 0,
-        warehouses=warehouses,
-        stocks=stocks,
-        production_stocks=production_stocks,
-        request=request,
-    )
-    _mark('build_inventory_context', t0)
+    if need_inventory_context:
+        t0 = time.time()
+        inventory_ctx = _build_inventory_context(
+            center_id=center_id or 0,
+            warehouses=warehouses,
+            stocks=stocks,
+            production_stocks=production_stocks,
+            request=request,
+        )
+        _mark('build_inventory_context', t0)
 
-    item_search = (request.query_params.get("item_search") or "").strip()
-    ql = item_search.lower()
-    items_pick = [it for it in items_json if ql in (it.get("name") or "").lower()][:60] if ql else items_json[:60]
+    item_search = ''
+    items_pick = []
+    if need_admin_page:
+        item_search = (request.query_params.get("item_search") or "").strip()
+        ql = item_search.lower()
+        items_pick = [it for it in items_json if ql in (it.get("name") or "").lower()][:60] if ql else items_json[:60]
 
     # Proveedores y precios
     conn2 = db(); cur2 = conn2.cursor()

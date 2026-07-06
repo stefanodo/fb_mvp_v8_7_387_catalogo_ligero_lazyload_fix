@@ -1,7 +1,7 @@
 System MAC · Acceso móvil
 
 Mac:   http://127.0.0.1:8000
-Móvil: http://192.168.1.145:8000
+Móvil: http://192.168.1.131:8000
 Alt.:  http://Stefanos-Mac-mini.local:8000
 
 Mantén esta ventana de Terminal abierta.
