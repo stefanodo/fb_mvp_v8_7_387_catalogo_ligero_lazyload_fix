@@ -12,7 +12,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.gzip import GZipMiddleware
 from typing import Optional
 import sqlite3
 import re
@@ -157,8 +156,6 @@ class NoStoreMiddleware(BaseHTTPMiddleware):
 app.add_middleware(DBConnectionMiddleware)
 app.add_middleware(TimingMiddleware)
 app.add_middleware(NoStoreMiddleware)
-# Compress large HTML responses to reduce transfer time
-app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # --- Montar routers ---
 app.include_router(stock.router)
@@ -174,12 +171,6 @@ app.include_router(operativa.router)
 app.include_router(ai_system.router)
 app.include_router(recipe_ai_router.router)
 app.include_router(debug_index.router)
-# Lazy fragment endpoints (AJAX) — included after core routers
-try:
-    from app.routers.lazy_loads import router as lazy_loads_router
-    app.include_router(lazy_loads_router)
-except Exception:
-    pass
 
 # --- Archivos estáticos ---
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
@@ -197,12 +188,6 @@ templates.env.globals.update(
     preferred_price_unit=preferred_price_unit,
     ocr_state_label=_ocr_state_label,
 )
-try:
-    import jinja2
-    cache_dir = os.getenv('JINJA_BYTECODE_CACHE_DIR', '/tmp/jinja2_bytecode')
-    templates.env.bytecode_cache = jinja2.FileSystemBytecodeCache(cache_dir)
-except Exception:
-    pass
 
 
 def _normalize_search_text(value: str) -> str:

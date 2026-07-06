@@ -2,21 +2,4 @@
   {% include "partials/module_exit.html" %}
   {% include "partials/stock_actions.html" %}
   {% include "partials/stock_minmax.html" %}
-
-  <div id="stockLazyContainer">
-    <div class="loading">Cargando tabla de stock…</div>
-  </div>
-  <script>
-    (function(){
-      const center = {{ selected_center_id or 0 }};
-      function loadStockTable(){
-        if(window.lazyLoads && window.lazyLoads.loadFragment){
-          window.lazyLoads.loadFragment('/_lazy/stock_table?center_id=' + encodeURIComponent(center), 'stockLazyContainer');
-        } else {
-          window.addEventListener('load', loadStockTable);
-        }
-      }
-      loadStockTable();
-    })();
-  </script>
 </section>
