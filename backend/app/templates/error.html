@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Error · System MAC</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>body{display:flex;align-items:center;justify-content:center;height:100vh;background:#0f1114;color:#fff}.card{background:#1b1d22;padding:18px;border-radius:12px;max-width:820px;text-align:center}a.btn{display:inline-block;margin-top:12px;padding:8px 12px;background:#b68a2a;color:#fff;border-radius:8px;text-decoration:none}</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Error</h1>
+    <p class="muted">{{ message or 'Ha ocurrido un error. Intenta recargar la página.' }}</p>
+    <div>
+      <a class="btn" href="/">Ir al inicio</a>
+      <a class="btn" href="#" onclick="location.reload();return false;">Recargar</a>
+    </div>
+  </div>
+</body>
+</html>

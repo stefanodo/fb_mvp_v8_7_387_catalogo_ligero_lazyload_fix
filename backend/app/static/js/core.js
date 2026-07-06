@@ -225,18 +225,280 @@ function goPage(id){
   if(id === 'stock') loadElaborados();
 }
 
-document.querySelectorAll('.nav-btn').forEach(btn=>btn.addEventListener('click', ()=>goPage(btn.dataset.target)));
+// Navigation interception + HTML-fetch fallback
+// - If the target section exists in the current DOM, use the fast show/hide `goPage`.
+// - Otherwise, fetch the full HTML for the target URL and swap the main `.container` content.
+const __prefetchHtmlCache = new Map();
+const __SPA_FETCH_TIMEOUT = 8000; // ms
+
+function _showSpaLoader(){
+  try{
+    let el = document.getElementById('spa-loading-overlay');
+    if(!el){
+      el = document.createElement('div'); el.id = 'spa-loading-overlay';
+      el.style.position='fixed'; el.style.left=0; el.style.top=0; el.style.right=0; el.style.bottom=0; el.style.background='rgba(0,0,0,0.12)'; el.style.zIndex=99999; el.style.display='flex'; el.style.alignItems='center'; el.style.justifyContent='center';
+      el.innerHTML = '<div style="padding:12px 18px;border-radius:10px;background:#111;color:#fff;font-weight:600;">Cargando…</div>';
+      document.body.appendChild(el);
+    }
+    el.style.display='flex';
+  }catch(_){ }
+}
+function _hideSpaLoader(){ try{ const el=document.getElementById('spa-loading-overlay'); if(el) el.style.display='none'; }catch(_){ } }
+
+async function fetchAndNavigate(href, {replace=false} = {}){
+  try{
+    if(!href) return false;
+    const url = new URL(href, window.location.href).toString();
+    // Only same-origin navigation is supported by this fallback
+    if(new URL(url).origin !== window.location.origin) return false;
+
+    let html = __prefetchHtmlCache.get(url);
+    if(!html){
+      _showSpaLoader();
+      const ac = new AbortController();
+      const tid = setTimeout(()=>ac.abort(), __SPA_FETCH_TIMEOUT);
+      let res;
+      try{
+        res = await fetch(url, {credentials: 'same-origin', headers: {'Accept':'text/html'}, signal: ac.signal});
+      }catch(err){
+        clearTimeout(tid); _hideSpaLoader();
+        // network error or timeout: fallback to full navigation to show server error page
+        window.location.href = url; return false;
+      }
+      clearTimeout(tid);
+      _hideSpaLoader();
+      if(!res.ok){
+        // server returned error (500/404) — fallback to full navigation so server can render diagnostic page
+        window.location.href = url; return false;
+      }
+      html = await res.text();
+      // store a short-lived cache to speed repeat navigations
+      __prefetchHtmlCache.set(url, html);
+      // keep cache small (10 entries)
+      if(__prefetchHtmlCache.size > 10){ const k = __prefetchHtmlCache.keys().next().value; __prefetchHtmlCache.delete(k); }
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const newContainer = doc.querySelector('.container');
+    const curContainer = document.querySelector('.container');
+    if(!newContainer || !curContainer) {
+      // fallback to full navigation
+      window.location.href = url;
+      return false;
+    }
+
+    // update document title
+    try{ const t = doc.querySelector('title'); if(t) document.title = t.textContent || document.title; }catch(_){ }
+
+    // replace main content
+    curContainer.innerHTML = newContainer.innerHTML;
+    // remove inert <script> tags added by innerHTML (they don't execute) to avoid duplicates
+    try{ curContainer.querySelectorAll('script').forEach(s=>s.parentNode && s.parentNode.removeChild(s)); }catch(_){ }
+
+    // update body page marker
+    try{ const newPage = doc.body && doc.body.dataset && doc.body.dataset.page; if(newPage) document.body.dataset.page = newPage; }catch(_){ }
+
+    // update nav active states
+    try{
+      const currentPage = document.body.dataset.page || new URL(url).searchParams.get('page') || '';
+      document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(b=>b.classList.toggle('active', (b.dataset.target||'')===currentPage));
+    }catch(_){ }
+
+    // copy/append page-specific CSS from fetched doc head
+    try{
+      const links = Array.from(doc.querySelectorAll('link[rel="stylesheet"][href]'));
+      const existing = new Set(Array.from(document.querySelectorAll('link[rel="stylesheet"][href]')).map(l=>new URL(l.getAttribute('href'), location.href).toString()));
+      links.forEach(l=>{
+        try{
+          const href = new URL(l.getAttribute('href'), location.href).toString();
+          if(!existing.has(href)){
+            const nl = document.createElement('link'); nl.rel='stylesheet'; nl.href = href; document.head.appendChild(nl);
+            existing.add(href);
+          }
+        }catch(_){ }
+      });
+    }catch(_){ }
+
+    // execute inline scripts and load external scripts found inside new container
+    try{
+      const scripts = Array.from(newContainer.querySelectorAll('script'));
+      for(const s of scripts){
+        try{
+          if(s.src){
+            const src = new URL(s.getAttribute('src'), url).toString();
+            // skip core framework scripts (already loaded)
+            if(/\/static\/js\/(core|ui|voice_assistant)(\.js)?/.test(src)) continue;
+            // avoid reloading same dynamic script twice
+            if(document.querySelector(`script[src="${src}"]`) && document.querySelector(`script[src="${src}"]`).getAttribute('data-dynamic-loaded')==='1') continue;
+            const ns = document.createElement('script'); ns.src = src; ns.async = false; ns.setAttribute('data-dynamic-loaded','1'); document.body.appendChild(ns);
+            await new Promise(res=>ns.addEventListener('load', res));
+          } else {
+            // inline script: run it by creating a new script element
+            const ni = document.createElement('script'); ni.textContent = s.textContent || s.innerText || '';
+            document.body.appendChild(ni);
+            // remove to avoid duplicates
+            ni.parentNode && ni.parentNode.removeChild(ni);
+          }
+        }catch(_){ }
+      }
+    }catch(_){ }
+
+    // also run any top-level scripts from the fetched page head (e.g. window.* assignments)
+    try{
+      const headScripts = Array.from(doc.head.querySelectorAll('script'));
+      for(const hs of headScripts){
+        try{
+          if(!hs.src){ const ni = document.createElement('script'); ni.textContent = hs.textContent || hs.innerText || ''; document.head.appendChild(ni); ni.parentNode && ni.parentNode.removeChild(ni); }
+        }catch(_){ }
+      }
+    }catch(_){ }
+
+    // copy meta refresh from fetched document (e.g. pages that auto-refresh)
+    try{
+      const refreshMeta = doc.head.querySelector('meta[http-equiv="refresh"]');
+      if(refreshMeta){
+        // remove existing meta refresh
+        Array.from(document.head.querySelectorAll('meta[http-equiv="refresh"]')).forEach(m=>m.parentNode && m.parentNode.removeChild(m));
+        const nm = document.createElement('meta'); nm.setAttribute('http-equiv','refresh'); if(refreshMeta.content) nm.setAttribute('content', refreshMeta.content); document.head.appendChild(nm);
+      }
+    }catch(_){ }
+
+    // small list of known initializers to call after DOM swap
+    try{ if(typeof initFlowPreserver === 'function') initFlowPreserver(); }catch(_){ }
+    try{ if(typeof bindOcrAmountCalc === 'function') bindOcrAmountCalc(); }catch(_){ }
+    try{ if(typeof bindItemAutocomplete === 'function') bindItemAutocomplete(); }catch(_){ }
+    try{ if(typeof renderSuppliers === 'function') renderSuppliers(); }catch(_){ }
+    try{ if(typeof renderSupplierPrices === 'function') renderSupplierPrices(); }catch(_){ }
+    try{ if(typeof initAdminPriceUI === 'function') initAdminPriceUI(); }catch(_){ }
+    try{ if(typeof wireAdminQuickFilters === 'function') wireAdminQuickFilters(); }catch(_){ }
+
+    // update history
+    try{ if(replace) history.replaceState({}, '', url); else history.pushState({}, '', url); }catch(_){ }
+
+    // scroll to top for new pages
+    try{ window.scrollTo({top:0, behavior:'auto'}); }catch(_){ }
+
+    return true;
+  }catch(e){ return false; }
+}
+
+// Navigation click handler uses goPage for in-DOM pages, otherwise fetches and swaps HTML
+document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn => btn.addEventListener('click', function (e) {
+  try{
+    const href = btn.getAttribute('href');
+    const target = btn.dataset.target || (href ? (new URL(href, window.location.href).searchParams.get('page')) : null);
+    if(!target){ return; }
+
+    // if the target exists in current DOM, use the fast switch
+    if(document.getElementById(target)){
+      e.preventDefault();
+      try { if (href) { const hrefUrl = new URL(href, window.location.href); const cur = new URL(window.location.href); hrefUrl.searchParams.forEach((v,k)=>cur.searchParams.set(k,v)); history.replaceState({}, '', cur.toString()); } }catch(_){ }
+      try{ if (typeof closeMobileMenu === 'function') closeMobileMenu(); }catch(_){ }
+      goPage(target);
+      return;
+    }
+
+    // otherwise fetch page HTML and swap
+    e.preventDefault();
+    try{ if (typeof closeMobileMenu === 'function') closeMobileMenu(); }catch(_){ }
+    if(href){ fetchAndNavigate(href); }
+  }catch(_){ }
+}));
+
+// --- Lightweight prefetch on hover / touch to warm server and CDN
+(function(){
+  // small prefetch that stores HTML in __prefetchHtmlCache
+  document.querySelectorAll('.nav-btn, .mobile-nav-btn').forEach(btn=>{
+    const href = btn.getAttribute && btn.getAttribute('href');
+    if(!href) return;
+    const prefetch = async ()=>{
+      try{
+        const url = new URL(href, window.location.href).toString();
+        if(__prefetchHtmlCache.has(url)) return;
+        const res = await fetch(url, {credentials:'same-origin', headers:{'Accept':'text/html'}});
+        if(!res.ok) return;
+        const txt = await res.text();
+        __prefetchHtmlCache.set(url, txt);
+        if(__prefetchHtmlCache.size>12){ const k=__prefetchHtmlCache.keys().next().value; __prefetchHtmlCache.delete(k); }
+      }catch(_){ }
+    };
+    btn.addEventListener('mouseover', prefetch, {passive:true});
+    btn.addEventListener('touchstart', prefetch, {passive:true});
+  });
+
+  document.addEventListener('DOMContentLoaded', ()=>{
+    try{
+      const current = window.location.href;
+      ['stock','recetas','producciones'].forEach(pageName=>{
+        const a = document.querySelector(`.nav-btn[data-target="${pageName}"]`);
+        if(a){ const href=a.getAttribute('href'); if(href && href !== current) { fetch(href, {credentials:'same-origin', headers:{'Accept':'text/html'}}).then(r=>r.text()).then(t=>__prefetchHtmlCache.set(new URL(href,location.href).toString(), t)).catch(()=>{}); } }
+      });
+    }catch(_){ }
+  });
+})();
+
+// handle browser back/forward
+window.addEventListener('popstate', function(){
+  try{ fetchAndNavigate(location.href, {replace:true}); }catch(_){ }
+});
 
 // preserve current page when changing center
 on('globalCenterFilter','change',(e)=>{
   const url=new URL(window.location.href);
   if(e.target.value==='0') url.searchParams.delete('center_id'); else url.searchParams.set('center_id', e.target.value);
   if(!url.searchParams.get('page')) url.searchParams.set('page', document.querySelector('.nav-btn.active')?.dataset.target || 'inicio');
-  window.location.href=url.toString();
+  // use SPA navigation where possible
+  try{ fetchAndNavigate(url.toString()); }catch(_){ window.location.href=url.toString(); }
 });
 
 // initial page from URL
 try{const p=new URL(window.location.href).searchParams.get('page'); if(p) goPage(p);}catch(e){}
+
+// Intercept same-origin form submissions to progressively handle via fetch
+document.addEventListener('submit', function(e){
+  const form = e.target;
+  if(!form || !form.action) return; // not a form
+  try{
+    const action = new URL(form.action, window.location.href);
+    if(action.origin !== window.location.origin) return; // external
+    // do not intercept if form has file inputs
+    if(form.querySelector('input[type="file"]')) return;
+    // allow opt-out via data-no-spa
+    if(form.hasAttribute('data-no-spa')) return;
+
+    // build fetch options
+    const method = (form.method || 'GET').toUpperCase();
+    if(method === 'GET'){
+      e.preventDefault();
+      const params = new URLSearchParams(new FormData(form));
+      const url = action.pathname + (params.toString() ? ('?' + params.toString()) : '');
+      fetchAndNavigate(url);
+      return;
+    }
+
+    // POST (non-file) -> send as form data and expect HTML back
+    e.preventDefault();
+    const fd = new FormData(form);
+    fetch(action.toString(), {method:'POST', credentials:'same-origin', body: fd, headers: {'X-Requested-With':'XMLHttpRequest', 'Accept':'text/html'}})
+      .then(async res => {
+        if(res.headers.get('content-type') && res.headers.get('content-type').includes('application/json')){
+          // JSON response - call default handler if present, else reload
+          const js = await res.json().catch(()=>null);
+          if(js && js.ok && js.redirect){ return fetchAndNavigate(js.redirect); }
+          // if JSON indicates success but no redirect, fallback to reload
+          window.location.reload();
+          return;
+        }
+        // assume HTML
+        const html = await res.text();
+        // place HTML into cache and navigate to the action URL
+        __prefetchHtmlCache.set(action.toString(), html);
+        fetchAndNavigate(action.toString());
+      }).catch(()=>{ form.submit(); });
+  }catch(_){ }
+});
 
 const mvCenter=document.getElementById('mv_center'); const mvWh=document.getElementById('mv_warehouse');
 function refreshWarehouses(){const cid=Number(mvCenter.value); mvWh.innerHTML=''; WAREHOUSES.filter(w=>w.center_id===cid).forEach(w=>{const o=document.createElement('option');o.value=w.id;o.textContent=w.name;mvWh.appendChild(o);});}

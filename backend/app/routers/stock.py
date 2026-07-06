@@ -10,6 +10,9 @@ from datetime import datetime
 import sqlite3
 import unicodedata
 from urllib.parse import quote_plus
+import time
+import threading
+import os
 
 from app.core import (
     db, _retry_db_write, _parse_float, _resolve_item_id,
@@ -22,6 +25,28 @@ from app.services.stock_queries_service import resolve_item_id_strict, stock_pag
 from app.services.orders_service import classify_order_fresh_group, item_matches_order_filters
 
 router = APIRouter()
+
+# Simple in-memory TTL cache for production stocks (keyed by center_id)
+_PRODUCTION_STOCKS_CACHE: dict = {}
+_PRODUCTION_STOCKS_CACHE_LOCK = threading.Lock()
+# seconds; override with env var PRODUCTION_STOCKS_CACHE_TTL
+_PRODUCTION_STOCKS_CACHE_TTL = int(os.getenv('PRODUCTION_STOCKS_CACHE_TTL', '30'))
+
+
+def clear_production_stocks_cache(center_id: int | None = None):
+    """Clear cached /api/elaborados entries. If center_id is provided,
+    only clears that key; otherwise clears all.
+    """
+    try:
+        with _PRODUCTION_STOCKS_CACHE_LOCK:
+            if center_id is None:
+                _PRODUCTION_STOCKS_CACHE.clear()
+            else:
+                k = f"center:{int(center_id or 0)}"
+                if k in _PRODUCTION_STOCKS_CACHE:
+                    del _PRODUCTION_STOCKS_CACHE[k]
+    except Exception:
+        pass
 
 
 def _norm_search_text(value: str) -> str:
@@ -115,6 +140,11 @@ def _create_movement_internal(center_id, warehouse_id, item_id, movement_type, q
         res = create_stock_movement(cur, center_id, warehouse_id, item_id, movement_type, qty_value, qty_unit, note)
         if res.get('ok'):
             conn.commit()
+            try:
+                # Invalidate cached production stocks since movements may affect reported stock
+                clear_production_stocks_cache(center_id)
+            except Exception:
+                pass
             return res
         return JSONResponse({'ok': False, 'error': res.get('error', 'Error')}, status_code=res.get('_status', 400))
     finally:
@@ -271,10 +301,32 @@ def search_items(q: str = "", limit: int = 50, block: str = "", fresh_group: str
 @router.get("/api/elaborados")
 def api_elaborados(center_id: int = 0):
     """Devuelve el stock de elaborados con porciones calculadas."""
+    key = f"center:{int(center_id or 0)}"
+    now = time.time()
     try:
+        # check cache first
+        with _PRODUCTION_STOCKS_CACHE_LOCK:
+            entry = _PRODUCTION_STOCKS_CACHE.get(key)
+            if entry:
+                ts, payload = entry
+                if now - ts < _PRODUCTION_STOCKS_CACHE_TTL:
+                    print(f"TIMING api_elaborados center={center_id} cached=1 ttl={_PRODUCTION_STOCKS_CACHE_TTL}")
+                    return {"ok": True, "elaborados": payload}
+
+        t0 = time.time()
         conn = db(); cur = conn.cursor()
         data = get_production_stocks(cur, center_id if center_id else None)
         conn.close()
+        elapsed = time.time() - t0
+
+        # cache result (thread-safe)
+        try:
+            with _PRODUCTION_STOCKS_CACHE_LOCK:
+                _PRODUCTION_STOCKS_CACHE[key] = (time.time(), data)
+        except Exception:
+            pass
+
+        print(f"TIMING api_elaborados center={center_id} cached=0 elapsed={elapsed:.3f}s")
         return {"ok": True, "elaborados": data}
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)

@@ -153,6 +153,15 @@ def production_confirm_form(production_id: int):
         conn.close()
         return _production_detail_redirect(production_id, err=1)
     conn.commit(); conn.close()
+    # invalidate production stocks cache (some productions create stock movements)
+    try:
+        import app.routers.stock as stock_router
+        try:
+            stock_router.clear_production_stocks_cache(result.get('center_id'))
+        except Exception:
+            stock_router.clear_production_stocks_cache()
+    except Exception:
+        pass
     return _production_detail_redirect(production_id, center_id=result['center_id'], ok=1)
 
 

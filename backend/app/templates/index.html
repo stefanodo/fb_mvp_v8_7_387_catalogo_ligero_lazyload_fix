@@ -56,19 +56,19 @@
 
   <!-- Nav desktop — siempre visible en pantallas grandes -->
   <nav class="nav" id="desktopNav">
-    <a class="nav-btn {% if page=='inicio' %}active{% endif %}" href="/?page=inicio&center_id={{selected_center_id}}">🏠 Inicio</a>
-    <a class="nav-btn {% if page=='finanzas' %}active{% endif %}" href="/?page=finanzas&center_id={{selected_center_id}}">💼 Finanzas</a>
-    <a class="nav-btn {% if page=='operativa' %}active{% endif %}" href="/?page=operativa&center_id={{selected_center_id}}">🎧 OÍDO ALFI</a>
-    <a class="nav-btn {% if page=='stock' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}">📦 Stock</a>
-    <a class="nav-btn {% if page=='inventario' %}active{% endif %}" href="/?page=inventario&center_id={{selected_center_id}}">🧮 Inventario</a>
-    <a class="nav-btn {% if page=='recetas' %}active{% endif %}" href="/?page=recetas&center_id={{selected_center_id}}">📋 Recetas</a>
-    <a class="nav-btn {% if page=='producciones' %}active{% endif %}" href="/?page=producciones&center_id={{selected_center_id}}">🍳 Producciones</a>
-    <a class="nav-btn {% if page=='pedidos' %}active{% endif %}" href="/?page=pedidos&center_id={{selected_center_id}}">🛒 Pedidos</a>
-    <a class="nav-btn {% if page=='albaranes' %}active{% endif %}" href="/?page=albaranes&center_id={{selected_center_id}}">🧾 Albaranes</a>
-    <a class="nav-btn {% if page=='mermas' %}active{% endif %}" href="/?page=mermas&center_id={{selected_center_id}}">🗑️ Mermas</a>
-    <a class="nav-btn {% if page=='mermas_control' %}active{% endif %}" href="/?page=mermas_control&center_id={{selected_center_id}}">📊 Control</a>
-    <a class="nav-btn {% if page=='admin' %}active{% endif %}" href="/?page=admin&center_id={{selected_center_id}}">🗂 Catálogo</a>
-    <a class="nav-btn {% if page=='laboratorio' %}active{% endif %}" href="/?page=laboratorio&center_id=0">🔬 Laboratorio</a>
+    <a class="nav-btn {% if page=='inicio' %}active{% endif %}" data-target="inicio" href="/?page=inicio&center_id={{selected_center_id}}">🏠 Inicio</a>
+    <a class="nav-btn {% if page=='finanzas' %}active{% endif %}" data-target="finanzas" href="/?page=finanzas&center_id={{selected_center_id}}">💼 Finanzas</a>
+    <a class="nav-btn {% if page=='operativa' %}active{% endif %}" data-target="operativa" href="/?page=operativa&center_id={{selected_center_id}}">🎧 OÍDO ALFI</a>
+    <a class="nav-btn {% if page=='stock' %}active{% endif %}" data-target="stock" href="/?page=stock&center_id={{selected_center_id}}">📦 Stock</a>
+    <a class="nav-btn {% if page=='inventario' %}active{% endif %}" data-target="inventario" href="/?page=inventario&center_id={{selected_center_id}}">🧮 Inventario</a>
+    <a class="nav-btn {% if page=='recetas' %}active{% endif %}" data-target="recetas" href="/?page=recetas&center_id={{selected_center_id}}">📋 Recetas</a>
+    <a class="nav-btn {% if page=='producciones' %}active{% endif %}" data-target="producciones" href="/?page=producciones&center_id={{selected_center_id}}">🍳 Producciones</a>
+    <a class="nav-btn {% if page=='pedidos' %}active{% endif %}" data-target="pedidos" href="/?page=pedidos&center_id={{selected_center_id}}">🛒 Pedidos</a>
+    <a class="nav-btn {% if page=='albaranes' %}active{% endif %}" data-target="albaranes" href="/?page=albaranes&center_id={{selected_center_id}}">🧾 Albaranes</a>
+    <a class="nav-btn {% if page=='mermas' %}active{% endif %}" data-target="mermas" href="/?page=mermas&center_id={{selected_center_id}}">🗑️ Mermas</a>
+    <a class="nav-btn {% if page=='mermas_control' %}active{% endif %}" data-target="mermas_control" href="/?page=mermas_control&center_id={{selected_center_id}}">📊 Control</a>
+    <a class="nav-btn {% if page=='admin' %}active{% endif %}" data-target="admin" href="/?page=admin&center_id={{selected_center_id}}">🗂 Catálogo</a>
+    <a class="nav-btn {% if page=='laboratorio' %}active{% endif %}" data-target="laboratorio" href="/?page=laboratorio&center_id=0">🔬 Laboratorio</a>
     <a class="nav-btn nav-btn-ia" href="/recipe-ai/ui">🤖 IA Recetas</a>
   </nav>
 
@@ -110,19 +110,19 @@
     </div>
     {% endif %}
     <nav class="mobile-nav">
-      <a class="mobile-nav-btn {% if page=='inicio' %}active{% endif %}" href="/?page=inicio&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🏠<span>Inicio</span></a>
-      <a class="mobile-nav-btn {% if page=='finanzas' %}active{% endif %}" href="/?page=finanzas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">💼<span>Finanzas</span></a>
-      <a class="mobile-nav-btn {% if page=='operativa' %}active{% endif %}" href="/?page=operativa&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🎧<span>OÍDO ALFI</span></a>
-      <a class="mobile-nav-btn {% if page=='stock' %}active{% endif %}" href="/?page=stock&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📦<span>Stock</span></a>
-      <a class="mobile-nav-btn {% if page=='inventario' %}active{% endif %}" href="/?page=inventario&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🧮<span>Inventario</span></a>
-      <a class="mobile-nav-btn {% if page=='recetas' %}active{% endif %}" href="/?page=recetas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📋<span>Recetas</span></a>
-      <a class="mobile-nav-btn {% if page=='producciones' %}active{% endif %}" href="/?page=producciones&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🍳<span>Producciones</span></a>
-      <a class="mobile-nav-btn {% if page=='pedidos' %}active{% endif %}" href="/?page=pedidos&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🛒<span>Pedidos</span></a>
-      <a class="mobile-nav-btn {% if page=='albaranes' %}active{% endif %}" href="/?page=albaranes&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🧾<span>Albaranes</span></a>
-      <a class="mobile-nav-btn {% if page=='mermas' %}active{% endif %}" href="/?page=mermas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🗑️<span>Mermas</span></a>
-      <a class="mobile-nav-btn {% if page=='mermas_control' %}active{% endif %}" href="/?page=mermas_control&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📊<span>Control</span></a>
-      <a class="mobile-nav-btn {% if page=='admin' %}active{% endif %}" href="/?page=admin&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🗂<span>Catálogo</span></a>
-      <a class="mobile-nav-btn {% if page=='laboratorio' %}active{% endif %}" href="/?page=laboratorio&center_id=0" onclick="closeMobileMenu()">🔬<span>Laboratorio</span></a>
+      <a class="mobile-nav-btn {% if page=='inicio' %}active{% endif %}" data-target="inicio" href="/?page=inicio&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🏠<span>Inicio</span></a>
+      <a class="mobile-nav-btn {% if page=='finanzas' %}active{% endif %}" data-target="finanzas" href="/?page=finanzas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">💼<span>Finanzas</span></a>
+      <a class="mobile-nav-btn {% if page=='operativa' %}active{% endif %}" data-target="operativa" href="/?page=operativa&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🎧<span>OÍDO ALFI</span></a>
+      <a class="mobile-nav-btn {% if page=='stock' %}active{% endif %}" data-target="stock" href="/?page=stock&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📦<span>Stock</span></a>
+      <a class="mobile-nav-btn {% if page=='inventario' %}active{% endif %}" data-target="inventario" href="/?page=inventario&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🧮<span>Inventario</span></a>
+      <a class="mobile-nav-btn {% if page=='recetas' %}active{% endif %}" data-target="recetas" href="/?page=recetas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📋<span>Recetas</span></a>
+      <a class="mobile-nav-btn {% if page=='producciones' %}active{% endif %}" data-target="producciones" href="/?page=producciones&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🍳<span>Producciones</span></a>
+      <a class="mobile-nav-btn {% if page=='pedidos' %}active{% endif %}" data-target="pedidos" href="/?page=pedidos&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🛒<span>Pedidos</span></a>
+      <a class="mobile-nav-btn {% if page=='albaranes' %}active{% endif %}" data-target="albaranes" href="/?page=albaranes&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🧾<span>Albaranes</span></a>
+      <a class="mobile-nav-btn {% if page=='mermas' %}active{% endif %}" data-target="mermas" href="/?page=mermas&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🗑️<span>Mermas</span></a>
+      <a class="mobile-nav-btn {% if page=='mermas_control' %}active{% endif %}" data-target="mermas_control" href="/?page=mermas_control&center_id={{selected_center_id}}" onclick="closeMobileMenu()">📊<span>Control</span></a>
+      <a class="mobile-nav-btn {% if page=='admin' %}active{% endif %}" data-target="admin" href="/?page=admin&center_id={{selected_center_id}}" onclick="closeMobileMenu()">🗂<span>Catálogo</span></a>
+      <a class="mobile-nav-btn {% if page=='laboratorio' %}active{% endif %}" data-target="laboratorio" href="/?page=laboratorio&center_id=0" onclick="closeMobileMenu()">🔬<span>Laboratorio</span></a>
       <a class="mobile-nav-btn mobile-nav-ia" href="/recipe-ai/ui" onclick="closeMobileMenu()">🤖<span>IA Recetas</span></a>
     </nav>
   </div>

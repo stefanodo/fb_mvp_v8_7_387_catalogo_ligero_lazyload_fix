@@ -44,6 +44,7 @@ from app.core import (
     # Limpieza startup
     _clear_pending_receipts_runtime,
 )
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # --- Routers ---
 from app.productions_panel import create_batch_productions
@@ -461,6 +462,44 @@ def _is_likely_final_dish(name: str = '', category: str = '', subcategory: str =
     if any(h in n for h in _FINAL_DISH_HINTS) and not any(k in n for k in ['pico de gallo','patatas fritas','fumet','caldo','fondo','salsa','pure','puré']):
         return True
     return False
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Return friendly HTML for 404s to avoid white pages and support SPA deep links.
+
+    For HTML accept headers we attempt to render the main `home` page; if that fails
+    we show a minimal error page. For non-HTML clients we return JSON.
+    """
+    accept = (request.headers.get('accept') or '').lower()
+    if exc.status_code == 404 and 'text/html' in accept:
+        try:
+            return home(request)
+        except Exception:
+            return templates.TemplateResponse('error.html', {'request': request, 'message': 'Página no encontrada (404).'}, status_code=200)
+    # default JSON
+    try:
+        return JSONResponse({'ok': False, 'error': str(exc.detail or str(exc))}, status_code=exc.status_code)
+    except Exception:
+        return JSONResponse({'ok': False, 'error': 'Not Found'}, status_code=exc.status_code)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    try:
+        import traceback as _tb
+        print(f"[error] Unhandled exception for {request.url.path}: {exc}")
+        print(_tb.format_exc())
+    except Exception:
+        pass
+    accept = (request.headers.get('accept') or '').lower()
+    if 'text/html' in accept:
+        # Render a friendly error page instead of a blank response
+        try:
+            return templates.TemplateResponse('error.html', {'request': request, 'message': 'Error interno del servidor. Intenta recargar la página.'}, status_code=500)
+        except Exception:
+            return HTMLResponse('<h1>Internal Server Error</h1><p>Please try again later.</p>', status_code=500)
+    return JSONResponse({'ok': False, 'error': str(exc)}, status_code=500)
 
 def _is_clean_production_candidate(name: str = '', category: str = '', subcategory: str = '', is_subrecipe=0, produced_item_id=0, explicit_producible=0) -> bool:
     n = _norm_ascii(name)
