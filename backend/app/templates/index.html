@@ -177,6 +177,7 @@ window.SUPPLIERS = {{ suppliers|tojson }};
 window.SUPPLIER_PRICES = {% if page == 'admin' %}[]{% else %}{{ supplier_prices|tojson }}{% endif %};
 </script>
 <script src="/static/js/core.js?v={{build_id}}"></script>
+<script src="/static/js/lazy_loads.js?v={{build_id}}"></script>
 <script src="/static/js/voice_assistant.js?v={{build_id}}"></script>
 {% if page == 'producciones' %}<script src="/static/js/producciones.js?v={{build_id}}"></script>{% endif %}
 {% if page == 'recetas' %}<script src="/static/js/recetas.js?v={{build_id}}"></script>{% endif %}
